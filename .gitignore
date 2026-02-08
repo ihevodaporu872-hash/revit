@@ -1,2 +1,16 @@
 node_modules/
+dist/
 .env
+uploads/
+*.log
+.DS_Store
+Thumbs.db
+nul
+
+# DDC source repositories (external dependencies, not part of Jens app)
+123/
+DDC_Skills_for_AI_Agents_in_Construction/
+cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto/
+CAD-BIM-to-Code-Automation-Pipeline-DDC-Workflow-with-LLM-ChatGPT/
+OpenConstructionEstimate-DDC-CWICR/
+Project-management-n8n-with-task-management-and-photo-reports/
