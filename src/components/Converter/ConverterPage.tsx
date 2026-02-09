@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileOutput,
   CheckCircle2,
@@ -24,6 +25,15 @@ import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { formatDate } from '../../lib/utils'
 import { MotionPage } from '../MotionPage'
+import {
+  staggerContainer,
+  fadeInUp,
+  scaleIn,
+  cardHover,
+  listItem,
+  modalOverlay,
+  modalContent,
+} from '../../lib/animations'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -213,11 +223,13 @@ export default function ConverterPage() {
     { key: 'progress', header: 'Progress', render: (j: ConversionJob) => (
       <div className="w-32">
         <div className="h-2 bg-muted rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${
-              j.status === 'failed' ? 'bg-danger' : j.status === 'completed' ? 'bg-success' : 'bg-primary'
+          <motion.div
+            className={`h-full rounded-full ${
+              j.status === 'failed' ? 'bg-destructive' : j.status === 'completed' ? 'bg-success' : 'bg-primary'
             }`}
-            style={{ width: `${j.progress}%` }}
+            initial={{ width: 0 }}
+            animate={{ width: `${j.progress}%` }}
+            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
           />
         </div>
       </div>
@@ -241,7 +253,7 @@ export default function ConverterPage() {
           </>
         )}
         {j.status === 'failed' && j.error && (
-          <span className="text-xs text-danger flex items-center gap-1">
+          <span className="text-xs text-destructive flex items-center gap-1">
             <AlertCircle size={12} /> {j.error}
           </span>
         )}
@@ -282,12 +294,25 @@ export default function ConverterPage() {
         </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Files Converted" value={totalConverted} icon={FileOutput} color="primary" trend={{ value: 12, label: 'this week' }} />
-        <StatCard label="Success Rate" value={`${successRate}%`} icon={CheckCircle2} color="success" />
-        <StatCard label="Avg Time" value="1m 48s" icon={Clock} color="warning" />
-        <StatCard label="Formats" value={formatsUsed} icon={BarChart3} color="primary" />
-      </div>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Files Converted" value={totalConverted} icon={FileOutput} color="primary" trend={{ value: 12, label: 'this week' }} />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Success Rate" value={`${successRate}%`} icon={CheckCircle2} color="success" />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Avg Time" value="1m 48s" icon={Clock} color="warning" />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Formats" value={formatsUsed} icon={BarChart3} color="primary" />
+        </motion.div>
+      </motion.div>
 
       {/* Main Content */}
       <Tabs tabs={tabs} defaultTab="convert">
@@ -298,7 +323,7 @@ export default function ConverterPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* File Upload - spans 2 cols */}
                 <div className="lg:col-span-2">
-                  <Card title="Upload Files" subtitle="Supports batch upload of CAD/BIM files">
+                  <Card title="Upload Files" subtitle="Supports batch upload of CAD/BIM files" hover>
                     <FileUpload
                       accept=".rvt,.ifc,.dwg,.dgn"
                       multiple
@@ -311,12 +336,14 @@ export default function ConverterPage() {
                 </div>
 
                 {/* Format Selection */}
-                <Card title="Output Format" subtitle="Select target format">
+                <Card title="Output Format" subtitle="Select target format" hover>
                   <div className="space-y-3">
                     {FORMAT_OPTIONS.map((fmt) => (
-                      <button
+                      <motion.button
                         key={fmt.id}
                         onClick={() => setOutputFormat(fmt.id)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
                           outputFormat === fmt.id
                             ? 'border-primary bg-primary/10'
@@ -330,7 +357,7 @@ export default function ConverterPage() {
                           <p className="font-medium text-sm text-foreground">{fmt.label}</p>
                           <p className="text-xs text-muted-foreground">{fmt.description}</p>
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
 
@@ -356,6 +383,7 @@ export default function ConverterPage() {
                 <Card
                   title="Conversion Queue"
                   subtitle={`${jobs.filter((j) => j.status === 'converting').length} active, ${jobs.filter((j) => j.status === 'queued').length} queued`}
+                  hover
                   actions={
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="sm" icon={<Trash2 size={14} />} onClick={clearCompleted}>
@@ -377,39 +405,49 @@ export default function ConverterPage() {
               )}
 
               {/* Integration Actions */}
-              {jobs.some((j) => j.status === 'completed') && (
-                <Card title="Quick Actions">
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      variant="outline"
-                      icon={<Eye size={16} />}
-                      onClick={() => addNotification('info', 'Opening latest result in 3D Viewer...')}
-                    >
-                      Open in 3D Viewer
-                    </Button>
-                    <Button
-                      variant="outline"
-                      icon={<Calculator size={16} />}
-                      onClick={() => addNotification('info', 'Running cost estimate on latest result...')}
-                    >
-                      Run Cost Estimate
-                    </Button>
-                    <Button
-                      variant="outline"
-                      icon={<Download size={16} />}
-                      onClick={() => addNotification('info', 'Downloading all completed files...')}
-                    >
-                      Download All
-                    </Button>
-                  </div>
-                </Card>
-              )}
+              <AnimatePresence>
+                {jobs.some((j) => j.status === 'completed') && (
+                  <motion.div
+                    variants={fadeInUp}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                  >
+                    <Card title="Quick Actions" hover>
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          variant="outline"
+                          icon={<Eye size={16} />}
+                          onClick={() => addNotification('info', 'Opening latest result in 3D Viewer...')}
+                        >
+                          Open in 3D Viewer
+                        </Button>
+                        <Button
+                          variant="outline"
+                          icon={<Calculator size={16} />}
+                          onClick={() => addNotification('info', 'Running cost estimate on latest result...')}
+                        >
+                          Run Cost Estimate
+                        </Button>
+                        <Button
+                          variant="outline"
+                          icon={<Download size={16} />}
+                          onClick={() => addNotification('info', 'Downloading all completed files...')}
+                        >
+                          Download All
+                        </Button>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ) : (
             /* History Tab */
             <Card
               title="Conversion History"
               subtitle={`${history.length} conversions in the last 7 days`}
+              hover
               actions={
                 <Button variant="outline" size="sm" icon={<Download size={14} />}>
                   Export Log
