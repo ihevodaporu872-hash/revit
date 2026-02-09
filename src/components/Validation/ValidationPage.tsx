@@ -561,7 +561,7 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
               />
             ) : (
               <div className="flex flex-col items-center py-12 text-muted-foreground">
-                <CheckCircle2 size={48} className="text-green-500 mb-3" />
+                <CheckCircle2 size={48} className="text-success mb-3" />
                 <p className="font-medium text-foreground">No issues found</p>
                 <p className="text-sm">All validation rules passed successfully.</p>
               </div>

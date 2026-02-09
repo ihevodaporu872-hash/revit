@@ -504,8 +504,8 @@ export default function ProjectMgmtPage() {
                     </span>
                   </div>
                   {/* Today marker */}
-                  <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10" style={{ left: '27%' }}>
-                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-red-500 font-bold whitespace-nowrap">
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10" style={{ left: '27%' }}>
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-destructive font-bold whitespace-nowrap">
                       Today
                     </div>
                   </div>

@@ -438,7 +438,7 @@ function HistoryTab() {
             <Download size={14} className="text-muted-foreground" />
           </button>
           <button className="p-1.5 rounded hover:bg-destructive/10 transition-colors" title="Delete">
-            <Trash2 size={14} className="text-muted-foreground hover:text-red-500" />
+            <Trash2 size={14} className="text-muted-foreground hover:text-destructive" />
           </button>
         </div>
       ),
