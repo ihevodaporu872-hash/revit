@@ -23,7 +23,7 @@ export default function Sidebar() {
   const { sidebarOpen, toggleSidebar } = useAppStore()
 
   return (
-    <aside className={`fixed left-0 top-0 h-full bg-sidebar text-white flex flex-col transition-all duration-300 z-40 ${sidebarOpen ? 'w-64' : 'w-16'}`}>
+    <aside className={`h-full bg-sidebar text-white flex flex-col transition-all duration-300 shrink-0 ${sidebarOpen ? 'w-64' : 'w-16'}`}>
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         {sidebarOpen && (
           <div className="flex items-center gap-2">
