@@ -7,7 +7,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
   test.describe('Page Load', () => {
     test('should display header with title and subtitle', async ({ page }) => {
-      await expect(page.locator('h1')).toHaveText('CAD/BIM Converter')
+      await expect(page.locator('main h1')).toHaveText('CAD/BIM Converter')
       await expect(page.locator('text=Convert Revit, IFC, DWG, and DGN files to Excel, 3D DAE, or PDF formats')).toBeVisible()
     })
 
@@ -15,7 +15,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
       await expect(page.locator('text=Files Converted')).toBeVisible()
       await expect(page.locator('text=Success Rate')).toBeVisible()
       await expect(page.locator('text=Avg Time')).toBeVisible()
-      await expect(page.locator('text=Formats')).toBeVisible()
+      await expect(page.getByText('Formats', { exact: true })).toBeVisible()
     })
 
     test('should display stat card values', async ({ page }) => {
@@ -48,7 +48,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
       await page.waitForTimeout(300)
 
       // History tab should show history table
-      await expect(page.locator('text=Conversion History')).toBeVisible()
+      await expect(page.locator('[data-slot="card-title"]').filter({ hasText: 'Conversion History' })).toBeVisible()
       await expect(page.locator('text=conversions in the last 7 days')).toBeVisible()
     })
 
@@ -146,22 +146,22 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
   test.describe('Convert Button', () => {
     test('should display convert button', async ({ page }) => {
-      const convertBtn = page.locator('button:has-text("Convert")')
+      const convertBtn = page.locator('button').filter({ hasText: /^Convert/ }).last()
       await expect(convertBtn).toBeVisible()
     })
 
     test('should show "Convert" text when no files selected', async ({ page }) => {
-      const convertBtn = page.locator('button:has-text("Convert")')
+      const convertBtn = page.locator('button').filter({ hasText: /^Convert/ }).last()
       await expect(convertBtn).toHaveText(/^Convert$/)
     })
 
     test('should have convert button disabled when no files selected', async ({ page }) => {
-      const convertBtn = page.locator('button:has-text("Convert")')
+      const convertBtn = page.locator('button').filter({ hasText: /^Convert/ }).last()
       await expect(convertBtn).toBeDisabled()
     })
 
     test('should display button in full width', async ({ page }) => {
-      const convertBtn = page.locator('button:has-text("Convert")')
+      const convertBtn = page.locator('button').filter({ hasText: /^Convert/ }).last()
       await expect(convertBtn).toHaveClass(/w-full/)
     })
   })
@@ -322,7 +322,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
       await page.getByRole('button', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
-      await expect(page.locator('text=Conversion History')).toBeVisible()
+      await expect(page.locator('[data-slot="card-title"]').filter({ hasText: 'Conversion History' })).toBeVisible()
     })
   })
 
