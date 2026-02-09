@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   BrainCircuit,
   Send,
@@ -28,6 +29,7 @@ import { Tabs } from '../ui/Tabs'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
+import { staggerContainer, fadeInUp, scaleIn, listItem, fadeIn } from '../../lib/animations'
 
 // ---- Types ----
 
@@ -274,6 +276,34 @@ print(df.describe())`,
   }
 }
 
+// ---- Typing dots animation ----
+
+const typingDotVariants = {
+  hidden: { opacity: 0.3, y: 0 },
+  visible: (i: number) => ({
+    opacity: [0.3, 1, 0.3],
+    y: [0, -4, 0],
+    transition: {
+      duration: 0.8,
+      repeat: Infinity,
+      ease: 'easeInOut',
+      delay: i * 0.15,
+    },
+  }),
+}
+
+// ---- Code block entrance ----
+
+const codeBlockVariants = {
+  hidden: { opacity: 0, y: 8, scaleY: 0.96 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scaleY: 1,
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] },
+  },
+}
+
 // ---- Component ----
 
 export default function AIAnalysisPage() {
@@ -405,12 +435,25 @@ export default function AIAnalysisPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Analyses Run" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'this week' }} />
-          <StatCard label="Avg Response" value={avgResponse} icon={Clock} color="success" />
-          <StatCard label="Files Processed" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'this month' }} />
-          <StatCard label="Charts Generated" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'this week' }} />
-        </div>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Analyses Run" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'this week' }} />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Avg Response" value={avgResponse} icon={Clock} color="success" />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Files Processed" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'this month' }} />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Charts Generated" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'this week' }} />
+          </motion.div>
+        </motion.div>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -428,13 +471,25 @@ export default function AIAnalysisPage() {
 
             {/* Quick Presets */}
             <Card title="Quick Analysis" subtitle="Common analysis patterns">
-              <div className="space-y-2">
+              <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate="visible"
+                className="space-y-2"
+              >
                 {QUICK_PRESETS.map((preset) => (
-                  <button
+                  <motion.button
                     key={preset.id}
+                    variants={listItem}
+                    whileHover={{
+                      scale: 1.02,
+                      borderColor: 'var(--primary)',
+                      boxShadow: '0 0 12px oklch(0.65 0.15 250 / 0.15)',
+                    }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => sendMessage(preset.prompt)}
                     disabled={loading || files.length === 0}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted hover:border-primary/30 transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
                   >
                     <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
                       {preset.icon}
@@ -444,9 +499,9 @@ export default function AIAnalysisPage() {
                       <p className="text-xs text-muted-foreground truncate">{preset.prompt}</p>
                     </div>
                     <Sparkles size={14} className="text-primary/40 shrink-0" />
-                  </button>
+                  </motion.button>
                 ))}
-              </div>
+              </motion.div>
             </Card>
           </div>
 
@@ -470,169 +525,225 @@ export default function AIAnalysisPage() {
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-[400px] max-h-[600px]">
                 {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
+                  <motion.div
+                    variants={fadeIn}
+                    initial="hidden"
+                    animate="visible"
+                    className="flex flex-col items-center justify-center h-full text-muted-foreground py-12"
+                  >
                     <Sparkles size={48} className="text-primary/20 mb-4" />
                     <h3 className="text-lg font-semibold text-foreground">Start Your Analysis</h3>
                     <p className="text-sm mt-1 max-w-sm text-center">
                       Upload a data file and describe what you want to analyze. Try the quick presets on the left, or type your own question below.
                     </p>
-                  </div>
+                  </motion.div>
                 )}
 
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.role === 'ai' && (
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0 mt-1">
-                        <Bot size={16} />
-                      </div>
-                    )}
-
-                    <div className={`max-w-[85%] space-y-3 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      {/* Message bubble */}
-                      <div className={`rounded-xl px-4 py-3 ${
-                        msg.role === 'user'
-                          ? 'bg-primary text-white rounded-br-sm'
-                          : 'bg-muted border border-border rounded-bl-sm'
-                      }`}>
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-muted-foreground'}`}>
-                          {new Date(msg.timestamp).toLocaleTimeString()}
-                        </p>
-                      </div>
-
-                      {/* Code block */}
-                      {msg.code && (
-                        <div className="rounded-xl border border-border overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-2 bg-[oklch(0.15_0.01_262)] text-muted-foreground">
-                            <div className="flex items-center gap-2 text-xs">
-                              <Code2 size={14} />
-                              <span>Generated Python Code</span>
-                            </div>
-                            <button
-                              onClick={() => copyCode(msg.id, msg.code!)}
-                              className="flex items-center gap-1 text-xs hover:text-white transition-colors"
-                            >
-                              {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
-                              {copiedId === msg.id ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
-                          <pre className="bg-[oklch(0.12_0.01_262)] text-foreground/80 p-4 overflow-x-auto text-xs leading-relaxed">
-                            <code>{msg.code}</code>
-                          </pre>
-                        </div>
+                <AnimatePresence mode="popLayout">
+                  {messages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      variants={fadeInUp}
+                      initial="hidden"
+                      animate="visible"
+                      exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                      layout
+                      className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {msg.role === 'ai' && (
+                        <motion.div
+                          variants={scaleIn}
+                          initial="hidden"
+                          animate="visible"
+                          className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0 mt-1"
+                        >
+                          <Bot size={16} />
+                        </motion.div>
                       )}
 
-                      {/* Results */}
-                      {msg.results && (
-                        <Tabs
-                          tabs={[
-                            ...(msg.results.tableData ? [{ id: 'table', label: 'Table', icon: <TableProperties size={14} /> }] : []),
-                            ...(msg.results.chartBars ? [{ id: 'chart', label: 'Chart', icon: <BarChart3 size={14} /> }] : []),
-                            ...(msg.results.stats ? [{ id: 'stats', label: 'Statistics', icon: <TrendingUp size={14} /> }] : []),
-                          ]}
-                          className="rounded-xl border border-border overflow-hidden bg-card"
-                        >
-                          {(activeTab) => (
-                            <div className="px-4 pb-4">
-                              {activeTab === 'table' && msg.results?.tableData && (
-                                <div className="overflow-x-auto">
-                                  <table className="w-full text-sm">
-                                    <thead>
-                                      <tr className="border-b border-border">
-                                        {msg.results.tableData.headers.map((h, i) => (
-                                          <th key={i} className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
-                                            {h}
-                                          </th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {msg.results.tableData.rows.map((row, ri) => (
-                                        <tr key={ri} className="border-b border-border/50 hover:bg-muted">
-                                          {row.map((cell, ci) => (
-                                            <td key={ci} className="px-3 py-2 text-foreground">
-                                              {cell}
-                                            </td>
+                      <div className={`max-w-[85%] space-y-3 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        {/* Message bubble */}
+                        <div className={`rounded-xl px-4 py-3 ${
+                          msg.role === 'user'
+                            ? 'bg-primary text-white rounded-br-sm'
+                            : 'bg-muted border border-border rounded-bl-sm'
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-muted-foreground'}`}>
+                            {new Date(msg.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+
+                        {/* Code block */}
+                        {msg.code && (
+                          <motion.div
+                            variants={codeBlockVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="rounded-xl border border-border overflow-hidden"
+                            style={{ transformOrigin: 'top' }}
+                          >
+                            <div className="flex items-center justify-between px-4 py-2 bg-[oklch(0.15_0.01_262)] text-muted-foreground">
+                              <div className="flex items-center gap-2 text-xs">
+                                <Code2 size={14} />
+                                <span>Generated Python Code</span>
+                              </div>
+                              <button
+                                onClick={() => copyCode(msg.id, msg.code!)}
+                                className="flex items-center gap-1 text-xs hover:text-white transition-colors"
+                              >
+                                {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
+                                {copiedId === msg.id ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <pre className="bg-[oklch(0.12_0.01_262)] text-foreground/80 p-4 overflow-x-auto text-xs leading-relaxed">
+                              <code>{msg.code}</code>
+                            </pre>
+                          </motion.div>
+                        )}
+
+                        {/* Results */}
+                        {msg.results && (
+                          <Tabs
+                            tabs={[
+                              ...(msg.results.tableData ? [{ id: 'table', label: 'Table', icon: <TableProperties size={14} /> }] : []),
+                              ...(msg.results.chartBars ? [{ id: 'chart', label: 'Chart', icon: <BarChart3 size={14} /> }] : []),
+                              ...(msg.results.stats ? [{ id: 'stats', label: 'Statistics', icon: <TrendingUp size={14} /> }] : []),
+                            ]}
+                            className="rounded-xl border border-border overflow-hidden bg-card"
+                          >
+                            {(activeTab) => (
+                              <div className="px-4 pb-4">
+                                {activeTab === 'table' && msg.results?.tableData && (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b border-border">
+                                          {msg.results.tableData.headers.map((h, i) => (
+                                            <th key={i} className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                                              {h}
+                                            </th>
                                           ))}
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
+                                      </thead>
+                                      <tbody>
+                                        {msg.results.tableData.rows.map((row, ri) => (
+                                          <tr key={ri} className="border-b border-border/50 hover:bg-muted">
+                                            {row.map((cell, ci) => (
+                                              <td key={ci} className="px-3 py-2 text-foreground">
+                                                {cell}
+                                              </td>
+                                            ))}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
 
-                              {activeTab === 'chart' && msg.results?.chartBars && (
-                                <div className="space-y-3">
-                                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distribution</p>
-                                  {msg.results.chartBars.map((bar, i) => (
-                                    <div key={i} className="space-y-1">
-                                      <div className="flex items-center justify-between text-sm">
-                                        <span className="text-foreground">{bar.label}</span>
-                                        <span className="font-medium text-foreground">{bar.value.toLocaleString()}</span>
+                                {activeTab === 'chart' && msg.results?.chartBars && (
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distribution</p>
+                                    {msg.results.chartBars.map((bar, i) => (
+                                      <div key={i} className="space-y-1">
+                                        <div className="flex items-center justify-between text-sm">
+                                          <span className="text-foreground">{bar.label}</span>
+                                          <span className="font-medium text-foreground">{bar.value.toLocaleString()}</span>
+                                        </div>
+                                        <div className="h-5 bg-border rounded-md overflow-hidden">
+                                          <div
+                                            className="h-full rounded-md transition-all duration-700"
+                                            style={{
+                                              width: `${(bar.value / maxBarValue(msg.results!.chartBars)) * 100}%`,
+                                              backgroundColor: bar.color,
+                                            }}
+                                          />
+                                        </div>
                                       </div>
-                                      <div className="h-5 bg-border rounded-md overflow-hidden">
-                                        <div
-                                          className="h-full rounded-md transition-all duration-700"
-                                          style={{
-                                            width: `${(bar.value / maxBarValue(msg.results!.chartBars)) * 100}%`,
-                                            backgroundColor: bar.color,
-                                          }}
-                                        />
+                                    ))}
+                                  </div>
+                                )}
+
+                                {activeTab === 'stats' && msg.results?.stats && (
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {msg.results.stats.map((stat, i) => (
+                                      <div key={i} className="p-3 rounded-lg bg-muted border border-border">
+                                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                                        <p className="text-lg font-bold text-foreground mt-0.5">{stat.value}</p>
+                                        {stat.change !== undefined && (
+                                          <p className={`text-xs mt-0.5 ${stat.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                            {stat.change >= 0 ? '+' : ''}{stat.change}%
+                                          </p>
+                                        )}
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {activeTab === 'stats' && msg.results?.stats && (
-                                <div className="grid grid-cols-2 gap-3">
-                                  {msg.results.stats.map((stat, i) => (
-                                    <div key={i} className="p-3 rounded-lg bg-muted border border-border">
-                                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                                      <p className="text-lg font-bold text-foreground mt-0.5">{stat.value}</p>
-                                      {stat.change !== undefined && (
-                                        <p className={`text-xs mt-0.5 ${stat.change >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                          {stat.change >= 0 ? '+' : ''}{stat.change}%
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Tabs>
-                      )}
-                    </div>
-
-                    {msg.role === 'user' && (
-                      <div className="p-2 rounded-lg bg-primary text-white h-fit shrink-0 mt-1">
-                        <User size={16} />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </Tabs>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {msg.role === 'user' && (
+                        <motion.div
+                          variants={scaleIn}
+                          initial="hidden"
+                          animate="visible"
+                          className="p-2 rounded-lg bg-primary text-white h-fit shrink-0 mt-1"
+                        >
+                          <User size={16} />
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
 
                 {/* Loading indicator */}
-                {loading && (
-                  <div className="flex gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0">
-                      <Bot size={16} />
-                    </div>
-                    <div className="bg-muted border border-border rounded-xl rounded-bl-sm px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>Analyzing data with Gemini AI...</span>
+                <AnimatePresence>
+                  {loading && (
+                    <motion.div
+                      variants={fadeInUp}
+                      initial="hidden"
+                      animate="visible"
+                      exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                      className="flex gap-3"
+                    >
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0">
+                        <Bot size={16} />
                       </div>
-                    </div>
-                  </div>
-                )}
+                      <div className="bg-muted border border-border rounded-xl rounded-bl-sm px-4 py-3">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Analyzing data with Gemini AI</span>
+                          <span className="flex items-center gap-0.5">
+                            {[0, 1, 2].map((i) => (
+                              <motion.span
+                                key={i}
+                                custom={i}
+                                variants={typingDotVariants}
+                                initial="hidden"
+                                animate="visible"
+                                className="inline-block w-1.5 h-1.5 rounded-full bg-primary"
+                              />
+                            ))}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div ref={chatEndRef} />
               </div>
 
               {/* Chat Input */}
-              <div className="border-t border-border p-4">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.15 }}
+                className="border-t border-border p-4"
+              >
                 <div className="flex items-center gap-3">
                   <input
                     ref={inputRef}
@@ -642,7 +753,7 @@ export default function AIAnalysisPage() {
                     onKeyDown={handleKeyDown}
                     placeholder={files.length > 0 ? 'Describe what you want to analyze...' : 'Upload a file first...'}
                     disabled={files.length === 0 || loading}
-                    className="flex-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
+                    className="flex-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 transition-shadow duration-200"
                   />
                   <Button
                     onClick={() => sendMessage(inputValue)}
@@ -656,7 +767,7 @@ export default function AIAnalysisPage() {
                 <p className="text-xs text-muted-foreground mt-2 px-1">
                   Press Enter to send. AI will generate Python code and show results from your data.
                 </p>
-              </div>
+              </motion.div>
             </Card>
           </div>
         </div>

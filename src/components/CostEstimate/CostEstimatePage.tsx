@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
   Globe,
@@ -27,6 +28,14 @@ import { Table } from '../ui/Table'
 import { useAppStore } from '../../store/appStore'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import { MotionPage } from '../MotionPage'
+import {
+  staggerContainer,
+  fadeInUp,
+  scaleIn,
+  listItem,
+  modalOverlay,
+  modalContent,
+} from '../../lib/animations'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -345,20 +354,33 @@ export default function CostEstimatePage() {
     <MotionPage>
       <div className="space-y-6">
         {/* Header */}
-        <div>
+        <motion.div variants={fadeInUp} initial="hidden" animate="visible">
           <h1 className="text-2xl font-bold text-foreground">CWICR Cost Estimation</h1>
           <p className="text-muted-foreground mt-1">
             Search 55,719 construction work items across 9 languages with AI-powered BIM classification
           </p>
-        </div>
+        </motion.div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Items" value="55,719" icon={Database} color="primary" />
-        <StatCard label="Languages" value={LANGUAGES.length} icon={Globe} color="success" />
-        <StatCard label="Avg Response Time" value="0.3s" icon={Clock} color="warning" />
-        <StatCard label="Estimates Today" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: 'vs yesterday' }} />
-      </div>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Total Items" value="55,719" icon={Database} color="primary" />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Languages" value={LANGUAGES.length} icon={Globe} color="success" />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Avg Response Time" value="0.3s" icon={Clock} color="warning" />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Estimates Today" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: 'vs yesterday' }} />
+        </motion.div>
+      </motion.div>
 
       {/* Main Content */}
       <Tabs tabs={tabs} defaultTab="search">
@@ -368,7 +390,7 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 {/* Search Bar */}
-                <Card>
+                <Card hover>
                   <div className="flex gap-3">
                     {/* Language selector */}
                     <div className="relative">
@@ -380,23 +402,35 @@ export default function CostEstimatePage() {
                         <span className="font-medium text-foreground">{currentLang.code}</span>
                         <ChevronDown size={14} className="text-muted-foreground ml-auto" />
                       </button>
-                      {showLangDropdown && (
-                        <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-20 py-1 min-w-[180px]">
-                          {LANGUAGES.map((lang) => (
-                            <button
-                              key={lang.code}
-                              onClick={() => { setLanguage(lang.code); setShowLangDropdown(false) }}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors ${
-                                language === lang.code ? 'bg-primary/10 text-primary' : 'text-foreground'
-                              }`}
-                            >
-                              <span className="text-base">{lang.flag}</span>
-                              <span>{lang.name}</span>
-                              {language === lang.code && <Check size={14} className="ml-auto text-primary" />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <AnimatePresence>
+                        {showLangDropdown && (
+                          <motion.div
+                            variants={modalContent}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-20 py-1 min-w-[180px]"
+                          >
+                            {LANGUAGES.map((lang, index) => (
+                              <motion.button
+                                key={lang.code}
+                                variants={listItem}
+                                initial="hidden"
+                                animate="visible"
+                                custom={index}
+                                onClick={() => { setLanguage(lang.code); setShowLangDropdown(false) }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors ${
+                                  language === lang.code ? 'bg-primary/10 text-primary' : 'text-foreground'
+                                }`}
+                              >
+                                <span className="text-base">{lang.flag}</span>
+                                <span>{lang.name}</span>
+                                {language === lang.code && <Check size={14} className="ml-auto text-primary" />}
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Search input */}
@@ -419,31 +453,45 @@ export default function CostEstimatePage() {
                 </Card>
 
                 {/* Search Results */}
-                {searchResults.length > 0 && (
-                  <Card
-                    title="Search Results"
-                    subtitle={`${searchResults.length} items found for "${searchQuery}" in ${currentLang.name}`}
-                  >
-                    <Table<WorkItem & Record<string, unknown>>
-                      columns={searchColumns as any}
-                      data={searchResults as any}
-                      keyField="id"
-                      emptyMessage="No results found. Try a different query."
-                    />
-                  </Card>
-                )}
+                <AnimatePresence>
+                  {searchResults.length > 0 && (
+                    <motion.div
+                      variants={fadeInUp}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                    >
+                      <Card
+                        title="Search Results"
+                        subtitle={`${searchResults.length} items found for "${searchQuery}" in ${currentLang.name}`}
+                        hover
+                      >
+                        <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+                          <Table<WorkItem & Record<string, unknown>>
+                            columns={searchColumns as any}
+                            data={searchResults as any}
+                            keyField="id"
+                            emptyMessage="No results found. Try a different query."
+                          />
+                        </motion.div>
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Empty state */}
                 {searchResults.length === 0 && !isSearching && (
-                  <Card>
-                    <div className="text-center py-12">
-                      <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-muted-foreground">Search for construction work items</p>
-                      <p className="text-muted-foreground/60 text-xs mt-1">
-                        Try "concrete", "steel beam", "insulation", or a work item code
-                      </p>
-                    </div>
-                  </Card>
+                  <motion.div variants={scaleIn} initial="hidden" animate="visible">
+                    <Card>
+                      <div className="text-center py-12">
+                        <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                        <p className="text-muted-foreground">Search for construction work items</p>
+                        <p className="text-muted-foreground/60 text-xs mt-1">
+                          Try "concrete", "steel beam", "insulation", or a work item code
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
                 )}
               </div>
             )
@@ -456,10 +504,13 @@ export default function CostEstimatePage() {
                 <Card
                   title="BIM Element Classification"
                   subtitle="Upload an Excel file with BIM elements to auto-classify using Gemini AI"
+                  hover
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
-                      <div
+                      <motion.div
+                        whileHover={{ scale: 1.01, borderColor: 'var(--primary)' }}
+                        whileTap={{ scale: 0.99 }}
                         className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors border-border hover:border-primary/50 hover:bg-muted"
                         onClick={() => handleClassifyUpload()}
                       >
@@ -468,7 +519,7 @@ export default function CostEstimatePage() {
                         <p className="text-sm text-muted-foreground mt-1">
                           Supports .xlsx with columns: Element Name, Type, Quantity
                         </p>
-                      </div>
+                      </motion.div>
                     </div>
                     <div className="text-center px-6">
                       <Sparkles size={24} className="mx-auto text-primary mb-2" />
@@ -489,34 +540,52 @@ export default function CostEstimatePage() {
                 </Card>
 
                 {/* Classification results */}
-                {classificationResults.length > 0 && (
-                  <Card
-                    title="Classification Results"
-                    subtitle={`${classificationResults.length} elements classified`}
-                    actions={
-                      <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
-                        Add All to Estimate
-                      </Button>
-                    }
-                  >
-                    <Table<ClassificationResult & Record<string, unknown>>
-                      columns={classifyColumns as any}
-                      data={classificationResults as any}
-                      keyField="elementName"
-                      emptyMessage="No classification results yet"
-                    />
-                    <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
-                      <p className="text-sm text-muted-foreground">
-                        Total estimated cost from classification:
-                      </p>
-                      <p className="text-lg font-bold text-foreground">
-                        {formatCurrency(
-                          classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0),
-                        )}
-                      </p>
-                    </div>
-                  </Card>
-                )}
+                <AnimatePresence>
+                  {classificationResults.length > 0 && (
+                    <motion.div
+                      variants={fadeInUp}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                    >
+                      <Card
+                        title="Classification Results"
+                        subtitle={`${classificationResults.length} elements classified`}
+                        hover
+                        actions={
+                          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
+                            Add All to Estimate
+                          </Button>
+                        }
+                      >
+                        <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+                          <Table<ClassificationResult & Record<string, unknown>>
+                            columns={classifyColumns as any}
+                            data={classificationResults as any}
+                            keyField="elementName"
+                            emptyMessage="No classification results yet"
+                          />
+                        </motion.div>
+                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+                          <p className="text-sm text-muted-foreground">
+                            Total estimated cost from classification:
+                          </p>
+                          <motion.p
+                            key={classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0)}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            className="text-lg font-bold text-foreground"
+                          >
+                            {formatCurrency(
+                              classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0),
+                            )}
+                          </motion.p>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )
           }
@@ -528,6 +597,7 @@ export default function CostEstimatePage() {
                 <Card
                   title="Cost Calculation"
                   subtitle={`${costItems.length} line items`}
+                  hover
                   actions={
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" icon={<FileSpreadsheet size={14} />} onClick={exportToExcel}>
@@ -540,13 +610,15 @@ export default function CostEstimatePage() {
                   }
                 >
                   {costItems.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-muted-foreground">No items added yet</p>
-                      <p className="text-muted-foreground/60 text-xs mt-1">
-                        Search for work items or classify BIM elements to add items
-                      </p>
-                    </div>
+                    <motion.div variants={scaleIn} initial="hidden" animate="visible">
+                      <div className="text-center py-12">
+                        <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                        <p className="text-muted-foreground">No items added yet</p>
+                        <p className="text-muted-foreground/60 text-xs mt-1">
+                          Search for work items or classify BIM elements to add items
+                        </p>
+                      </div>
+                    </motion.div>
                   ) : (
                     <>
                       {/* Cost items table */}
@@ -563,49 +635,63 @@ export default function CostEstimatePage() {
                               <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-16"></th>
                             </tr>
                           </thead>
-                          <tbody>
-                            {costItems.map((item) => (
-                              <tr key={item.id} className="border-b border-border/50 hover:bg-muted transition-colors">
-                                <td className="px-4 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
-                                <td className="px-4 py-3 text-sm text-foreground">{item.workItem.description}</td>
-                                <td className="px-4 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
-                                <td className="px-4 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center justify-center gap-1">
+                          <AnimatePresence mode="popLayout">
+                            <motion.tbody
+                              variants={staggerContainer}
+                              initial="hidden"
+                              animate="visible"
+                            >
+                              {costItems.map((item) => (
+                                <motion.tr
+                                  key={item.id}
+                                  variants={listItem}
+                                  initial="hidden"
+                                  animate="visible"
+                                  exit="exit"
+                                  layout
+                                  className="border-b border-border/50 hover:bg-muted transition-colors"
+                                >
+                                  <td className="px-4 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
+                                  <td className="px-4 py-3 text-sm text-foreground">{item.workItem.description}</td>
+                                  <td className="px-4 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
+                                  <td className="px-4 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => updateQuantity(item.id, -1)}
+                                        className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                      >
+                                        <Minus size={14} />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => setQuantityDirect(item.id, parseInt(e.target.value) || 0)}
+                                        className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
+                                      />
+                                      <button
+                                        onClick={() => updateQuantity(item.id, 1)}
+                                        className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-foreground text-right">
+                                    {formatCurrency(item.total)}
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
                                     <button
-                                      onClick={() => updateQuantity(item.id, -1)}
-                                      className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                      onClick={() => removeCostItem(item.id)}
+                                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     >
-                                      <Minus size={14} />
+                                      <Trash2 size={14} />
                                     </button>
-                                    <input
-                                      type="number"
-                                      value={item.quantity}
-                                      onChange={(e) => setQuantityDirect(item.id, parseInt(e.target.value) || 0)}
-                                      className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
-                                    />
-                                    <button
-                                      onClick={() => updateQuantity(item.id, 1)}
-                                      className="p-1 rounded hover:bg-muted text-muted-foreground"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm font-medium text-foreground text-right">
-                                  {formatCurrency(item.total)}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    onClick={() => removeCostItem(item.id)}
-                                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
+                                  </td>
+                                </motion.tr>
+                              ))}
+                            </motion.tbody>
+                          </AnimatePresence>
                         </table>
                       </div>
 
@@ -617,7 +703,15 @@ export default function CostEstimatePage() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-muted-foreground">Grand Total</p>
-                            <p className="text-2xl font-bold text-foreground">{formatCurrency(grandTotal)}</p>
+                            <motion.p
+                              key={grandTotal}
+                              initial={{ opacity: 0, scale: 0.85, y: 4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                              className="text-2xl font-bold text-foreground"
+                            >
+                              {formatCurrency(grandTotal)}
+                            </motion.p>
                           </div>
                         </div>
                       </div>
@@ -634,18 +728,21 @@ export default function CostEstimatePage() {
               <Card
                 title="Recent Estimates"
                 subtitle={`${recentEstimates.length} estimates in the last 7 days`}
+                hover
                 actions={
                   <Button variant="outline" size="sm" icon={<Download size={14} />}>
                     Export All
                   </Button>
                 }
               >
-                <Table<RecentEstimate & Record<string, unknown>>
-                  columns={historyColumns as any}
-                  data={recentEstimates as any}
-                  keyField="id"
-                  emptyMessage="No recent estimates"
-                />
+                <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+                  <Table<RecentEstimate & Record<string, unknown>>
+                    columns={historyColumns as any}
+                    data={recentEstimates as any}
+                    keyField="id"
+                    emptyMessage="No recent estimates"
+                  />
+                </motion.div>
               </Card>
             )
           }
