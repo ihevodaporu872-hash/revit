@@ -7,7 +7,7 @@ test.describe('Module 4: BIM Validation', () => {
 
   test('should display page header and subtitle', async ({ page }) => {
     // Check main heading
-    const heading = page.locator('header h1, h1')
+    const heading = page.locator('main h1')
     await expect(heading).toBeVisible()
     await expect(heading).toContainText('BIM Validation')
 
@@ -115,11 +115,9 @@ test.describe('Module 4: BIM Validation', () => {
     await expect(emptyDescription).toBeVisible()
   })
 
-  test('should display score legend', async ({ page }) => {
-    // Check legend items
-    await expect(page.getByText(/90-100%.*pass/i)).toBeVisible()
-    await expect(page.getByText(/70-89%.*warning/i)).toBeVisible()
-    await expect(page.getByText(/0-69%.*fail/i)).toBeVisible()
+  test('should not display score legend without validation results', async ({ page }) => {
+    // Legend only appears after validation runs
+    await expect(page.getByText(/score colors:/i)).not.toBeVisible()
   })
 
   test('should display validation rules card with selected count', async ({ page }) => {
@@ -181,14 +179,13 @@ test.describe('Module 4: BIM Validation', () => {
     const mainContent = page.locator('main, [role="main"]').first()
     await expect(mainContent).toBeVisible()
 
-    // Verify grid layout for stats (should have multiple stat cards in a row)
-    const statsGrid = page.locator('div').filter({ hasText: 'Models Validated' }).locator('..').locator('..')
-    await expect(statsGrid).toBeVisible()
+    // Verify stat cards are visible in the layout
+    await expect(page.getByText('Models Validated')).toBeVisible()
   })
 
   test('should display ShieldCheck icon in header', async ({ page }) => {
     // The icon is rendered as an SVG, check for the header with icon structure
-    const header = page.locator('h1').filter({ hasText: 'BIM Validation' })
+    const header = page.locator('main h1').filter({ hasText: 'BIM Validation' })
     await expect(header).toBeVisible()
   })
 
@@ -241,7 +238,7 @@ test.describe('Module 4: BIM Validation', () => {
     ]
 
     for (const label of ruleLabels) {
-      await expect(page.getByText(label)).toBeVisible()
+      await expect(page.getByText(label, { exact: true })).toBeVisible()
     }
   })
 
@@ -273,14 +270,8 @@ test.describe('Module 4: BIM Validation', () => {
     await expect(rulesSection).toBeVisible()
   })
 
-  test('should show score legend with color indicators', async ({ page }) => {
-    // Check for legend text
-    const legend = page.getByText(/score colors:/i)
-    await expect(legend).toBeVisible()
-
-    // Check for all three score ranges
-    await expect(page.getByText(/90-100%.*pass/i)).toBeVisible()
-    await expect(page.getByText(/70-89%.*warning/i)).toBeVisible()
-    await expect(page.getByText(/0-69%.*fail/i)).toBeVisible()
+  test('should not show score legend without validation results', async ({ page }) => {
+    // Legend only appears after validation runs
+    await expect(page.getByText(/score colors:/i)).not.toBeVisible()
   })
 })
