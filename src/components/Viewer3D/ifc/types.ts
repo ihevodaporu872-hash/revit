@@ -136,6 +136,35 @@ export interface AreaMeasurement {
   visualGroup: import('three').Group
 }
 
+// ── Revit Properties (enriched from XLSX upload) ────────────────────
+
+export interface RevitProperties {
+  globalId: string
+  elementName?: string
+  elementType?: string
+  category?: string
+  family?: string
+  familyType?: string
+  level?: string
+  phaseCreated?: string
+  phaseDemolished?: string
+  area?: number
+  volume?: number
+  length?: number
+  width?: number
+  height?: number
+  perimeter?: number
+  material?: string
+  materialArea?: number
+  materialVolume?: number
+  structuralUsage?: string
+  classification?: string
+  assemblyCode?: string
+  mark?: string
+  comments?: string
+  customParams?: Record<string, unknown>
+}
+
 // ── Appearance Profiler ──────────────────────────────────────────────
 
 export interface ProfileLegendEntry {

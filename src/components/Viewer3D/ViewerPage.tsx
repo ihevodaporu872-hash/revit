@@ -30,6 +30,7 @@ import {
   Focus,
   Palette,
   Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -57,6 +58,8 @@ import { AppearanceProfilerPanel } from './AppearanceProfilerPanel'
 import { useExcelExport } from './useExcelExport'
 import { ExportDialog } from './ExportDialog'
 import { useBoxSelect } from './useBoxSelect'
+import { useRevitEnrichment } from './useRevitEnrichment'
+import { RevitPropertiesPanel } from './RevitPropertiesPanel'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
 import {
@@ -178,6 +181,7 @@ export default function ViewerPage() {
 
   const { exportToExcel } = useExcelExport()
   const wireframe = useWireframe()
+  const revitEnrichment = useRevitEnrichment()
 
   const clearAllSelections = useCallback(() => {
     selectedMeshesRef.current.forEach(({ mesh, originalMaterial }) => {
@@ -603,14 +607,88 @@ export default function ViewerPage() {
         setLoadedModels(ifcServiceRef.current.getLoadedModels())
 
         addNotification('success', `Model loaded: ${result.stats.totalElements} elements`)
+
+        // Prefetch Revit enrichment data for all GlobalIds in this model
+        const service = ifcServiceRef.current
+        if (service) {
+          const allGlobalIds: string[] = []
+          const extractGlobalIds = async (node: import('./ifc/types').IFCSpatialNode) => {
+            const info = await service.getElementProperties(node.expressID)
+            if (info) {
+              const gid = info.properties.find(p => p.name === 'GlobalId')
+              if (gid?.value) allGlobalIds.push(gid.value)
+            }
+            for (const child of node.children) {
+              await extractGlobalIds(child)
+            }
+          }
+          // Run in background — don't block UI
+          extractGlobalIds(result.tree).then(() => {
+            if (allGlobalIds.length > 0) {
+              revitEnrichment.prefetchBulk(allGlobalIds)
+            }
+          })
+        }
       } catch (err) {
         console.error('IFC load error:', err)
         setLoadingProgress(null)
         addNotification('error', `Failed to load IFC: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     },
-    [addNotification, fitToModel, sectionPlanes],
+    [addNotification, fitToModel, sectionPlanes, revitEnrichment],
   )
+
+  // ── XLSX Upload handler ─────────────────────────────────
+
+  const handleXlsxUpload = useCallback(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.xlsx,.xls'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const resp = await fetch('http://localhost:3001/api/revit/upload-xlsx', {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await resp.json()
+        if (resp.ok) {
+          addNotification('success', `Revit data imported: ${data.count} elements`)
+          // Invalidate cache and re-prefetch
+          revitEnrichment.invalidateCache()
+          const service = ifcServiceRef.current
+          if (service) {
+            const allGlobalIds: string[] = []
+            const tree = treeData
+            // Quick re-prefetch from loaded model
+            const extractIds = async (nodes: TreeNode[]) => {
+              for (const node of nodes) {
+                const info = await service.getElementProperties(node.expressID)
+                if (info) {
+                  const gid = info.properties.find(p => p.name === 'GlobalId')
+                  if (gid?.value) allGlobalIds.push(gid.value)
+                }
+                if (node.children) await extractIds(node.children)
+              }
+            }
+            extractIds(tree).then(() => {
+              if (allGlobalIds.length > 0) revitEnrichment.prefetchBulk(allGlobalIds)
+            })
+          }
+        } else {
+          addNotification('error', data.error || 'Failed to import Revit data')
+        }
+      } catch (err) {
+        addNotification('error', `Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+    input.click()
+  }, [addNotification, revitEnrichment, treeData])
 
   // ── Tool handlers ───────────────────────────────────────
 
@@ -866,7 +944,7 @@ export default function ViewerPage() {
           variants={fadeInUp}
           initial="hidden"
           animate="visible"
-          className="flex items-center justify-between"
+          className="flex items-center gap-4"
         >
           <div>
             <h1 className="text-2xl font-bold text-foreground">3D IFC Viewer</h1>
@@ -874,22 +952,21 @@ export default function ViewerPage() {
               {modelFile ? modelFile : 'Upload an IFC file to view and inspect 3D building models'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <label>
-              <Button variant="primary" icon={<Upload size={16} />} onClick={() => {
-                const input = document.createElement('input')
-                input.type = 'file'
-                input.accept = '.ifc'
-                input.onchange = (e) => {
-                  const files = (e.target as HTMLInputElement).files
-                  if (files) handleFileUpload(Array.from(files))
-                }
-                input.click()
-              }}>
-                Upload IFC
-              </Button>
-            </label>
-          </div>
+          <Button variant="primary" icon={<Upload size={16} />} onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.ifc'
+            input.onchange = (e) => {
+              const files = (e.target as HTMLInputElement).files
+              if (files) handleFileUpload(Array.from(files))
+            }
+            input.click()
+          }}>
+            Upload IFC
+          </Button>
+          <Button variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
+            Upload Revit (.xlsx)
+          </Button>
         </motion.div>
 
         {/* Main viewer area */}
@@ -1324,25 +1401,7 @@ export default function ViewerPage() {
                         <p className="text-muted-foreground">Type</p>
                         <p className="font-medium text-foreground">{selectedElement.type}</p>
                       </div>
-                      {selectedElement.volume && (
-                        <div className="bg-card rounded-lg p-2 border border-border">
-                          <p className="text-muted-foreground">Volume</p>
-                          <p className="font-medium text-foreground">{selectedElement.volume}</p>
-                        </div>
-                      )}
-                      {selectedElement.area && (
-                        <div className="bg-card rounded-lg p-2 border border-border">
-                          <p className="text-muted-foreground">Area</p>
-                          <p className="font-medium text-foreground">{selectedElement.area}</p>
-                        </div>
-                      )}
                     </div>
-                    {selectedElement.material && (
-                      <div className="mt-2 text-xs">
-                        <span className="text-muted-foreground">Material: </span>
-                        <span className="text-foreground font-medium">{selectedElement.material}</span>
-                      </div>
-                    )}
                     {/* Color button */}
                     {selectedElementIds.length === 1 && (
                       <div className="relative mt-2">
@@ -1361,7 +1420,6 @@ export default function ViewerPage() {
                             currentColor={customColors[`el-${selectedElement.id}`]}
                             onApply={(color) => {
                               setCustomColor(`el-${selectedElement.id}`, color)
-                              // Apply color visually to mesh
                               const mesh = ifcServiceRef.current?.getMesh(selectedElement.id)
                               if (mesh && mesh.material instanceof THREE.MeshPhysicalMaterial) {
                                 const mat = mesh.material.clone()
@@ -1371,7 +1429,6 @@ export default function ViewerPage() {
                             }}
                             onClear={() => {
                               clearCustomColor(`el-${selectedElement.id}`)
-                              // Restore original — re-select to refresh
                               const entry = selectedMeshesRef.current.get(selectedElement.id)
                               if (entry) {
                                 entry.mesh.material = entry.originalMaterial
@@ -1384,24 +1441,15 @@ export default function ViewerPage() {
                     )}
                   </div>
 
-                  <div className="px-4 py-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">All Properties</p>
-                    <div className="space-y-0">
-                      {selectedElement.properties.map((prop, i) => (
-                        <div
-                          key={i}
-                          className={`flex justify-between items-start py-2 px-2 rounded text-xs ${
-                            i % 2 === 0 ? 'bg-muted/30' : ''
-                          } ${
-                            i < selectedElement.properties.length - 1 ? 'border-b border-border/50' : ''
-                          }`}
-                        >
-                          <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
-                          <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Revit-enriched properties panel */}
+                  <RevitPropertiesPanel
+                    revitProps={(() => {
+                      const gid = selectedElement.properties.find(p => p.name === 'GlobalId')
+                      return gid ? revitEnrichment.getRevitProps(gid.value) : undefined
+                    })()}
+                    ifcProperties={selectedElement.properties}
+                    onUploadXlsx={handleXlsxUpload}
+                  />
                 </div>
               </motion.div>
             )}

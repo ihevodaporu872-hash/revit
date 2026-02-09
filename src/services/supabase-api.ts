@@ -375,6 +375,44 @@ export async function saveQTOReport(report: {
   return data
 }
 
+// ── Revit Properties (IFC Element Enrichment) ─────────────────────────────────
+
+import type { RevitProperties } from '../components/Viewer3D/ifc/types'
+
+export async function fetchRevitProperties(globalId: string, projectId = 'default'): Promise<RevitProperties | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('ifc_element_properties')
+    .select('*')
+    .eq('global_id', globalId)
+    .eq('project_id', projectId)
+    .single()
+  if (error || !data) return null
+  return snakeToCamel(data) as unknown as RevitProperties
+}
+
+export async function fetchRevitPropertiesBulk(globalIds: string[], projectId = 'default'): Promise<Map<string, RevitProperties>> {
+  const map = new Map<string, RevitProperties>()
+  if (!supabase || globalIds.length === 0) return map
+
+  // Supabase .in() has a limit, batch in chunks of 500
+  const chunkSize = 500
+  for (let i = 0; i < globalIds.length; i += chunkSize) {
+    const chunk = globalIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('global_id', chunk)
+    if (error || !data) continue
+    for (const row of data) {
+      const camel = snakeToCamel(row) as unknown as RevitProperties
+      map.set(row.global_id, camel)
+    }
+  }
+  return map
+}
+
 // ── Chat Sessions ──────────────────────────────────────────────────────────────
 
 export async function fetchChatSessions() {

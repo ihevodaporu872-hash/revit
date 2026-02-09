@@ -1419,6 +1419,264 @@ app.get('/api/health', (_req, res) => {
 })
 
 // ---------------------------------------------------------------------------
+// 18. POST /api/revit/upload-xlsx — Parse Revit XLSX and upsert to Supabase
+// ---------------------------------------------------------------------------
+app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase()
+    if (!['.xlsx', '.xls'].includes(ext)) {
+      return res.status(400).json({ error: 'Only .xlsx/.xls files are accepted' })
+    }
+
+    const XLSX = (await import('xlsx')).default
+    const workbook = XLSX.readFile(req.file.path)
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'No data rows found in the spreadsheet' })
+    }
+
+    const projectId = req.body.projectId || 'default'
+
+    // Column mapping: detect common Revit export column names
+    const columnMap = {
+      globalId:         ['GlobalId', 'Global Id', 'GUID', 'guid', 'GlobalID', 'Element GUID'],
+      elementName:      ['Name', 'Element Name', 'ElementName', 'name'],
+      elementType:      ['Type', 'Element Type', 'ElementType', 'type', 'Type Name'],
+      category:         ['Category', 'category', 'Revit Category'],
+      family:           ['Family', 'family', 'Family Name'],
+      familyType:       ['Family and Type', 'FamilyType', 'Family Type', 'Type Name'],
+      level:            ['Level', 'level', 'Base Level', 'Reference Level'],
+      phaseCreated:     ['Phase Created', 'PhaseCreated', 'Phase', 'phase'],
+      phaseDemolished:  ['Phase Demolished', 'PhaseDemolished'],
+      area:             ['Area', 'area', 'Surface Area'],
+      volume:           ['Volume', 'volume'],
+      length:           ['Length', 'length'],
+      width:            ['Width', 'width'],
+      height:           ['Height', 'height', 'Unconnected Height'],
+      perimeter:        ['Perimeter', 'perimeter'],
+      material:         ['Material', 'material', 'Structural Material', 'Material: Name'],
+      materialArea:     ['Material Area', 'MaterialArea', 'Material: Area'],
+      materialVolume:   ['Material Volume', 'MaterialVolume', 'Material: Volume'],
+      structuralUsage:  ['Structural Usage', 'StructuralUsage'],
+      classification:   ['Classification', 'OmniClass Number', 'Classification Code'],
+      assemblyCode:     ['Assembly Code', 'AssemblyCode', 'Assembly Description'],
+      mark:             ['Mark', 'mark', 'Type Mark'],
+      comments:         ['Comments', 'comments'],
+    }
+
+    // Detect which columns are present
+    const sampleRow = rows[0]
+    const availableCols = Object.keys(sampleRow)
+    const resolvedMap = {}
+    const mappedCols = new Set()
+
+    for (const [field, candidates] of Object.entries(columnMap)) {
+      for (const candidate of candidates) {
+        if (availableCols.includes(candidate)) {
+          resolvedMap[field] = candidate
+          mappedCols.add(candidate)
+          break
+        }
+      }
+    }
+
+    if (!resolvedMap.globalId) {
+      return res.status(400).json({
+        error: 'No GlobalId column found in the spreadsheet',
+        availableColumns: availableCols,
+        hint: 'Ensure your Revit export includes a GlobalId column',
+      })
+    }
+
+    // Parse rows
+    const records = []
+    const errors = []
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      const globalId = String(row[resolvedMap.globalId] || '').trim()
+      if (!globalId) {
+        errors.push({ row: i + 2, reason: 'Missing GlobalId' })
+        continue
+      }
+
+      // Collect unmapped columns into custom_params
+      const customParams = {}
+      for (const col of availableCols) {
+        if (!mappedCols.has(col) && col !== resolvedMap.globalId && row[col] !== '' && row[col] !== undefined) {
+          customParams[col] = row[col]
+        }
+      }
+
+      const parseNum = (field) => {
+        if (!resolvedMap[field]) return null
+        const v = parseFloat(row[resolvedMap[field]])
+        return isNaN(v) ? null : v
+      }
+      const parseStr = (field) => {
+        if (!resolvedMap[field]) return null
+        const v = String(row[resolvedMap[field]] || '').trim()
+        return v || null
+      }
+
+      records.push({
+        project_id:       projectId,
+        global_id:        globalId,
+        element_name:     parseStr('elementName'),
+        element_type:     parseStr('elementType'),
+        category:         parseStr('category'),
+        family:           parseStr('family'),
+        family_type:      parseStr('familyType'),
+        level:            parseStr('level'),
+        phase_created:    parseStr('phaseCreated'),
+        phase_demolished: parseStr('phaseDemolished'),
+        area:             parseNum('area'),
+        volume:           parseNum('volume'),
+        length:           parseNum('length'),
+        width:            parseNum('width'),
+        height:           parseNum('height'),
+        perimeter:        parseNum('perimeter'),
+        material:         parseStr('material'),
+        material_area:    parseNum('materialArea'),
+        material_volume:  parseNum('materialVolume'),
+        structural_usage: parseStr('structuralUsage'),
+        classification:   parseStr('classification'),
+        assembly_code:    parseStr('assemblyCode'),
+        mark:             parseStr('mark'),
+        comments:         parseStr('comments'),
+        custom_params:    Object.keys(customParams).length > 0 ? customParams : {},
+      })
+    }
+
+    if (records.length === 0) {
+      return res.status(400).json({ error: 'No valid records with GlobalId found', errors })
+    }
+
+    // Upsert to Supabase in batches
+    let insertedCount = 0
+    if (supabaseServer) {
+      const batchSize = 500
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize)
+        const { error: upsertError } = await supabaseServer
+          .from('ifc_element_properties')
+          .upsert(batch, { onConflict: 'project_id,global_id' })
+        if (upsertError) {
+          console.error('[Revit XLSX] Upsert error:', upsertError.message)
+          errors.push({ batch: Math.floor(i / batchSize), reason: upsertError.message })
+        } else {
+          insertedCount += batch.length
+        }
+      }
+    } else {
+      return res.status(503).json({ error: 'Supabase not configured — cannot store Revit properties' })
+    }
+
+    // Optionally forward to n8n for extra processing
+    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
+    if (n8nWebhookUrl) {
+      try {
+        const response = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, recordCount: insertedCount, fileName: req.file.originalname }),
+        })
+        console.log(`[Revit XLSX] n8n webhook responded: ${response.status}`)
+      } catch (n8nErr) {
+        console.warn('[Revit XLSX] n8n webhook failed (non-blocking):', n8nErr.message)
+      }
+    }
+
+    // Cleanup uploaded file
+    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+
+    console.log(`[Revit XLSX] Processed ${insertedCount} records from ${req.file.originalname}`)
+
+    res.json({
+      count: insertedCount,
+      totalRows: rows.length,
+      errors: errors.length > 0 ? errors : undefined,
+      mappedColumns: Object.entries(resolvedMap).map(([field, col]) => `${field} ← "${col}"`),
+      unmappedColumns: availableCols.filter(c => !mappedCols.has(c) && c !== resolvedMap.globalId),
+    })
+  } catch (err) {
+    console.error('[Revit XLSX] Error:', err)
+    res.status(500).json({ error: 'Failed to process Revit XLSX', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 19. GET /api/revit/properties/:globalId — Fetch single element properties
+// ---------------------------------------------------------------------------
+app.get('/api/revit/properties/:globalId', async (req, res) => {
+  try {
+    if (!supabaseServer) {
+      return res.status(503).json({ error: 'Supabase not configured' })
+    }
+    const { globalId } = req.params
+    const projectId = req.query.projectId || 'default'
+
+    const { data, error } = await supabaseServer
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('global_id', globalId)
+      .eq('project_id', projectId)
+      .single()
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Element not found', globalId })
+    }
+
+    res.json(data)
+  } catch (err) {
+    console.error('[Revit Props] Error:', err)
+    res.status(500).json({ error: 'Failed to fetch properties', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 20. POST /api/revit/properties/bulk — Batch fetch element properties
+// ---------------------------------------------------------------------------
+app.post('/api/revit/properties/bulk', async (req, res) => {
+  try {
+    if (!supabaseServer) {
+      return res.status(503).json({ error: 'Supabase not configured' })
+    }
+    const { globalIds, projectId = 'default' } = req.body
+
+    if (!Array.isArray(globalIds) || globalIds.length === 0) {
+      return res.status(400).json({ error: 'globalIds array is required' })
+    }
+
+    const { data, error } = await supabaseServer
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('global_id', globalIds.slice(0, 1000))
+
+    if (error) {
+      return res.status(500).json({ error: 'Query failed', message: error.message })
+    }
+
+    res.json({
+      results: data || [],
+      count: data?.length || 0,
+      requested: globalIds.length,
+    })
+  } catch (err) {
+    console.error('[Revit Props Bulk] Error:', err)
+    res.status(500).json({ error: 'Failed to fetch properties', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Static file serving for uploaded outputs
 // ---------------------------------------------------------------------------
 app.use('/uploads', express.static(UPLOADS_DIR))
@@ -1448,6 +1706,9 @@ app.use((_req, res) => {
       'POST   /api/qto/generate',
       'POST   /api/ai/chat',
       'GET    /api/health',
+      'POST   /api/revit/upload-xlsx',
+      'GET    /api/revit/properties/:globalId',
+      'POST   /api/revit/properties/bulk',
     ],
   })
 })
