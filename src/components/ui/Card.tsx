@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils'
+import { Card as ShadcnCard, CardContent, CardHeader, CardTitle, CardDescription } from './shadcn/card'
 
 interface CardProps {
   children: React.ReactNode
@@ -10,18 +11,18 @@ interface CardProps {
 
 export function Card({ children, className, title, subtitle, actions }: CardProps) {
   return (
-    <div className={cn('bg-surface rounded-xl border border-border shadow-sm', className)}>
+    <ShadcnCard className={cn(className)}>
       {(title || actions) && (
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4">
           <div>
-            {title && <h3 className="font-semibold text-text">{title}</h3>}
-            {subtitle && <p className="text-sm text-text-secondary mt-0.5">{subtitle}</p>}
+            {title && <CardTitle className="text-base">{title}</CardTitle>}
+            {subtitle && <CardDescription className="mt-0.5">{subtitle}</CardDescription>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
-        </div>
+        </CardHeader>
       )}
-      <div className="p-6">{children}</div>
-    </div>
+      <CardContent className="px-6 py-6">{children}</CardContent>
+    </ShadcnCard>
   )
 }
 
@@ -33,20 +34,20 @@ export function StatCard({ label, value, icon: Icon, trend, color = 'primary' }:
   color?: 'primary' | 'success' | 'warning' | 'danger'
 }) {
   const colorMap = {
-    primary: 'bg-blue-50 text-blue-600',
-    success: 'bg-green-50 text-green-600',
-    warning: 'bg-amber-50 text-amber-600',
-    danger: 'bg-red-50 text-red-600',
+    primary: 'bg-primary/10 text-primary',
+    success: 'bg-success/10 text-success',
+    warning: 'bg-warning/10 text-warning',
+    danger: 'bg-destructive/10 text-destructive',
   }
 
   return (
-    <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
+    <ShadcnCard className="p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-text-secondary">{label}</p>
-          <p className="text-2xl font-bold text-text mt-1">{value}</p>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {trend && (
-            <p className={`text-xs mt-1 ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-xs mt-1 ${trend.value >= 0 ? 'text-success' : 'text-destructive'}`}>
               {trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}
             </p>
           )}
@@ -57,6 +58,6 @@ export function StatCard({ label, value, icon: Icon, trend, color = 'primary' }:
           </div>
         )}
       </div>
-    </div>
+    </ShadcnCard>
   )
 }
