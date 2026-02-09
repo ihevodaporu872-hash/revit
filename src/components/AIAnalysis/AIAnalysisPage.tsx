@@ -503,7 +503,7 @@ export default function AIAnalysisPage() {
                       {/* Code block */}
                       {msg.code && (
                         <div className="rounded-xl border border-border overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-2 bg-gray-900 text-gray-400">
+                          <div className="flex items-center justify-between px-4 py-2 bg-[oklch(0.15_0.01_262)] text-muted-foreground">
                             <div className="flex items-center gap-2 text-xs">
                               <Code2 size={14} />
                               <span>Generated Python Code</span>
@@ -516,7 +516,7 @@ export default function AIAnalysisPage() {
                               {copiedId === msg.id ? 'Copied' : 'Copy'}
                             </button>
                           </div>
-                          <pre className="bg-gray-950 text-gray-300 p-4 overflow-x-auto text-xs leading-relaxed">
+                          <pre className="bg-[oklch(0.12_0.01_262)] text-foreground/80 p-4 overflow-x-auto text-xs leading-relaxed">
                             <code>{msg.code}</code>
                           </pre>
                         </div>

@@ -192,9 +192,9 @@ function scoreColor(score: number): string {
 }
 
 function scoreBgColor(score: number): string {
-  if (score >= 90) return 'bg-green-500'
-  if (score >= 70) return 'bg-amber-500'
-  return 'bg-red-500'
+  if (score >= 90) return 'bg-success'
+  if (score >= 70) return 'bg-warning'
+  return 'bg-destructive'
 }
 
 function severityBadge(severity: ValidationIssue['severity']) {
@@ -575,15 +575,15 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
               <span>Score colors: </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <div className="w-3 h-3 rounded-full bg-success" />
               <span>90-100% Pass</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <div className="w-3 h-3 rounded-full bg-warning" />
               <span>70-89% Warning</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <div className="w-3 h-3 rounded-full bg-destructive" />
               <span>0-69% Fail</span>
             </div>
           </div>

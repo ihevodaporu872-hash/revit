@@ -215,7 +215,7 @@ export default function ConverterPage() {
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
-              j.status === 'failed' ? 'bg-danger' : j.status === 'completed' ? 'bg-green-500' : 'bg-primary'
+              j.status === 'failed' ? 'bg-danger' : j.status === 'completed' ? 'bg-success' : 'bg-primary'
             }`}
             style={{ width: `${j.progress}%` }}
           />

@@ -63,10 +63,10 @@ interface GanttItem {
 // ---- Constants ----
 
 const STATUS_COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'todo', label: 'To Do', color: 'bg-gray-400' },
-  { id: 'in_progress', label: 'In Progress', color: 'bg-blue-500' },
-  { id: 'review', label: 'Review', color: 'bg-amber-500' },
-  { id: 'done', label: 'Done', color: 'bg-green-500' },
+  { id: 'todo', label: 'To Do', color: 'bg-muted-foreground' },
+  { id: 'in_progress', label: 'In Progress', color: 'bg-primary' },
+  { id: 'review', label: 'Review', color: 'bg-warning' },
+  { id: 'done', label: 'Done', color: 'bg-success' },
 ]
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; variant: 'danger' | 'warning' | 'info' }> = {
@@ -312,7 +312,7 @@ export default function ProjectMgmtPage() {
               <span className="text-xs font-medium text-muted-foreground">
                 Telegram Bot: {telegramConnected ? 'Connected' : 'Disconnected'}
               </span>
-              <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-success' : 'bg-muted-foreground'}`} />
             </div>
             <Button
               variant="outline"
