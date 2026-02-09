@@ -7,7 +7,7 @@ test.describe('Module 8: QTO Reports', () => {
 
   test.describe('Page Load', () => {
     test('should display header with title', async ({ page }) => {
-      const header = page.locator('h1')
+      const header = page.locator('main h1')
       await expect(header).toBeVisible()
       await expect(header).toHaveText('QTO Reports')
     })
@@ -20,9 +20,6 @@ test.describe('Module 8: QTO Reports', () => {
     })
 
     test('should display 4 stat cards', async ({ page }) => {
-      // Wait for stat cards to be visible
-      await page.waitForSelector('[data-testid="stat-card"], .stat-card, [class*="stat"]', { timeout: 5000 })
-
       // Check for Total Elements
       await expect(page.getByText('Total Elements')).toBeVisible()
 
@@ -436,7 +433,7 @@ test.describe('Module 8: QTO Reports', () => {
     test('should have animated page transitions', async ({ page }) => {
       // Check that page content appears (animations complete)
       await page.waitForTimeout(1000)
-      await expect(page.locator('h1')).toBeVisible()
+      await expect(page.locator('main h1')).toBeVisible()
     })
 
     test('should have hover effects on grouping buttons', async ({ page }) => {
