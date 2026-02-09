@@ -232,7 +232,7 @@ function GenerateTab() {
 
         <Card title="Report Options">
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-text mb-2">Group By</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Group By</label>
             {GROUP_OPTIONS.map((opt) => {
               const Icon = opt.icon
               return (
@@ -241,8 +241,8 @@ function GenerateTab() {
                   onClick={() => setGroupBy(opt.value)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
                     groupBy === opt.value
-                      ? 'border-primary bg-primary-light/50 text-primary'
-                      : 'border-border hover:border-primary/40 text-text-secondary hover:text-text'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border hover:border-primary/40 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Icon size={18} />
@@ -461,11 +461,11 @@ export default function QTOReportsPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <MotionPage><div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-text">QTO Reports</h1>
-        <p className="text-text-secondary mt-1">
+        <h1 className="text-2xl font-bold text-foreground">QTO Reports</h1>
+        <p className="text-muted-foreground mt-1">
           Generate Quantity Take-Off reports from IFC models and Excel files
         </p>
       </div>
@@ -507,6 +507,6 @@ export default function QTOReportsPage() {
           </>
         )}
       </Tabs>
-    </div>
+    </div></MotionPage>
   )
 }
