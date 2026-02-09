@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
   Plus,
@@ -25,6 +26,15 @@ import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
+import {
+  staggerContainer,
+  fadeInUp,
+  scaleIn,
+  cardHover,
+  listItem,
+  modalOverlay,
+  modalContent,
+} from '../../lib/animations'
 
 // ---- Types ----
 
@@ -328,12 +338,25 @@ export default function ProjectMgmtPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Tasks" value={totalTasks} icon={ListTodo} color="primary" />
-          <StatCard label="Completed" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'completion rate' }} />
-          <StatCard label="Overdue" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
-          <StatCard label="Team Members" value={teamMembers} icon={Users} color="primary" />
-        </div>
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Total Tasks" value={totalTasks} icon={ListTodo} color="primary" />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Completed" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'completion rate' }} />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Overdue" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
+          </motion.div>
+          <motion.div variants={fadeInUp}>
+            <StatCard label="Team Members" value={teamMembers} icon={Users} color="primary" />
+          </motion.div>
+        </motion.div>
 
         {/* Filters */}
         {showFilters && (
@@ -389,17 +412,34 @@ export default function ProjectMgmtPage() {
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
                     <h3 className="font-semibold text-foreground text-sm">{col.label}</h3>
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                      {columnTasks.length}
-                    </span>
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={columnTasks.length}
+                        className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {columnTasks.length}
+                      </motion.span>
+                    </AnimatePresence>
                   </div>
                 </div>
 
                 {/* Task Cards */}
-                <div className="space-y-3 min-h-[200px]">
+                <motion.div
+                  className="space-y-3 min-h-[200px]"
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {columnTasks.map((task) => (
-                    <div
+                    <motion.div
                       key={task.id}
+                      variants={fadeInUp}
+                      whileHover={{ y: -2 }}
+                      transition={{ duration: 0.15 }}
                       onClick={() => setSelectedTask(task)}
                       className="bg-card rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
                     >
@@ -450,7 +490,7 @@ export default function ProjectMgmtPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
 
                   {columnTasks.length === 0 && (
@@ -458,7 +498,7 @@ export default function ProjectMgmtPage() {
                       No tasks
                     </div>
                   )}
-                </div>
+                </motion.div>
               </div>
             )
           })}
@@ -476,7 +516,7 @@ export default function ProjectMgmtPage() {
               <span>Mar 1</span>
             </div>
 
-            {GANTT_ITEMS.map((item) => (
+            {GANTT_ITEMS.map((item, index) => (
               <div key={item.id} className="flex items-center gap-3">
                 <div className="w-36 shrink-0 text-right">
                   <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
@@ -490,19 +530,21 @@ export default function ProjectMgmtPage() {
                     ))}
                   </div>
                   {/* Bar */}
-                  <div
-                    className="absolute top-1 bottom-1 rounded-md transition-all"
+                  <motion.div
+                    className="absolute top-1 bottom-1 rounded-md"
                     style={{
                       left: `${item.startPercent}%`,
-                      width: `${item.widthPercent}%`,
                       backgroundColor: item.color,
                       opacity: 0.85,
                     }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${item.widthPercent}%` }}
+                    transition={{ duration: 0.8, delay: index * 0.08, ease: [0.25, 0.1, 0.25, 1] }}
                   >
                     <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white truncate px-2">
                       {item.widthPercent > 15 ? item.title : ''}
                     </span>
-                  </div>
+                  </motion.div>
                   {/* Today marker */}
                   <div className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10" style={{ left: '27%' }}>
                     <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-destructive font-bold whitespace-nowrap">
@@ -516,246 +558,289 @@ export default function ProjectMgmtPage() {
         </Card>
 
         {/* Add Task Dialog */}
-        {showAddDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddDialog(false)}>
-            <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                <h3 className="text-lg font-semibold text-foreground">New Task</h3>
-                <button onClick={() => setShowAddDialog(false)} className="p-1 hover:bg-muted rounded-lg transition-colors">
-                  <X size={18} className="text-muted-foreground" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Title *</label>
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Enter task title..."
-                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
+        <AnimatePresence>
+          {showAddDialog && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowAddDialog(false)}
+              variants={modalOverlay}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div
+                className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg"
+                onClick={(e) => e.stopPropagation()}
+                variants={modalContent}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h3 className="text-lg font-semibold text-foreground">New Task</h3>
+                  <button onClick={() => setShowAddDialog(false)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+                    <X size={18} className="text-muted-foreground" />
+                  </button>
                 </div>
 
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
-                  <textarea
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    placeholder="Describe the task..."
-                    rows={3}
-                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                  />
-                </div>
-
-                {/* Assignee + Priority */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="p-6 space-y-4">
+                  {/* Title */}
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Assignee</label>
-                    <select
-                      value={newAssignee}
-                      onChange={(e) => setNewAssignee(e.target.value)}
-                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    >
-                      {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Priority</label>
-                    <select
-                      value={newPriority}
-                      onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    >
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Due Date</label>
-                  <input
-                    type="date"
-                    value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.keys(TAG_COLORS).map((tag) => (
-                      <button
-                        key={tag}
-                        onClick={() => toggleTag(tag)}
-                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                          newTags.includes(tag)
-                            ? 'border-primary bg-primary/10 text-primary font-medium'
-                            : 'border-border text-muted-foreground hover:border-primary/30'
-                        }`}
-                      >
-                        <Tag size={10} className="inline mr-1" />
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-                <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-                <Button onClick={addTask} icon={<Plus size={16} />}>Create Task</Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Task Detail Drawer */}
-        {selectedTask && (
-          <div className="fixed inset-0 bg-black/50 flex justify-end z-50" onClick={() => setSelectedTask(null)}>
-            <div className="bg-card w-full max-w-lg h-full overflow-y-auto shadow-2xl border-l border-border" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
-                <div className="flex items-center gap-3">
-                  <Badge variant={PRIORITY_CONFIG[selectedTask.priority].variant}>
-                    {PRIORITY_CONFIG[selectedTask.priority].label}
-                  </Badge>
-                  <Badge variant={selectedTask.status === 'done' ? 'success' : 'default'}>
-                    {STATUS_COLUMNS.find((c) => c.id === selectedTask.status)?.label}
-                  </Badge>
-                </div>
-                <button onClick={() => setSelectedTask(null)} className="p-1 hover:bg-muted rounded-lg transition-colors">
-                  <X size={18} className="text-muted-foreground" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-6">
-                {/* Title & Description */}
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">{selectedTask.title}</h2>
-                  <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{selectedTask.description}</p>
-                </div>
-
-                {/* Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-muted rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground">Assignee</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <User size={14} className="text-primary" />
-                      <span className="text-sm font-medium text-foreground">{selectedTask.assignee}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground">Due Date</p>
-                    <div className={`flex items-center gap-2 mt-1 ${isOverdue(selectedTask) ? 'text-destructive' : ''}`}>
-                      <Calendar size={14} className={isOverdue(selectedTask) ? 'text-destructive' : 'text-primary'} />
-                      <span className="text-sm font-medium">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground">Created</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Clock size={14} className="text-primary" />
-                      <span className="text-sm font-medium text-foreground">{new Date(selectedTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground">Comments</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <MessageSquare size={14} className="text-primary" />
-                      <span className="text-sm font-medium text-foreground">{selectedTask.comments.length}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                {selectedTask.tags.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedTask.tags.map((tag) => (
-                        <span key={tag} className={`text-xs px-2 py-1 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-muted text-muted-foreground'}`}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Move Task */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Move To</p>
-                  <div className="flex gap-2">
-                    {STATUS_COLUMNS.filter((c) => c.id !== selectedTask.status).map((col) => (
-                      <Button
-                        key={col.id}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => moveTask(selectedTask.id, col.id)}
-                        icon={<ArrowRight size={12} />}
-                      >
-                        {col.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Comments */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Comments ({selectedTask.comments.length})
-                  </p>
-
-                  {selectedTask.comments.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedTask.comments.map((comment) => (
-                        <div key={comment.id} className="p-3 bg-muted rounded-lg border border-border">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold text-foreground">{comment.author}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(comment.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{comment.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No comments yet.</p>
-                  )}
-
-                  {/* Add comment */}
-                  <div className="flex items-center gap-2 mt-3">
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Title *</label>
                     <input
                       type="text"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') addComment() }}
-                      placeholder="Add a comment..."
-                      className="flex-1 px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Enter task title..."
+                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
-                    <Button
-                      size="sm"
-                      icon={<SendIcon size={14} />}
-                      onClick={addComment}
-                      disabled={!commentText.trim()}
-                    >
-                      Send
-                    </Button>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
+                    <textarea
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      placeholder="Describe the task..."
+                      rows={3}
+                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                    />
+                  </div>
+
+                  {/* Assignee + Priority */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Assignee</label>
+                      <select
+                        value={newAssignee}
+                        onChange={(e) => setNewAssignee(e.target.value)}
+                        className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Priority</label>
+                      <select
+                        value={newPriority}
+                        onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
+                        className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Due Date */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Due Date</label>
+                    <input
+                      type="date"
+                      value={newDueDate}
+                      onChange={(e) => setNewDueDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(TAG_COLORS).map((tag) => (
+                        <motion.button
+                          key={tag}
+                          onClick={() => toggleTag(tag)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                            newTags.includes(tag)
+                              ? 'border-primary bg-primary/10 text-primary font-medium'
+                              : 'border-border text-muted-foreground hover:border-primary/30'
+                          }`}
+                        >
+                          <Tag size={10} className="inline mr-1" />
+                          {tag}
+                        </motion.button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                  <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+                  <Button onClick={addTask} icon={<Plus size={16} />}>Create Task</Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Task Detail Drawer */}
+        <AnimatePresence>
+          {selectedTask && (
+            <motion.div
+              className="fixed inset-0 bg-black/50 flex justify-end z-50"
+              onClick={() => setSelectedTask(null)}
+              variants={modalOverlay}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.div
+                className="bg-card w-full max-w-lg h-full overflow-y-auto shadow-2xl border-l border-border"
+                onClick={(e) => e.stopPropagation()}
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={PRIORITY_CONFIG[selectedTask.priority].variant}>
+                      {PRIORITY_CONFIG[selectedTask.priority].label}
+                    </Badge>
+                    <Badge variant={selectedTask.status === 'done' ? 'success' : 'default'}>
+                      {STATUS_COLUMNS.find((c) => c.id === selectedTask.status)?.label}
+                    </Badge>
+                  </div>
+                  <button onClick={() => setSelectedTask(null)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+                    <X size={18} className="text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Title & Description */}
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">{selectedTask.title}</h2>
+                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{selectedTask.description}</p>
+                  </div>
+
+                  {/* Details */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Assignee</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <User size={14} className="text-primary" />
+                        <span className="text-sm font-medium text-foreground">{selectedTask.assignee}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Due Date</p>
+                      <div className={`flex items-center gap-2 mt-1 ${isOverdue(selectedTask) ? 'text-destructive' : ''}`}>
+                        <Calendar size={14} className={isOverdue(selectedTask) ? 'text-destructive' : 'text-primary'} />
+                        <span className="text-sm font-medium">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Created</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Clock size={14} className="text-primary" />
+                        <span className="text-sm font-medium text-foreground">{new Date(selectedTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Comments</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <MessageSquare size={14} className="text-primary" />
+                        <span className="text-sm font-medium text-foreground">{selectedTask.comments.length}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {selectedTask.tags.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTask.tags.map((tag) => (
+                          <span key={tag} className={`text-xs px-2 py-1 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-muted text-muted-foreground'}`}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Move Task */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Move To</p>
+                    <div className="flex gap-2">
+                      {STATUS_COLUMNS.filter((c) => c.id !== selectedTask.status).map((col) => (
+                        <Button
+                          key={col.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => moveTask(selectedTask.id, col.id)}
+                          icon={<ArrowRight size={12} />}
+                        >
+                          {col.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      Comments ({selectedTask.comments.length})
+                    </p>
+
+                    {selectedTask.comments.length > 0 ? (
+                      <motion.div
+                        className="space-y-3"
+                        variants={staggerContainer}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        {selectedTask.comments.map((comment) => (
+                          <motion.div
+                            key={comment.id}
+                            variants={listItem}
+                            className="p-3 bg-muted rounded-lg border border-border"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold text-foreground">{comment.author}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(comment.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{comment.text}</p>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No comments yet.</p>
+                    )}
+
+                    {/* Add comment */}
+                    <div className="flex items-center gap-2 mt-3">
+                      <input
+                        type="text"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') addComment() }}
+                        placeholder="Add a comment..."
+                        className="flex-1 px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                      <Button
+                        size="sm"
+                        icon={<SendIcon size={14} />}
+                        onClick={addComment}
+                        disabled={!commentText.trim()}
+                      >
+                        Send
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </MotionPage>
   )

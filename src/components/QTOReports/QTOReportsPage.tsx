@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3, Layers, Building2, GitBranch, List,
   Download, FileSpreadsheet, FileText, Globe,
@@ -11,6 +12,7 @@ import { Table } from '../ui/Table'
 import { Tabs } from '../ui/Tabs'
 import { FileUpload } from '../ui/FileUpload'
 import { formatDate, formatCurrency } from '../../lib/utils'
+import { staggerContainer, fadeInUp, scaleIn, listItem } from '../../lib/animations'
 import type { QTOReport, QTOOptions, QTOReportRecord } from '../../services/api'
 import { generateQTO } from '../../services/api'
 import { MotionPage } from '../MotionPage'
@@ -220,7 +222,7 @@ function GenerateTab() {
       {/* Upload + Options */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card title="Upload File" subtitle="IFC or Excel files for quantity extraction">
+          <Card hover title="Upload File" subtitle="IFC or Excel files for quantity extraction">
             <FileUpload
               accept=".ifc,.xlsx,.xls"
               onFilesSelected={setFiles}
@@ -230,14 +232,16 @@ function GenerateTab() {
           </Card>
         </div>
 
-        <Card title="Report Options">
+        <Card hover title="Report Options">
           <div className="space-y-3">
             <label className="block text-sm font-medium text-foreground mb-2">Group By</label>
             {GROUP_OPTIONS.map((opt) => {
               const Icon = opt.icon
               return (
-                <button
+                <motion.button
                   key={opt.value}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setGroupBy(opt.value)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
                     groupBy === opt.value
@@ -247,7 +251,7 @@ function GenerateTab() {
                 >
                   <Icon size={18} />
                   {opt.label}
-                </button>
+                </motion.button>
               )
             })}
 
@@ -269,52 +273,63 @@ function GenerateTab() {
       {report && (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Elements" value={report.summary.totalElements} icon={Layers} color="primary" />
-            <StatCard label="Categories" value={report.summary.totalCategories} icon={BarChart3} color="success" />
-            <StatCard label="Floors" value={report.summary.totalFloors} icon={Building2} color="warning" />
-            <StatCard label="Estimated Cost" value={formatCurrency(report.summary.estimatedCost)} color="primary" />
-          </div>
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          >
+            <motion.div variants={fadeInUp}>
+              <StatCard label="Total Elements" value={report.summary.totalElements} icon={Layers} color="primary" />
+            </motion.div>
+            <motion.div variants={fadeInUp}>
+              <StatCard label="Categories" value={report.summary.totalCategories} icon={BarChart3} color="success" />
+            </motion.div>
+            <motion.div variants={fadeInUp}>
+              <StatCard label="Floors" value={report.summary.totalFloors} icon={Building2} color="warning" />
+            </motion.div>
+            <motion.div variants={fadeInUp}>
+              <StatCard label="Estimated Cost" value={formatCurrency(report.summary.estimatedCost)} color="primary" />
+            </motion.div>
+          </motion.div>
 
           {/* Report Table */}
           <Card
+            hover
             title={`QTO Report - ${report.fileName}`}
             subtitle={`Grouped by ${report.groupBy} | Generated ${formatDate(report.createdAt)}`}
             actions={
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   icon={<FileSpreadsheet size={14} />}
                   onClick={() => {
                     const csv = exportToCsv(report)
                     downloadBlob(csv, `qto-report-${report.id}.csv`, 'text/csv')
                   }}
-                >
-                  Excel
-                </Button>
+                  title="Export to Excel (CSV)"
+                />
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   icon={<FileText size={14} />}
                   onClick={() => {
                     const html = exportToHtml(report)
                     downloadBlob(html, `qto-report-${report.id}.pdf.html`, 'text/html')
                   }}
-                >
-                  PDF
-                </Button>
+                  title="Export as PDF"
+                />
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
                   icon={<Globe size={14} />}
                   onClick={() => {
                     const html = exportToHtml(report)
                     downloadBlob(html, `qto-report-${report.id}.html`, 'text/html')
                   }}
-                >
-                  HTML
-                </Button>
+                  title="Export as HTML"
+                />
               </div>
             }
           >
@@ -335,56 +350,78 @@ function GenerateTab() {
                   {report.categories.map((cat) => (
                     <>
                       {/* Category header row */}
-                      <tr
+                      <motion.tr
                         key={`cat-${cat.name}`}
                         className="bg-muted cursor-pointer hover:bg-primary/10 transition-colors"
                         onClick={() => toggleCategory(cat.name)}
+                        whileTap={{ scale: 0.995 }}
+                        variants={fadeInUp}
+                        initial="hidden"
+                        animate="visible"
                       >
                         <td className="px-4 py-3 text-sm font-semibold text-foreground" colSpan={2}>
                           <div className="flex items-center gap-2">
-                            <span className={`transition-transform inline-block ${expandedCategories.has(cat.name) ? 'rotate-90' : ''}`}>
+                            <motion.span
+                              className="inline-block"
+                              animate={{ rotate: expandedCategories.has(cat.name) ? 90 : 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
                               &#9654;
-                            </span>
+                            </motion.span>
                             {cat.name}
                             <Badge variant="default">{cat.elementCount} elements</Badge>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground text-right" />
-                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right font-mono">
                           {cat.totalQuantity.toLocaleString()}
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{cat.unit}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground text-right" />
-                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
+                        <td className="px-4 py-3 text-sm text-muted-foreground text-right font-mono" />
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right font-mono">
                           {formatCurrency(cat.totalCost)}
                         </td>
-                      </tr>
+                      </motion.tr>
 
                       {/* Expanded element rows */}
-                      {expandedCategories.has(cat.name) &&
-                        cat.elements.map((el) => (
-                          <tr key={el.id} className="border-b border-border/30 hover:bg-muted/50 transition-colors">
-                            <td className="px-4 py-2.5 text-sm text-foreground pl-10">{el.name}</td>
-                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.material}</td>
-                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.floor}</td>
-                            <td className="px-4 py-2.5 text-sm text-foreground text-right">{el.quantity.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.unit}</td>
-                            <td className="px-4 py-2.5 text-sm text-foreground text-right">{formatCurrency(el.unitCost)}</td>
-                            <td className="px-4 py-2.5 text-sm text-foreground font-medium text-right">{formatCurrency(el.totalCost)}</td>
-                          </tr>
-                        ))}
+                      <AnimatePresence>
+                        {expandedCategories.has(cat.name) &&
+                          cat.elements.map((el) => (
+                            <motion.tr
+                              key={el.id}
+                              variants={listItem}
+                              initial="hidden"
+                              animate="visible"
+                              exit="exit"
+                              className="border-b border-border/30 hover:bg-muted/50 transition-colors"
+                            >
+                              <td className="px-4 py-2.5 text-sm text-foreground pl-10">{el.name}</td>
+                              <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.material}</td>
+                              <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.floor}</td>
+                              <td className="px-4 py-2.5 text-sm text-foreground text-right font-mono">{el.quantity.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.unit}</td>
+                              <td className="px-4 py-2.5 text-sm text-foreground text-right font-mono">{formatCurrency(el.unitCost)}</td>
+                              <td className="px-4 py-2.5 text-sm text-foreground font-medium text-right font-mono">{formatCurrency(el.totalCost)}</td>
+                            </motion.tr>
+                          ))}
+                      </AnimatePresence>
                     </>
                   ))}
 
                   {/* Grand Total */}
-                  <tr className="border-t-2 border-border bg-muted">
+                  <motion.tr
+                    className="border-t-2 border-border bg-muted"
+                    variants={scaleIn}
+                    initial="hidden"
+                    animate="visible"
+                  >
                     <td className="px-4 py-3 text-sm font-bold text-foreground" colSpan={6}>
                       Grand Total
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-primary text-right">
+                    <td className="px-4 py-3 text-sm font-bold text-primary text-right font-mono">
                       {formatCurrency(report.summary.estimatedCost)}
                     </td>
-                  </tr>
+                  </motion.tr>
                 </tbody>
               </table>
             </div>
@@ -421,7 +458,7 @@ function HistoryTab() {
       key: 'estimatedCost',
       header: 'Estimated Cost',
       render: (r: typeof history[0]) => (
-        <span className="font-medium">{formatCurrency(r.estimatedCost)}</span>
+        <span className="font-medium text-right font-mono">{formatCurrency(r.estimatedCost)}</span>
       ),
     },
     {
@@ -446,7 +483,7 @@ function HistoryTab() {
   ]
 
   return (
-    <Card title="Report History" subtitle="Previously generated QTO reports">
+    <Card hover title="Report History" subtitle="Previously generated QTO reports">
       <Table columns={columns} data={history} emptyMessage="No reports generated yet" />
     </Card>
   )
@@ -463,40 +500,53 @@ export default function QTOReportsPage() {
   return (
     <MotionPage><div className="space-y-6">
       {/* Header */}
-      <div>
+      <motion.div variants={fadeInUp} initial="hidden" animate="visible">
         <h1 className="text-2xl font-bold text-foreground">QTO Reports</h1>
         <p className="text-muted-foreground mt-1">
           Generate Quantity Take-Off reports from IFC models and Excel files
         </p>
-      </div>
+      </motion.div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Elements"
-          value={MOCK_QTO_REPORT.summary.totalElements}
-          icon={Layers}
-          color="primary"
-        />
-        <StatCard
-          label="Categories"
-          value={MOCK_QTO_REPORT.summary.totalCategories}
-          icon={BarChart3}
-          color="success"
-        />
-        <StatCard
-          label="Floors"
-          value={MOCK_QTO_REPORT.summary.totalFloors}
-          icon={Building2}
-          color="warning"
-        />
-        <StatCard
-          label="Estimated Cost"
-          value={formatCurrency(MOCK_QTO_REPORT.summary.estimatedCost)}
-          color="primary"
-          trend={{ value: 3.2, label: 'from last estimate' }}
-        />
-      </div>
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        <motion.div variants={fadeInUp}>
+          <StatCard
+            label="Total Elements"
+            value={MOCK_QTO_REPORT.summary.totalElements}
+            icon={Layers}
+            color="primary"
+          />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard
+            label="Categories"
+            value={MOCK_QTO_REPORT.summary.totalCategories}
+            icon={BarChart3}
+            color="success"
+          />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard
+            label="Floors"
+            value={MOCK_QTO_REPORT.summary.totalFloors}
+            icon={Building2}
+            color="warning"
+          />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard
+            label="Estimated Cost"
+            value={formatCurrency(MOCK_QTO_REPORT.summary.estimatedCost)}
+            color="primary"
+            trend={{ value: 3.2, label: 'from last estimate' }}
+          />
+        </motion.div>
+      </motion.div>
 
       {/* Tabs */}
       <Tabs tabs={tabs} defaultTab="generate">
