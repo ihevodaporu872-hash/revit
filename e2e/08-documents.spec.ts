@@ -8,7 +8,7 @@ test.describe('Module 7: Document Control', () => {
   // ─── Page Load Tests ────────────────────────────────────────────────────────
 
   test('should display page header and subtitle', async ({ page }) => {
-    await expect(page.locator('h1')).toHaveText('Document Control')
+    await expect(page.locator('main h1')).toHaveText('Document Control')
     await expect(page.locator('p').filter({ hasText: 'Manage project documents, RFIs, submittals, and generate meeting minutes' })).toBeVisible()
   })
 
@@ -377,8 +377,8 @@ test.describe('Module 7: Document Control', () => {
   // ─── Accessibility and UI Tests ─────────────────────────────────────────────
 
   test('should have proper heading hierarchy', async ({ page }) => {
-    await expect(page.locator('h1')).toHaveCount(1)
-    await expect(page.locator('h1')).toHaveText('Document Control')
+    await expect(page.locator('main h1')).toHaveCount(1)
+    await expect(page.locator('main h1')).toHaveText('Document Control')
   })
 
   test('should display icons on stat cards', async ({ page }) => {
