@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck,
   Play,
@@ -22,6 +23,7 @@ import { Table } from '../ui/Table'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
+import { staggerContainer, fadeInUp, scaleIn, cardHover, listItem } from '../../lib/animations'
 
 // ---- Types ----
 
@@ -358,12 +360,25 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Models Validated" value={modelsValidated} icon={FileCheck2} color="primary" trend={{ value: 12, label: 'this month' }} />
-        <StatCard label="Average Score" value={`${avgScore}%`} icon={Target} color="success" trend={{ value: 5, label: 'vs last month' }} />
-        <StatCard label="Issues Found" value={issuesFound} icon={AlertTriangle} color="warning" trend={{ value: -8, label: 'vs last month' }} />
-        <StatCard label="Pass Rate" value={`${passRate}%`} icon={TrendingUp} color="success" trend={{ value: 3, label: 'improvement' }} />
-      </div>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Models Validated" value={modelsValidated} icon={FileCheck2} color="primary" trend={{ value: 12, label: 'this month' }} />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Average Score" value={`${avgScore}%`} icon={Target} color="success" trend={{ value: 5, label: 'vs last month' }} />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Issues Found" value={issuesFound} icon={AlertTriangle} color="warning" trend={{ value: -8, label: 'vs last month' }} />
+        </motion.div>
+        <motion.div variants={fadeInUp}>
+          <StatCard label="Pass Rate" value={`${passRate}%`} icon={TrendingUp} color="success" trend={{ value: 3, label: 'improvement' }} />
+        </motion.div>
+      </motion.div>
 
       {/* Upload & Rules */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -384,10 +399,11 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
         <Card title="Validation Rules" subtitle="Select rules to check" actions={
           <span className="text-xs text-muted-foreground">{rules.filter((r) => r.checked).length}/{rules.length} selected</span>
         }>
-          <div className="space-y-3">
+          <motion.div className="space-y-3" variants={staggerContainer} initial="hidden" animate="visible">
             {rules.map((rule) => (
-              <label
+              <motion.label
                 key={rule.id}
+                variants={listItem}
                 className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer"
               >
                 <input
@@ -400,9 +416,9 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                   <p className="text-sm font-medium text-foreground">{rule.label}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{rule.description}</p>
                 </div>
-              </label>
+              </motion.label>
             ))}
-          </div>
+          </motion.div>
 
           <Button
             className="w-full mt-4"
@@ -417,8 +433,15 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
       </div>
 
       {/* Results */}
+      <AnimatePresence mode="wait">
       {report && (
-        <>
+        <motion.div
+          key="report"
+          variants={scaleIn}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
           {/* Overall Score */}
           <Card>
             <div className="flex items-center gap-8">
@@ -426,11 +449,13 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
               <div className="relative w-32 h-32 shrink-0">
                 <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
                   <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="10" className="text-border" />
-                  <circle
+                  <motion.circle
                     cx="60" cy="60" r="52" fill="none"
                     strokeWidth="10"
                     strokeLinecap="round"
-                    strokeDasharray={`${(report.overallScore / 100) * 327} 327`}
+                    initial={{ strokeDasharray: "0 327" }}
+                    animate={{ strokeDasharray: `${(report.overallScore / 100) * 327} 327` }}
+                    transition={{ duration: 1, ease: [0.25, 0.1, 0.25, 1], delay: 0.2 }}
                     className={scoreBgColor(report.overallScore).replace('bg-', 'text-')}
                     stroke="currentColor"
                   />
@@ -473,9 +498,11 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
                 {/* Progress bar */}
                 <div className="mt-3 h-2 bg-border rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-1000 ${scoreBgColor(report.overallScore)}`}
-                    style={{ width: `${report.overallScore}%` }}
+                  <motion.div
+                    className={`h-full rounded-full ${scoreBgColor(report.overallScore)}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${report.overallScore}%` }}
+                    transition={{ duration: 1, ease: [0.25, 0.1, 0.25, 1], delay: 0.3 }}
                   />
                 </div>
               </div>
@@ -483,10 +510,19 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
           </Card>
 
           {/* Rule Results Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
             {report.ruleResults.map((result) => (
-              <div
+              <motion.div
                 key={result.ruleId}
+                variants={fadeInUp}
+                whileHover={{ y: -2 }}
+                initial="rest"
+                animate="rest"
                 className="bg-card rounded-xl border border-border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setExpandedRule(expandedRule === result.ruleId ? null : result.ruleId)}
               >
@@ -507,39 +543,51 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
                   {/* Progress bar */}
                   <div className="mt-3 h-1.5 bg-border rounded-full overflow-hidden">
-                    <div
+                    <motion.div
                       className={`h-full rounded-full ${scoreBgColor(result.score)}`}
-                      style={{ width: `${result.score}%` }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${result.score}%` }}
+                      transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1], delay: 0.1 }}
                     />
                   </div>
 
                   {/* Expanded details */}
-                  {expandedRule === result.ruleId && (
-                    <div className="mt-4 pt-4 border-t border-border space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Elements</span>
-                        <span className="font-medium text-foreground">{result.total}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Passed</span>
-                        <span className="font-medium text-success">{result.passed}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Failed</span>
-                        <span className="font-medium text-destructive">{result.total - result.passed}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Related Issues</span>
-                        <span className="font-medium text-foreground">
-                          {report.issues.filter((i) => i.rule === result.ruleName).length}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {expandedRule === result.ruleId && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-4 pt-4 border-t border-border space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total Elements</span>
+                            <span className="font-medium text-foreground">{result.total}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Passed</span>
+                            <span className="font-medium text-success">{result.passed}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Failed</span>
+                            <span className="font-medium text-destructive">{result.total - result.passed}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Related Issues</span>
+                            <span className="font-medium text-foreground">
+                              {report.issues.filter((i) => i.rule === result.ruleName).length}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Issues Table */}
           <Card
@@ -587,38 +635,59 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
               <span>0-69% Fail</span>
             </div>
           </div>
-        </>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Empty state */}
+      <AnimatePresence mode="wait">
       {!report && !running && (
-        <Card>
-          <div className="flex flex-col items-center py-16 text-muted-foreground">
-            <ListChecks size={56} className="mb-4 text-primary/30" />
-            <h3 className="text-lg font-semibold text-foreground">No Validation Results Yet</h3>
-            <p className="text-sm mt-1 max-w-md text-center">
-              Upload an IFC or Excel file, select your validation rules, and click "Run Validation" to check your BIM model against industry standards.
-            </p>
-          </div>
-        </Card>
+        <motion.div
+          key="empty"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          <Card>
+            <div className="flex flex-col items-center py-16 text-muted-foreground">
+              <ListChecks size={56} className="mb-4 text-primary/30" />
+              <h3 className="text-lg font-semibold text-foreground">No Validation Results Yet</h3>
+              <p className="text-sm mt-1 max-w-md text-center">
+                Upload an IFC or Excel file, select your validation rules, and click "Run Validation" to check your BIM model against industry standards.
+              </p>
+            </div>
+          </Card>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Running animation */}
+      <AnimatePresence mode="wait">
       {running && (
-        <Card>
-          <div className="flex flex-col items-center py-16">
-            <div className="relative w-20 h-20 mb-4">
-              <div className="absolute inset-0 border-4 border-border rounded-full" />
-              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <BarChart3 size={28} className="absolute inset-0 m-auto text-primary" />
+        <motion.div
+          key="running"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -16 }}
+          transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+        >
+          <Card>
+            <div className="flex flex-col items-center py-16">
+              <div className="relative w-20 h-20 mb-4">
+                <div className="absolute inset-0 border-4 border-border rounded-full" />
+                <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <BarChart3 size={28} className="absolute inset-0 m-auto text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">Validating Model...</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Checking {rules.filter((r) => r.checked).length} rules against {files.length} file(s)
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-foreground">Validating Model...</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Checking {rules.filter((r) => r.checked).length} rules against {files.length} file(s)
-            </p>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
       )}
+      </AnimatePresence>
       </div>
     </MotionPage>
   )
