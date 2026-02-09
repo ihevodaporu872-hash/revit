@@ -13,6 +13,7 @@ import { FileUpload } from '../ui/FileUpload'
 import { formatDate, formatCurrency } from '../../lib/utils'
 import type { QTOReport, QTOOptions, QTOReportRecord } from '../../services/api'
 import { generateQTO } from '../../services/api'
+import { MotionPage } from '../MotionPage'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -321,13 +322,13 @@ function GenerateTab() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Category / Element</th>
-                    <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Material</th>
-                    <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Floor</th>
-                    <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Quantity</th>
-                    <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Unit</th>
-                    <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Unit Cost</th>
-                    <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Total</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Category / Element</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Material</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Floor</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Quantity</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit Cost</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,10 +337,10 @@ function GenerateTab() {
                       {/* Category header row */}
                       <tr
                         key={`cat-${cat.name}`}
-                        className="bg-surface-alt cursor-pointer hover:bg-blue-50/50 transition-colors"
+                        className="bg-muted cursor-pointer hover:bg-primary/10 transition-colors"
                         onClick={() => toggleCategory(cat.name)}
                       >
-                        <td className="px-4 py-3 text-sm font-semibold text-text" colSpan={2}>
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground" colSpan={2}>
                           <div className="flex items-center gap-2">
                             <span className={`transition-transform inline-block ${expandedCategories.has(cat.name) ? 'rotate-90' : ''}`}>
                               &#9654;
@@ -348,13 +349,13 @@ function GenerateTab() {
                             <Badge variant="default">{cat.elementCount} elements</Badge>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-text-secondary text-right" />
-                        <td className="px-4 py-3 text-sm font-semibold text-text text-right">
+                        <td className="px-4 py-3 text-sm text-muted-foreground text-right" />
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
                           {cat.totalQuantity.toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 text-sm text-text-secondary">{cat.unit}</td>
-                        <td className="px-4 py-3 text-sm text-text-secondary text-right" />
-                        <td className="px-4 py-3 text-sm font-semibold text-text text-right">
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{cat.unit}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground text-right" />
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
                           {formatCurrency(cat.totalCost)}
                         </td>
                       </tr>
@@ -362,22 +363,22 @@ function GenerateTab() {
                       {/* Expanded element rows */}
                       {expandedCategories.has(cat.name) &&
                         cat.elements.map((el) => (
-                          <tr key={el.id} className="border-b border-border/30 hover:bg-surface-alt/50 transition-colors">
-                            <td className="px-4 py-2.5 text-sm text-text pl-10">{el.name}</td>
-                            <td className="px-4 py-2.5 text-sm text-text-secondary">{el.material}</td>
-                            <td className="px-4 py-2.5 text-sm text-text-secondary">{el.floor}</td>
-                            <td className="px-4 py-2.5 text-sm text-text text-right">{el.quantity.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-sm text-text-secondary">{el.unit}</td>
-                            <td className="px-4 py-2.5 text-sm text-text text-right">{formatCurrency(el.unitCost)}</td>
-                            <td className="px-4 py-2.5 text-sm text-text font-medium text-right">{formatCurrency(el.totalCost)}</td>
+                          <tr key={el.id} className="border-b border-border/30 hover:bg-muted/50 transition-colors">
+                            <td className="px-4 py-2.5 text-sm text-foreground pl-10">{el.name}</td>
+                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.material}</td>
+                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.floor}</td>
+                            <td className="px-4 py-2.5 text-sm text-foreground text-right">{el.quantity.toLocaleString()}</td>
+                            <td className="px-4 py-2.5 text-sm text-muted-foreground">{el.unit}</td>
+                            <td className="px-4 py-2.5 text-sm text-foreground text-right">{formatCurrency(el.unitCost)}</td>
+                            <td className="px-4 py-2.5 text-sm text-foreground font-medium text-right">{formatCurrency(el.totalCost)}</td>
                           </tr>
                         ))}
                     </>
                   ))}
 
                   {/* Grand Total */}
-                  <tr className="border-t-2 border-border bg-surface-alt">
-                    <td className="px-4 py-3 text-sm font-bold text-text" colSpan={6}>
+                  <tr className="border-t-2 border-border bg-muted">
+                    <td className="px-4 py-3 text-sm font-bold text-foreground" colSpan={6}>
                       Grand Total
                     </td>
                     <td className="px-4 py-3 text-sm font-bold text-primary text-right">
@@ -433,11 +434,11 @@ function HistoryTab() {
       header: '',
       render: () => (
         <div className="flex items-center gap-1">
-          <button className="p-1.5 rounded hover:bg-surface-alt transition-colors" title="Download">
-            <Download size={14} className="text-text-secondary" />
+          <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Download">
+            <Download size={14} className="text-muted-foreground" />
           </button>
-          <button className="p-1.5 rounded hover:bg-red-50 transition-colors" title="Delete">
-            <Trash2 size={14} className="text-text-secondary hover:text-red-500" />
+          <button className="p-1.5 rounded hover:bg-destructive/10 transition-colors" title="Delete">
+            <Trash2 size={14} className="text-muted-foreground hover:text-red-500" />
           </button>
         </div>
       ),

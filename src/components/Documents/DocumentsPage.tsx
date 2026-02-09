@@ -20,6 +20,7 @@ import {
   getSubmittals,
   generateMeetingMinutes,
 } from '../../services/api'
+import { MotionPage } from '../MotionPage'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -133,15 +134,15 @@ function DocumentsTab() {
     { key: 'author', header: 'Author' },
     { key: 'date', header: 'Date', render: (d: typeof documents[0]) => formatDate(d.date) },
     { key: 'version', header: 'Version', render: (d: typeof documents[0]) => (
-      <span className="font-mono text-xs bg-surface-alt px-2 py-0.5 rounded">v{d.version}</span>
+      <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">v{d.version}</span>
     )},
     { key: 'actions', header: '', render: () => (
       <div className="flex items-center gap-1">
-        <button className="p-1.5 rounded hover:bg-surface-alt transition-colors" title="Preview">
-          <Eye size={14} className="text-text-secondary" />
+        <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Preview">
+          <Eye size={14} className="text-muted-foreground" />
         </button>
-        <button className="p-1.5 rounded hover:bg-surface-alt transition-colors" title="Download">
-          <Download size={14} className="text-text-secondary" />
+        <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Download">
+          <Download size={14} className="text-muted-foreground" />
         </button>
       </div>
     )},
@@ -151,13 +152,13 @@ function DocumentsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search documents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
         <Button icon={<Plus size={16} />} onClick={() => setShowUpload(!showUpload)}>
@@ -175,7 +176,7 @@ function DocumentsTab() {
             description="PDF, DWG, IFC, Excel, Word, Images up to 500MB"
           />
           {uploading && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-text-secondary">
+            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
               <Loader2 size={14} className="animate-spin" />
               Uploading...
             </div>
@@ -248,7 +249,7 @@ function RFITab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted-foreground">
           Tracking {rfis.filter((r) => r.status === 'Open' || r.status === 'Overdue').length} open RFIs
         </p>
         <Button icon={<Plus size={16} />} onClick={() => setShowForm(!showForm)}>
@@ -260,21 +261,21 @@ function RFITab() {
         <Card title="Create New RFI">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-text mb-1">Subject</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Subject</label>
               <input
                 type="text"
                 value={form.subject}
                 onChange={(e) => setForm({ ...form, subject: e.target.value })}
                 placeholder="Describe the request for information..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Priority</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value as RFI['priority'] })}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
@@ -283,22 +284,22 @@ function RFITab() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Assigned To</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Assigned To</label>
               <input
                 type="text"
                 value={form.assignedTo}
                 onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
                 placeholder="Name of assignee"
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text mb-1">Due Date</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Due Date</label>
               <input
                 type="date"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div className="flex items-end">
@@ -327,7 +328,7 @@ function SubmittalsTab() {
     { key: 'description', header: 'Description' },
     { key: 'status', header: 'Status', render: (s: typeof submittals[0]) => submittalStatusBadge(s.status) },
     { key: 'specSection', header: 'Spec Section', render: (s: typeof submittals[0]) => (
-      <span className="font-mono text-xs bg-surface-alt px-2 py-0.5 rounded">{s.specSection}</span>
+      <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{s.specSection}</span>
     )},
     { key: 'dueDate', header: 'Due Date', render: (s: typeof submittals[0]) => formatDate(s.dueDate) },
     { key: 'contractor', header: 'Contractor' },
@@ -336,7 +337,7 @@ function SubmittalsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted-foreground">
           {submittals.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length} submittals awaiting action
         </p>
       </div>
@@ -408,7 +409,7 @@ Review and edit as needed before distribution.`
             onChange={(e) => setNotes(e.target.value)}
             placeholder={"Enter meeting notes here...\n\nExample:\n- Discussed foundation schedule\n- John to review structural calcs by Friday\n- HVAC coordination meeting next Tuesday\n- Budget review: $2.3M spent of $5M budget\n- Safety incident report: zero incidents this month"}
             rows={16}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono"
           />
           <Button
             onClick={handleGenerate}
@@ -426,7 +427,7 @@ Review and edit as needed before distribution.`
       <Card title="Formatted Minutes" subtitle="AI-generated meeting minutes preview">
         {minutes ? (
           <div className="space-y-4">
-            <pre className="whitespace-pre-wrap text-sm text-text font-mono bg-surface-alt p-4 rounded-lg border border-border max-h-[500px] overflow-y-auto leading-relaxed">
+            <pre className="whitespace-pre-wrap text-sm text-foreground font-mono bg-muted p-4 rounded-lg border border-border max-h-[500px] overflow-y-auto leading-relaxed">
               {minutes}
             </pre>
             <div className="flex gap-2">
@@ -458,7 +459,7 @@ Review and edit as needed before distribution.`
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <MessageSquareText size={48} className="mb-3 opacity-40" />
             <p className="font-medium">No minutes generated yet</p>
             <p className="text-sm mt-1">Enter your meeting notes and click Generate</p>
@@ -487,56 +488,58 @@ export default function DocumentsPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">Document Control</h1>
-        <p className="text-text-secondary mt-1">
-          Manage project documents, RFIs, submittals, and generate meeting minutes
-        </p>
-      </div>
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Document Control</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage project documents, RFIs, submittals, and generate meeting minutes
+          </p>
+        </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Documents"
-          value={totalDocs}
-          icon={FileText}
-          color="primary"
-        />
-        <StatCard
-          label="Pending RFIs"
-          value={pendingRFIs}
-          icon={ClipboardList}
-          color="warning"
-          trend={{ value: -12, label: 'vs last month' }}
-        />
-        <StatCard
-          label="Open Submittals"
-          value={openSubmittals}
-          icon={FileCheck2}
-          color="success"
-        />
-        <StatCard
-          label="Overdue Items"
-          value={overdueItems}
-          icon={AlertTriangle}
-          color="danger"
-          trend={{ value: 5, label: 'vs last week' }}
-        />
-      </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Documents"
+            value={totalDocs}
+            icon={FileText}
+            color="primary"
+          />
+          <StatCard
+            label="Pending RFIs"
+            value={pendingRFIs}
+            icon={ClipboardList}
+            color="warning"
+            trend={{ value: -12, label: 'vs last month' }}
+          />
+          <StatCard
+            label="Open Submittals"
+            value={openSubmittals}
+            icon={FileCheck2}
+            color="success"
+          />
+          <StatCard
+            label="Overdue Items"
+            value={overdueItems}
+            icon={AlertTriangle}
+            color="danger"
+            trend={{ value: 5, label: 'vs last week' }}
+          />
+        </div>
 
-      {/* Tabs */}
-      <Tabs tabs={tabs} defaultTab="documents">
-        {(activeTab) => (
-          <>
-            {activeTab === 'documents' && <DocumentsTab />}
-            {activeTab === 'rfis' && <RFITab />}
-            {activeTab === 'submittals' && <SubmittalsTab />}
-            {activeTab === 'minutes' && <MeetingMinutesTab />}
-          </>
-        )}
-      </Tabs>
-    </div>
+        {/* Tabs */}
+        <Tabs tabs={tabs} defaultTab="documents">
+          {(activeTab) => (
+            <>
+              {activeTab === 'documents' && <DocumentsTab />}
+              {activeTab === 'rfis' && <RFITab />}
+              {activeTab === 'submittals' && <SubmittalsTab />}
+              {activeTab === 'minutes' && <MeetingMinutesTab />}
+            </>
+          )}
+        </Tabs>
+      </div>
+    </MotionPage>
   )
 }
