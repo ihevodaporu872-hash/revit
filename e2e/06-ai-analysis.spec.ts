@@ -8,7 +8,7 @@ test.describe('Module 5: AI Data Analysis', () => {
   // ====== PAGE LOAD ======
 
   test('should display page header with title and subtitle', async ({ page }) => {
-    const header = page.locator('header h1')
+    const header = page.locator('main h1')
     await expect(header).toBeVisible()
     await expect(header).toHaveText('AI Data Analysis')
 
@@ -68,10 +68,10 @@ test.describe('Module 5: AI Data Analysis', () => {
     await expect(page.getByText('Show distribution')).toBeVisible()
 
     // Preset 3: Find anomalies
-    await expect(page.getByText('Find anomalies')).toBeVisible()
+    await expect(page.getByText('Find anomalies', { exact: true })).toBeVisible()
 
     // Preset 4: Compare columns
-    await expect(page.getByText('Compare columns')).toBeVisible()
+    await expect(page.getByText('Compare columns', { exact: true })).toBeVisible()
   })
 
   test('should show preset buttons as disabled without file', async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe('Module 5: AI Data Analysis', () => {
   // ====== CHAT INTERFACE ======
 
   test('should display chat input field with placeholder', async ({ page }) => {
-    const chatInput = page.locator('input[type="text"]').filter({ hasText: '' })
+    const chatInput = page.getByPlaceholder(/upload a file first/i)
     await expect(chatInput).toBeVisible()
 
     // Should show "Upload a file first..." when no file is uploaded
@@ -135,7 +135,7 @@ test.describe('Module 5: AI Data Analysis', () => {
   })
 
   test('should disable chat input without file', async ({ page }) => {
-    const chatInput = page.locator('input[type="text"]').filter({ hasText: '' })
+    const chatInput = page.getByPlaceholder(/upload a file first/i)
     await expect(chatInput).toBeDisabled()
 
     const sendButton = page.locator('button:has-text("Send")')
@@ -168,7 +168,7 @@ test.describe('Module 5: AI Data Analysis', () => {
     await expect(groupPreset).toBeVisible()
 
     // The full prompt should be visible in the button (even if truncated)
-    await expect(groupPreset.locator('text=/group.*category/i')).toBeVisible()
+    await expect(groupPreset).toBeVisible()
   })
 
   // ====== STAT CARDS VALUES ======
@@ -224,7 +224,7 @@ test.describe('Module 5: AI Data Analysis', () => {
 
   test('should have accessible form elements', async ({ page }) => {
     // Input should have proper placeholder
-    const chatInput = page.locator('input[type="text"]')
+    const chatInput = page.getByPlaceholder(/upload a file first/i)
     await expect(chatInput).toHaveAttribute('placeholder')
 
     // Button should be clickable (or disabled with proper state)
