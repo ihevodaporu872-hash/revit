@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { fetchTasks, createTask as sbCreateTask, updateTask as sbUpdateTask, addTaskComment as sbAddComment } from '../../services/supabase-api'
 import {
   LayoutDashboard,
   Plus,
@@ -207,6 +208,11 @@ const GANTT_ITEMS: GanttItem[] = [
 export default function ProjectMgmtPage() {
   const { addNotification } = useAppStore()
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
+  useEffect(() => {
+    fetchTasks()
+      .then((rows) => { if (rows.length > 0) setTasks(rows as Task[]) })
+      .catch(() => {})
+  }, [])
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [commentText, setCommentText] = useState('')
@@ -259,6 +265,16 @@ export default function ProjectMgmtPage() {
       createdAt: Date.now(),
     }
     setTasks((prev) => [task, ...prev])
+    // Persist to Supabase
+    sbCreateTask({
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      assignee: task.assignee,
+      dueDate: task.dueDate,
+      tags: task.tags,
+    }).catch(() => {})
     setShowAddDialog(false)
     setNewTitle('')
     setNewDescription('')
@@ -284,12 +300,14 @@ export default function ProjectMgmtPage() {
     )
     setSelectedTask((prev) => prev ? { ...prev, comments: [...prev.comments, comment] } : null)
     setCommentText('')
+    sbAddComment(selectedTask.id, 'You', commentText).catch(() => {})
   }, [commentText, selectedTask])
 
   const moveTask = useCallback((taskId: string, newStatus: TaskStatus) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
     )
+    sbUpdateTask(taskId, { status: newStatus }).catch(() => {})
     if (selectedTask?.id === taskId) {
       setSelectedTask((prev) => prev ? { ...prev, status: newStatus } : null)
     }

@@ -30,6 +30,7 @@ import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
 import { staggerContainer, fadeInUp, scaleIn, listItem, fadeIn } from '../../lib/animations'
+import { saveChatSession } from '../../services/supabase-api'
 
 // ---- Types ----
 
@@ -321,6 +322,8 @@ export default function AIAnalysisPage() {
   const [filesProcessed] = useState(31)
   const [chartsGenerated] = useState(18)
 
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null)
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -363,6 +366,13 @@ export default function AIAnalysisPage() {
             results: data.results,
           }
           setMessages((prev) => [...prev, aiMsg])
+          // Persist chat session to Supabase
+          saveChatSession({
+            id: chatSessionId || undefined,
+            title: files[0]?.name || 'AI Analysis',
+            fileName: files[0]?.name,
+            messages: [...messages, userMsg, aiMsg].map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
+          }).then((saved) => { if (saved?.id) setChatSessionId(saved.id) }).catch(() => {})
           setAnalysesRun((prev) => prev + 1)
           return
         }
@@ -382,6 +392,13 @@ export default function AIAnalysisPage() {
         results: mock.results,
       }
       setMessages((prev) => [...prev, aiMsg])
+      // Persist chat session to Supabase
+      saveChatSession({
+        id: chatSessionId || undefined,
+        title: files[0]?.name || 'AI Analysis',
+        fileName: files[0]?.name,
+        messages: [...messages, userMsg, aiMsg].map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
+      }).then((saved) => { if (saved?.id) setChatSessionId(saved.id) }).catch(() => {})
       setAnalysesRun((prev) => prev + 1)
     } catch (err) {
       addNotification('error', `Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
