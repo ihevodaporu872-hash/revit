@@ -6,6 +6,7 @@ uploads/
 .DS_Store
 Thumbs.db
 nul
+.mcp.json
 
 # DDC source repositories (external dependencies, not part of Jens app)
 123/

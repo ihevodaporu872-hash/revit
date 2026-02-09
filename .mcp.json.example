@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "Framelink MCP for Figma": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "figma-developer-mcp", "--stdio"],
+      "env": {
+        "FIGMA_PERSONAL_ACCESS_TOKEN": "your-figma-token-here"
+      }
+    }
+  }
+}
