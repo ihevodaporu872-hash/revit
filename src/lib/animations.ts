@@ -91,6 +91,79 @@ export const hoverLift = {
   transition: fastTransition,
 }
 
+// ── Card Hover ───────────────────────────────────────────
+
+export const cardHover: Variants = {
+  rest: { y: 0, transition: fastTransition },
+  hover: { y: -2, transition: fastTransition },
+}
+
+// ── List Item ────────────────────────────────────────────
+
+export const listItem: Variants = {
+  hidden: { opacity: 0, x: -8 },
+  visible: { opacity: 1, x: 0, transition: defaultTransition },
+  exit: { opacity: 0, x: 8, transition: fastTransition },
+}
+
+// ── Progress Bar ─────────────────────────────────────────
+
+export const progressBar: Variants = {
+  hidden: { width: 0 },
+  visible: (width: number) => ({
+    width: `${width}%`,
+    transition: { duration: 0.8, ease: [0.25, 0.1, 0.25, 1] },
+  }),
+}
+
+// ── Shimmer ──────────────────────────────────────────────
+
+export const shimmer: Variants = {
+  hidden: { opacity: 0.5 },
+  visible: {
+    opacity: [0.5, 1, 0.5],
+    transition: { duration: 1.5, repeat: Infinity, ease: 'easeInOut' },
+  },
+}
+
+// ── Tooltip Show ─────────────────────────────────────────
+
+export const tooltipShow: Variants = {
+  hidden: { opacity: 0, y: 4, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: fastTransition },
+}
+
+// ── Modal Overlay & Content ──────────────────────────────
+
+export const modalOverlay: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+  exit: { opacity: 0, transition: { duration: 0.15 } },
+}
+
+export const modalContent: Variants = {
+  hidden: { opacity: 0, scale: 0.95, y: 8 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 400, damping: 30 } },
+  exit: { opacity: 0, scale: 0.95, y: 8, transition: { duration: 0.15 } },
+}
+
+// ── Table Row ────────────────────────────────────────────
+
+export const tableRow: Variants = {
+  hidden: { opacity: 0, y: 4 },
+  visible: { opacity: 1, y: 0, transition: fastTransition },
+}
+
+// ── Badge Pulse ──────────────────────────────────────────
+
+export const badgePulse: Variants = {
+  hidden: { scale: 1 },
+  visible: {
+    scale: [1, 1.05, 1],
+    transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+  },
+}
+
 // ── Page Transition ──────────────────────────────────────
 
 export const pageTransition: Variants = {

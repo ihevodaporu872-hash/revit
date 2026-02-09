@@ -1,5 +1,7 @@
 import { cn } from '../../lib/utils'
 import { cva } from 'class-variance-authority'
+import { motion } from 'framer-motion'
+import { badgePulse } from '../../lib/animations'
 
 const badgeVariants = cva(
   'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
@@ -20,14 +22,24 @@ const badgeVariants = cva(
   }
 )
 
-export function Badge({ children, variant = 'default', className }: {
+export function Badge({ children, variant = 'default', className, pulse }: {
   children: React.ReactNode
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info'
   className?: string
+  pulse?: boolean
 }) {
+  const Wrapper = pulse ? motion.span : 'span'
+  const motionProps = pulse ? { variants: badgePulse, initial: 'hidden', animate: 'visible' } : {}
+
   return (
-    <span className={cn(badgeVariants({ variant }), className)}>
+    <Wrapper {...motionProps} className={cn(badgeVariants({ variant }), className)}>
+      {pulse && (
+        <span className="relative flex h-2 w-2 mr-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
+        </span>
+      )}
       {children}
-    </span>
+    </Wrapper>
   )
 }
