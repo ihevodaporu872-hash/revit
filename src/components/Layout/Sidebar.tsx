@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/appStore'
 import { ThemeToggle } from '../ThemeToggle'
+import { defaultTransition, layoutIndicator, sidebarLabelVariants } from '../../lib/animations'
 import {
   ArrowLeftRight, FileType, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
@@ -29,7 +30,7 @@ export default function Sidebar() {
   return (
     <motion.aside
       animate={{ width: sidebarOpen ? 256 : 64 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      transition={defaultTransition}
       className="h-full bg-sidebar text-sidebar-foreground flex flex-col shrink-0 overflow-hidden"
     >
       {/* Header */}
@@ -82,17 +83,18 @@ export default function Sidebar() {
                 {active && (
                   <motion.div
                     layoutId="sidebar-active"
-                    className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sidebar-primary shadow-[0_0_8px_var(--sidebar-primary)]"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sidebar-primary shadow-[var(--shadow-glow)]"
+                    transition={layoutIndicator}
                   />
                 )}
                 <Icon size={20} className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`} />
                 <AnimatePresence>
                   {sidebarOpen && (
                     <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
+                      variants={sidebarLabelVariants}
+                      initial="collapsed"
+                      animate="expanded"
+                      exit="collapsed"
                       className="text-sm font-medium whitespace-nowrap overflow-hidden"
                     >
                       {mod.label}

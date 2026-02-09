@@ -455,11 +455,12 @@ export default function ProjectMgmtPage() {
                   {columnTasks.map((task) => (
                     <motion.div
                       key={task.id}
-                      variants={fadeInUp}
-                      whileHover={{ y: -2 }}
-                      transition={{ duration: 0.15 }}
+                      variants={cardHover}
+                      initial="rest"
+                      animate="rest"
+                      whileHover="hover"
                       onClick={() => setSelectedTask(task)}
-                      className="bg-card rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
+                      className="bg-card rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-primary/20 transition-all group"
                     >
                       {/* Drag handle */}
                       <div className="flex items-start gap-2">
@@ -671,12 +672,12 @@ export default function ProjectMgmtPage() {
                         <motion.button
                           key={tag}
                           onClick={() => toggleTag(tag)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                             newTags.includes(tag)
                               ? 'border-primary bg-primary/10 text-primary font-medium'
-                              : 'border-border text-muted-foreground hover:border-primary/30'
+                              : 'border-border text-muted-foreground hover:border-primary/20'
                           }`}
                         >
                           <Tag size={10} className="inline mr-1" />

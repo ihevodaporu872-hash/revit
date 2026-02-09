@@ -3,6 +3,7 @@ import { Bell, Settings, Search, ChevronRight, User } from 'lucide-react'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ThemeToggle } from '../ThemeToggle'
+import { fastTransition } from '../../lib/animations'
 
 const pageTitles: Record<string, { title: string; parent?: string }> = {
   '/converter': { title: 'CAD/BIM Converter', parent: 'Modules' },
@@ -41,7 +42,7 @@ export default function TopBar() {
         <motion.div
           className="relative"
           animate={{ width: searchFocused ? 280 : 200 }}
-          transition={{ duration: 0.2 }}
+          transition={fastTransition}
         >
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input

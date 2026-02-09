@@ -12,7 +12,7 @@ import { Table } from '../ui/Table'
 import { Tabs } from '../ui/Tabs'
 import { FileUpload } from '../ui/FileUpload'
 import { formatDate, formatCurrency } from '../../lib/utils'
-import { staggerContainer, fadeInUp, scaleIn, listItem } from '../../lib/animations'
+import { staggerContainer, fadeInUp, scaleIn, listItem, interactiveScale } from '../../lib/animations'
 import type { QTOReport, QTOOptions, QTOReportRecord } from '../../services/api'
 import { generateQTO } from '../../services/api'
 import { MotionPage } from '../MotionPage'
@@ -258,13 +258,15 @@ function GenerateTab() {
               return (
                 <motion.button
                   key={opt.value}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  variants={interactiveScale}
+                  initial="rest"
+                  whileHover="hover"
+                  whileTap="tap"
                   onClick={() => setGroupBy(opt.value)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
                     groupBy === opt.value
                       ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border hover:border-primary/40 text-muted-foreground hover:text-foreground'
+                      : 'border-border hover:border-primary/20 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Icon size={18} />

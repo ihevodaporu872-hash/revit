@@ -2,6 +2,7 @@ import { cn } from '../../lib/utils'
 import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button as ShadcnButton } from './shadcn/button'
+import { interactiveScale } from '../../lib/animations'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
@@ -28,7 +29,7 @@ const sizeMap = {
 
 export function Button({ variant = 'primary', size = 'md', loading, icon, children, className, disabled, ...props }: ButtonProps) {
   return (
-    <motion.div whileTap={{ scale: disabled || loading ? 1 : 0.97 }} className="inline-flex">
+    <motion.div variants={interactiveScale} initial="rest" whileHover="hover" whileTap={disabled || loading ? undefined : "tap"} className="inline-flex">
       <ShadcnButton
         variant={variantMap[variant]}
         size={sizeMap[size]}

@@ -536,10 +536,10 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
             {report.ruleResults.map((result) => (
               <motion.div
                 key={result.ruleId}
-                variants={fadeInUp}
-                whileHover={{ y: -2 }}
+                variants={cardHover}
                 initial="rest"
                 animate="rest"
+                whileHover="hover"
                 className="bg-card rounded-xl border border-border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setExpandedRule(expandedRule === result.ruleId ? null : result.ruleId)}
               >
@@ -668,7 +668,7 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
         >
           <Card>
             <div className="flex flex-col items-center py-16 text-muted-foreground">
-              <ListChecks size={56} className="mb-4 text-primary/30" />
+              <ListChecks size={48} className="mb-4 text-primary/30" />
               <h3 className="text-lg font-semibold text-foreground">No Validation Results Yet</h3>
               <p className="text-sm mt-1 max-w-md text-center">
                 Upload an IFC or Excel file, select your validation rules, and click "Run Validation" to check your BIM model against industry standards.

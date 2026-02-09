@@ -1,6 +1,6 @@
 import { cn } from '../../lib/utils'
 import { motion } from 'framer-motion'
-import { fadeInUp, scaleIn } from '../../lib/animations'
+import { fadeInUp, scaleIn, cardHover } from '../../lib/animations'
 import { Card as ShadcnCard, CardContent, CardHeader, CardTitle, CardDescription } from './shadcn/card'
 
 interface CardProps {
@@ -16,18 +16,18 @@ interface CardProps {
 export function Card({ children, className, title, subtitle, actions, glass, hover }: CardProps) {
   return (
     <motion.div
-      variants={fadeInUp}
-      initial="hidden"
-      animate="visible"
-      whileHover={hover ? { y: -2 } : undefined}
+      variants={hover ? cardHover : fadeInUp}
+      initial={hover ? "rest" : "hidden"}
+      animate={hover ? "rest" : "visible"}
+      whileHover={hover ? "hover" : undefined}
     >
       <ShadcnCard className={cn(
         glass && 'backdrop-blur-sm bg-card/80',
-        hover && 'transition-shadow hover:shadow-lg hover:border-primary/20',
+        hover && 'transition-shadow hover:shadow-md hover:border-primary/20',
         className,
       )}>
         {(title || actions) && (
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-6 py-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-5 py-4">
             <div>
               {title && <CardTitle className="text-base">{title}</CardTitle>}
               {subtitle && <CardDescription className="mt-0.5">{subtitle}</CardDescription>}
@@ -35,7 +35,7 @@ export function Card({ children, className, title, subtitle, actions, glass, hov
             {actions && <div className="flex items-center gap-2">{actions}</div>}
           </CardHeader>
         )}
-        <CardContent className="px-6 py-6">{children}</CardContent>
+        <CardContent className="px-5 pb-5">{children}</CardContent>
       </ShadcnCard>
     </motion.div>
   )

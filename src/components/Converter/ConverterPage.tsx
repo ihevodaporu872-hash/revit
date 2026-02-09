@@ -34,6 +34,7 @@ import {
   listItem,
   modalOverlay,
   modalContent,
+  interactiveScale,
 } from '../../lib/animations'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -361,12 +362,14 @@ export default function ConverterPage() {
                       <motion.button
                         key={fmt.id}
                         onClick={() => setOutputFormat(fmt.id)}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        variants={interactiveScale}
+                        initial="rest"
+                        whileHover="hover"
+                        whileTap="tap"
                         className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
                           outputFormat === fmt.id
                             ? 'border-primary bg-primary/10'
-                            : 'border-border hover:border-primary/30 hover:bg-muted'
+                            : 'border-border hover:border-primary/20 hover:bg-muted'
                         }`}
                       >
                         <div className={`p-2 rounded-lg ${outputFormat === fmt.id ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
@@ -433,7 +436,7 @@ export default function ConverterPage() {
                     exit="hidden"
                   >
                     <Card title="Quick Actions" hover>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           icon={<Eye size={16} />}

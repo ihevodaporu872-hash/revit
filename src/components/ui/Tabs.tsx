@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { layoutIndicator, tabContent } from '../../lib/animations'
 
 interface Tab {
   id: string
@@ -47,7 +48,7 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
               <motion.div
                 layoutId="tab-indicator"
                 className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                transition={layoutIndicator}
               />
             )}
           </button>
@@ -56,10 +57,10 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15 }}
+          variants={tabContent}
+          initial="initial"
+          animate="animate"
+          exit="exit"
           className="pt-4"
         >
           {children(activeTab)}

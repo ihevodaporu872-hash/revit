@@ -29,7 +29,7 @@ import { Tabs } from '../ui/Tabs'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
-import { staggerContainer, fadeInUp, scaleIn, listItem, fadeIn } from '../../lib/animations'
+import { staggerContainer, fadeInUp, scaleIn, listItem, fadeIn, interactiveScale } from '../../lib/animations'
 import { saveChatSession } from '../../services/supabase-api'
 
 // ---- Types ----
@@ -501,7 +501,7 @@ export default function AIAnalysisPage() {
                     whileHover={{
                       scale: 1.02,
                       borderColor: 'var(--primary)',
-                      boxShadow: '0 0 12px oklch(0.65 0.15 250 / 0.15)',
+                      boxShadow: 'var(--shadow-glow)',
                     }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => sendMessage(preset.prompt)}

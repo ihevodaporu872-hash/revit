@@ -23,7 +23,7 @@ export function Table<T extends Record<string, unknown>>({ columns, data, keyFie
   if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <Inbox size={40} className="mb-3 opacity-30" />
+        <Inbox size={48} className="mb-3 opacity-30" />
         <p className="text-sm">{emptyMessage || 'No data available'}</p>
       </div>
     )

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { Upload, X, File, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn, formatFileSize } from '../../lib/utils'
-import { fadeInUp, listItem, staggerContainer } from '../../lib/animations'
+import { fadeInUp, listItem, staggerContainer, interactiveScaleSubtle } from '../../lib/animations'
 
 interface FileUploadProps {
   accept?: string
@@ -51,11 +51,13 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
   return (
     <div className={cn('space-y-3', className)}>
       <motion.div
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
+        variants={interactiveScaleSubtle}
+        initial="rest"
+        whileHover="hover"
+        whileTap="tap"
         animate={dragOver ? { borderColor: 'var(--primary)' } : {}}
         className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden',
+          'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors relative overflow-hidden',
           dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50',
         )}
         onClick={() => inputRef.current?.click()}

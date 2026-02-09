@@ -36,6 +36,7 @@ import {
   listItem,
   modalOverlay,
   modalContent,
+  springTransition,
 } from '../../lib/animations'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -449,7 +450,7 @@ export default function CostEstimatePage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         placeholder="Search work items... e.g. 'concrete wall', 'steel beam', '03.31'"
-                        className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
+                        className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
                       />
                     </div>
 
@@ -490,7 +491,7 @@ export default function CostEstimatePage() {
                 {searchResults.length === 0 && !isSearching && (
                   <motion.div variants={scaleIn} initial="hidden" animate="visible">
                     <Card>
-                      <div className="text-center py-12">
+                      <div className="text-center py-16">
                         <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
                         <p className="text-muted-foreground">Search for construction work items</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
@@ -581,7 +582,7 @@ export default function CostEstimatePage() {
                             key={classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0)}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            transition={springTransition}
                             className="text-lg font-bold text-foreground"
                           >
                             {formatCurrency(
@@ -618,7 +619,7 @@ export default function CostEstimatePage() {
                 >
                   {costItems.length === 0 ? (
                     <motion.div variants={scaleIn} initial="hidden" animate="visible">
-                      <div className="text-center py-12">
+                      <div className="text-center py-16">
                         <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
                         <p className="text-muted-foreground">No items added yet</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
@@ -714,7 +715,7 @@ export default function CostEstimatePage() {
                               key={grandTotal}
                               initial={{ opacity: 0, scale: 0.85, y: 4 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
-                              transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                              transition={springTransition}
                               className="text-2xl font-bold text-foreground"
                             >
                               {formatCurrency(grandTotal)}

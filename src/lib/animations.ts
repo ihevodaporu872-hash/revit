@@ -81,9 +81,41 @@ export const staggerContainerSlow: Variants = {
   },
 }
 
+// ── Interactive Scale Variants ───────────────────────────
+
+export const interactiveScale: Variants = {
+  rest: { scale: 1 },
+  hover: { scale: 1.02, transition: fastTransition },
+  tap: { scale: 0.98, transition: fastTransition },
+}
+
+export const interactiveScaleSubtle: Variants = {
+  rest: { scale: 1 },
+  hover: { scale: 1.01, transition: fastTransition },
+  tap: { scale: 0.99, transition: fastTransition },
+}
+
+// ── Tab Content ─────────────────────────────────────────
+
+export const tabContent: Variants = {
+  initial: { opacity: 0, y: 4 },
+  animate: { opacity: 1, y: 0, transition: fastTransition },
+  exit: { opacity: 0, y: -4, transition: fastTransition },
+}
+
+// ── Layout Indicator ────────────────────────────────────
+
+export const layoutIndicator: Transition = {
+  type: 'spring',
+  stiffness: 400,
+  damping: 30,
+}
+
 // ── Hover & Tap ──────────────────────────────────────────
 
+/** @deprecated — use interactiveScale */
 export const hoverScale = { scale: 1.02 }
+/** @deprecated — use interactiveScale */
 export const tapScale = { scale: 0.98 }
 
 export const hoverLift = {
