@@ -20,4 +20,7 @@ export default defineConfig({
     },
   },
   assetsInclude: ['**/*.wasm'],
+  optimizeDeps: {
+    exclude: ['web-ifc'],
+  },
 })
