@@ -27,6 +27,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { useAppStore } from '../../store/appStore'
+import { MotionPage } from '../MotionPage'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -432,16 +433,16 @@ export default function ViewerPage() {
     const hasChildren = node.children && node.children.length > 0
     const iconMap = {
       project: <Building2 size={14} className="text-primary" />,
-      site: <Grid3x3 size={14} className="text-green-600" />,
-      building: <Building2 size={14} className="text-amber-600" />,
-      storey: <Layers size={14} className="text-blue-500" />,
-      element: <Box size={14} className="text-text-secondary" />,
+      site: <Grid3x3 size={14} className="text-success" />,
+      building: <Building2 size={14} className="text-warning" />,
+      storey: <Layers size={14} className="text-primary" />,
+      element: <Box size={14} className="text-muted-foreground" />,
     }
 
     return (
       <div key={node.id}>
         <button
-          className="flex items-center gap-1.5 w-full px-2 py-1.5 text-left text-sm hover:bg-surface-alt rounded transition-colors"
+          className="flex items-center gap-1.5 w-full px-2 py-1.5 text-left text-sm hover:bg-muted rounded transition-colors"
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => {
             if (hasChildren) toggleTreeNode(node.id)
@@ -454,7 +455,7 @@ export default function ViewerPage() {
             <span className="w-3" />
           )}
           {iconMap[node.type]}
-          <span className="truncate text-text">{node.label}</span>
+          <span className="truncate text-foreground">{node.label}</span>
         </button>
         {hasChildren && node.expanded && node.children!.map((child) => renderTreeNode(child, depth + 1))}
       </div>
@@ -475,15 +476,16 @@ export default function ViewerPage() {
   // ── Render ──────────────────────────────────────────────
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text">3D IFC Viewer</h1>
-          <p className="text-text-secondary mt-0.5">
-            {modelFile ? modelFile : 'Upload an IFC file to view and inspect 3D building models'}
-          </p>
-        </div>
+    <MotionPage>
+      <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">3D IFC Viewer</h1>
+            <p className="text-muted-foreground mt-0.5">
+              {modelFile ? modelFile : 'Upload an IFC file to view and inspect 3D building models'}
+            </p>
+          </div>
         <div className="flex items-center gap-2">
           {!isModelLoaded && (
             <Button variant="outline" icon={<Box size={16} />} onClick={loadDemoModel}>
@@ -511,11 +513,11 @@ export default function ViewerPage() {
       <div className="flex-1 flex gap-4 min-h-0">
         {/* Selection Tree Panel */}
         {showTree && (
-          <div className="w-72 flex flex-col border border-border rounded-xl bg-surface overflow-hidden shrink-0">
+          <div className="w-72 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-text">Selection Tree</h3>
-              <button onClick={() => setShowTree(false)} className="p-1 hover:bg-surface-alt rounded">
-                <X size={14} className="text-text-secondary" />
+              <h3 className="text-sm font-semibold text-foreground">Selection Tree</h3>
+              <button onClick={() => setShowTree(false)} className="p-1 hover:bg-muted rounded">
+                <X size={14} className="text-muted-foreground" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto py-2">
@@ -523,29 +525,29 @@ export default function ViewerPage() {
             </div>
             {/* Model stats at bottom */}
             <div className="border-t border-border p-3 space-y-1.5">
-              <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Model Info</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Model Info</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <span className="text-text-secondary">Elements</span>
-                <span className="text-text font-medium">{MODEL_STATS.totalElements.toLocaleString()}</span>
-                <span className="text-text-secondary">Types</span>
-                <span className="text-text font-medium">{MODEL_STATS.types}</span>
-                <span className="text-text-secondary">Stories</span>
-                <span className="text-text font-medium">{MODEL_STATS.stories}</span>
-                <span className="text-text-secondary">Materials</span>
-                <span className="text-text font-medium">{MODEL_STATS.materials}</span>
-                <span className="text-text-secondary">IFC Version</span>
-                <span className="text-text font-medium">{MODEL_STATS.ifcVersion}</span>
-                <span className="text-text-secondary">File Size</span>
-                <span className="text-text font-medium">{MODEL_STATS.fileSize}</span>
+                <span className="text-muted-foreground">Elements</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.totalElements.toLocaleString()}</span>
+                <span className="text-muted-foreground">Types</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.types}</span>
+                <span className="text-muted-foreground">Stories</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.stories}</span>
+                <span className="text-muted-foreground">Materials</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.materials}</span>
+                <span className="text-muted-foreground">IFC Version</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.ifcVersion}</span>
+                <span className="text-muted-foreground">File Size</span>
+                <span className="text-foreground font-medium">{MODEL_STATS.fileSize}</span>
               </div>
             </div>
           </div>
         )}
 
         {/* Viewport */}
-        <div className="flex-1 relative rounded-xl border border-border overflow-hidden bg-surface">
+        <div className="flex-1 relative rounded-xl border border-border overflow-hidden bg-card">
           {/* Toolbar */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-surface/90 backdrop-blur-sm rounded-lg border border-border shadow-sm p-1">
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border shadow-sm p-1">
             {tools.map((tool) => (
               <button
                 key={tool.id}
@@ -554,7 +556,7 @@ export default function ViewerPage() {
                 className={`p-2 rounded-md transition-colors ${
                   activeTool === tool.id
                     ? 'bg-primary text-white'
-                    : 'text-text-secondary hover:bg-surface-alt hover:text-text'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 {tool.icon}
@@ -564,7 +566,7 @@ export default function ViewerPage() {
             <button
               title="Fit to View"
               onClick={fitToView}
-              className="p-2 rounded-md text-text-secondary hover:bg-surface-alt hover:text-text transition-colors"
+              className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <Maximize size={18} />
             </button>
@@ -574,7 +576,7 @@ export default function ViewerPage() {
                 const cam = cameraRef.current
                 if (cam) { cam.position.multiplyScalar(0.85); controlsRef.current?.update() }
               }}
-              className="p-2 rounded-md text-text-secondary hover:bg-surface-alt hover:text-text transition-colors"
+              className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ZoomIn size={18} />
             </button>
@@ -584,7 +586,7 @@ export default function ViewerPage() {
                 const cam = cameraRef.current
                 if (cam) { cam.position.multiplyScalar(1.15); controlsRef.current?.update() }
               }}
-              className="p-2 rounded-md text-text-secondary hover:bg-surface-alt hover:text-text transition-colors"
+              className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ZoomOut size={18} />
             </button>
@@ -595,21 +597,21 @@ export default function ViewerPage() {
             <button
               title={showTree ? 'Hide Tree' : 'Show Tree'}
               onClick={() => setShowTree(!showTree)}
-              className="p-2 rounded-lg bg-surface/90 backdrop-blur-sm border border-border shadow-sm text-text-secondary hover:text-text transition-colors"
+              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {showTree ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
             </button>
             <button
               title="Model Info"
               onClick={() => addNotification('info', `Model: ${MODEL_STATS.totalElements} elements, ${MODEL_STATS.types} types, ${MODEL_STATS.stories} stories`)}
-              className="p-2 rounded-lg bg-surface/90 backdrop-blur-sm border border-border shadow-sm text-text-secondary hover:text-text transition-colors"
+              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <Info size={18} />
             </button>
             <button
               title="Toggle Visibility"
               onClick={() => addNotification('info', 'Toggle element visibility')}
-              className="p-2 rounded-lg bg-surface/90 backdrop-blur-sm border border-border shadow-sm text-text-secondary hover:text-text transition-colors"
+              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {isModelLoaded ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
@@ -619,7 +621,7 @@ export default function ViewerPage() {
           {isModelLoaded && (
             <button
               onClick={handleMockSelect}
-              className="absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs bg-surface/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-text-secondary hover:text-text transition-colors"
+              className="absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs bg-card/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Click to simulate element selection
             </button>
@@ -629,9 +631,9 @@ export default function ViewerPage() {
           {!isModelLoaded && (
             <div className="absolute inset-0 z-5 flex items-center justify-center pointer-events-none">
               <div className="text-center pointer-events-auto">
-                <Box size={48} className="mx-auto text-text-secondary/30 mb-3" />
-                <p className="text-text-secondary text-sm">No model loaded</p>
-                <p className="text-text-secondary/60 text-xs mt-1">Upload an IFC file or load the demo model</p>
+                <Box size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground text-sm">No model loaded</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">Upload an IFC file or load the demo model</p>
               </div>
             </div>
           )}
@@ -642,54 +644,54 @@ export default function ViewerPage() {
 
         {/* Properties Panel */}
         {showProperties && selectedElement && (
-          <div className="w-80 flex flex-col border border-border rounded-xl bg-surface overflow-hidden shrink-0">
+          <div className="w-80 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div>
-                <h3 className="text-sm font-semibold text-text">Element Properties</h3>
-                <p className="text-xs text-text-secondary mt-0.5">{selectedElement.type}</p>
+                <h3 className="text-sm font-semibold text-foreground">Element Properties</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{selectedElement.type}</p>
               </div>
-              <button onClick={() => { setShowProperties(false); setSelectedElement(null) }} className="p-1 hover:bg-surface-alt rounded">
-                <X size={14} className="text-text-secondary" />
+              <button onClick={() => { setShowProperties(false); setSelectedElement(null) }} className="p-1 hover:bg-muted rounded">
+                <X size={14} className="text-muted-foreground" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {/* Element summary */}
-              <div className="px-4 py-3 border-b border-border bg-surface-alt/50">
-                <p className="text-sm font-medium text-text">{selectedElement.name}</p>
+              <div className="px-4 py-3 border-b border-border bg-muted/50">
+                <p className="text-sm font-medium text-foreground">{selectedElement.name}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-surface rounded-lg p-2 border border-border">
-                    <p className="text-text-secondary">Express ID</p>
-                    <p className="font-medium text-text">{selectedElement.id}</p>
+                  <div className="bg-card rounded-lg p-2 border border-border">
+                    <p className="text-muted-foreground">Express ID</p>
+                    <p className="font-medium text-foreground">{selectedElement.id}</p>
                   </div>
-                  <div className="bg-surface rounded-lg p-2 border border-border">
-                    <p className="text-text-secondary">Type</p>
-                    <p className="font-medium text-text">{selectedElement.type}</p>
+                  <div className="bg-card rounded-lg p-2 border border-border">
+                    <p className="text-muted-foreground">Type</p>
+                    <p className="font-medium text-foreground">{selectedElement.type}</p>
                   </div>
                   {selectedElement.volume && (
-                    <div className="bg-surface rounded-lg p-2 border border-border">
-                      <p className="text-text-secondary">Volume</p>
-                      <p className="font-medium text-text">{selectedElement.volume}</p>
+                    <div className="bg-card rounded-lg p-2 border border-border">
+                      <p className="text-muted-foreground">Volume</p>
+                      <p className="font-medium text-foreground">{selectedElement.volume}</p>
                     </div>
                   )}
                   {selectedElement.area && (
-                    <div className="bg-surface rounded-lg p-2 border border-border">
-                      <p className="text-text-secondary">Area</p>
-                      <p className="font-medium text-text">{selectedElement.area}</p>
+                    <div className="bg-card rounded-lg p-2 border border-border">
+                      <p className="text-muted-foreground">Area</p>
+                      <p className="font-medium text-foreground">{selectedElement.area}</p>
                     </div>
                   )}
                 </div>
                 {selectedElement.material && (
                   <div className="mt-2 text-xs">
-                    <span className="text-text-secondary">Material: </span>
-                    <span className="text-text font-medium">{selectedElement.material}</span>
+                    <span className="text-muted-foreground">Material: </span>
+                    <span className="text-foreground font-medium">{selectedElement.material}</span>
                   </div>
                 )}
               </div>
 
               {/* Property table */}
               <div className="px-4 py-3">
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">All Properties</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">All Properties</p>
                 <div className="space-y-0">
                   {selectedElement.properties.map((prop, i) => (
                     <div
@@ -698,8 +700,8 @@ export default function ViewerPage() {
                         i < selectedElement.properties.length - 1 ? 'border-b border-border/50' : ''
                       }`}
                     >
-                      <span className="text-text-secondary shrink-0 mr-3">{prop.name}</span>
-                      <span className="text-text font-medium text-right break-all">{prop.value}</span>
+                      <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
+                      <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
                     </div>
                   ))}
                 </div>
@@ -708,6 +710,7 @@ export default function ViewerPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </MotionPage>
   )
 }

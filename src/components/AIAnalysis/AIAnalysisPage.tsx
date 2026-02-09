@@ -27,6 +27,7 @@ import { Badge } from '../ui/Badge'
 import { Tabs } from '../ui/Tabs'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
+import { MotionPage } from '../MotionPage'
 
 // ---- Types ----
 
@@ -383,281 +384,283 @@ export default function AIAnalysisPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text flex items-center gap-3">
-            <BrainCircuit size={28} className="text-primary" />
-            AI Data Analysis
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Upload data files and ask AI to analyze, visualize, and find insights
-          </p>
-        </div>
-        {messages.length > 0 && (
-          <Button variant="outline" icon={<RotateCcw size={16} />} onClick={clearChat}>
-            Clear Chat
-          </Button>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Analyses Run" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'this week' }} />
-        <StatCard label="Avg Response" value={avgResponse} icon={Clock} color="success" />
-        <StatCard label="Files Processed" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'this month' }} />
-        <StatCard label="Charts Generated" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'this week' }} />
-      </div>
-
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Upload + Presets */}
-        <div className="space-y-6">
-          {/* File Upload */}
-          <Card title="Data Source" subtitle="Upload Excel or CSV files">
-            <FileUpload
-              accept=".xlsx,.xls,.csv"
-              onFilesSelected={setFiles}
-              label="Drop data files here"
-              description="Supports .xlsx, .xls, .csv"
-            />
-          </Card>
-
-          {/* Quick Presets */}
-          <Card title="Quick Analysis" subtitle="Common analysis patterns">
-            <div className="space-y-2">
-              {QUICK_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => sendMessage(preset.prompt)}
-                  disabled={loading || files.length === 0}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-surface-alt hover:border-primary/30 transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
-                    {preset.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text">{preset.label}</p>
-                    <p className="text-xs text-text-secondary truncate">{preset.prompt}</p>
-                  </div>
-                  <Sparkles size={14} className="text-primary/40 shrink-0" />
-                </button>
-              ))}
-            </div>
-          </Card>
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+              <BrainCircuit size={28} className="text-primary" />
+              AI Data Analysis
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Upload data files and ask AI to analyze, visualize, and find insights
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <Button variant="outline" icon={<RotateCcw size={16} />} onClick={clearChat}>
+              Clear Chat
+            </Button>
+          )}
         </div>
 
-        {/* Right: Chat + Results */}
-        <div className="lg:col-span-2 flex flex-col">
-          <Card className="flex-1 flex flex-col !p-0">
-            {/* Chat Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  <Bot size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text">Jens AI Assistant</h3>
-                  <p className="text-xs text-text-secondary">Powered by Google Gemini</p>
-                </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Analyses Run" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'this week' }} />
+          <StatCard label="Avg Response" value={avgResponse} icon={Clock} color="success" />
+          <StatCard label="Files Processed" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'this month' }} />
+          <StatCard label="Charts Generated" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'this week' }} />
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left: Upload + Presets */}
+          <div className="space-y-6">
+            {/* File Upload */}
+            <Card title="Data Source" subtitle="Upload Excel or CSV files">
+              <FileUpload
+                accept=".xlsx,.xls,.csv"
+                onFilesSelected={setFiles}
+                label="Drop data files here"
+                description="Supports .xlsx, .xls, .csv"
+              />
+            </Card>
+
+            {/* Quick Presets */}
+            <Card title="Quick Analysis" subtitle="Common analysis patterns">
+              <div className="space-y-2">
+                {QUICK_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => sendMessage(preset.prompt)}
+                    disabled={loading || files.length === 0}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted hover:border-primary/30 transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
+                      {preset.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{preset.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">{preset.prompt}</p>
+                    </div>
+                    <Sparkles size={14} className="text-primary/40 shrink-0" />
+                  </button>
+                ))}
               </div>
-              <Badge variant="success">Online</Badge>
-            </div>
+            </Card>
+          </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-[400px] max-h-[600px]">
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-text-secondary py-12">
-                  <Sparkles size={48} className="text-primary/20 mb-4" />
-                  <h3 className="text-lg font-semibold text-text">Start Your Analysis</h3>
-                  <p className="text-sm mt-1 max-w-sm text-center">
-                    Upload a data file and describe what you want to analyze. Try the quick presets on the left, or type your own question below.
-                  </p>
+          {/* Right: Chat + Results */}
+          <div className="lg:col-span-2 flex flex-col">
+            <Card className="flex-1 flex flex-col !p-0">
+              {/* Chat Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <Bot size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Jens AI Assistant</h3>
+                    <p className="text-xs text-muted-foreground">Powered by Google Gemini</p>
+                  </div>
                 </div>
-              )}
+                <Badge variant="success">Online</Badge>
+              </div>
 
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'ai' && (
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0 mt-1">
-                      <Bot size={16} />
-                    </div>
-                  )}
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-[400px] max-h-[600px]">
+                {messages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
+                    <Sparkles size={48} className="text-primary/20 mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground">Start Your Analysis</h3>
+                    <p className="text-sm mt-1 max-w-sm text-center">
+                      Upload a data file and describe what you want to analyze. Try the quick presets on the left, or type your own question below.
+                    </p>
+                  </div>
+                )}
 
-                  <div className={`max-w-[85%] space-y-3 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                    {/* Message bubble */}
-                    <div className={`rounded-xl px-4 py-3 ${
-                      msg.role === 'user'
-                        ? 'bg-primary text-white rounded-br-sm'
-                        : 'bg-surface-alt border border-border rounded-bl-sm'
-                    }`}>
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-text-secondary'}`}>
-                        {new Date(msg.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-
-                    {/* Code block */}
-                    {msg.code && (
-                      <div className="rounded-xl border border-border overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 bg-gray-900 text-gray-400">
-                          <div className="flex items-center gap-2 text-xs">
-                            <Code2 size={14} />
-                            <span>Generated Python Code</span>
-                          </div>
-                          <button
-                            onClick={() => copyCode(msg.id, msg.code!)}
-                            className="flex items-center gap-1 text-xs hover:text-white transition-colors"
-                          >
-                            {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
-                            {copiedId === msg.id ? 'Copied' : 'Copy'}
-                          </button>
-                        </div>
-                        <pre className="bg-gray-950 text-gray-300 p-4 overflow-x-auto text-xs leading-relaxed">
-                          <code>{msg.code}</code>
-                        </pre>
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'ai' && (
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0 mt-1">
+                        <Bot size={16} />
                       </div>
                     )}
 
-                    {/* Results */}
-                    {msg.results && (
-                      <Tabs
-                        tabs={[
-                          ...(msg.results.tableData ? [{ id: 'table', label: 'Table', icon: <TableProperties size={14} /> }] : []),
-                          ...(msg.results.chartBars ? [{ id: 'chart', label: 'Chart', icon: <BarChart3 size={14} /> }] : []),
-                          ...(msg.results.stats ? [{ id: 'stats', label: 'Statistics', icon: <TrendingUp size={14} /> }] : []),
-                        ]}
-                        className="rounded-xl border border-border overflow-hidden bg-surface"
-                      >
-                        {(activeTab) => (
-                          <div className="px-4 pb-4">
-                            {activeTab === 'table' && msg.results?.tableData && (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-border">
-                                      {msg.results.tableData.headers.map((h, i) => (
-                                        <th key={i} className="text-left px-3 py-2 text-xs font-semibold text-text-secondary uppercase">
-                                          {h}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {msg.results.tableData.rows.map((row, ri) => (
-                                      <tr key={ri} className="border-b border-border/50 hover:bg-surface-alt">
-                                        {row.map((cell, ci) => (
-                                          <td key={ci} className="px-3 py-2 text-text">
-                                            {cell}
-                                          </td>
+                    <div className={`max-w-[85%] space-y-3 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      {/* Message bubble */}
+                      <div className={`rounded-xl px-4 py-3 ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-white rounded-br-sm'
+                          : 'bg-muted border border-border rounded-bl-sm'
+                      }`}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-muted-foreground'}`}>
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+
+                      {/* Code block */}
+                      {msg.code && (
+                        <div className="rounded-xl border border-border overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2 bg-gray-900 text-gray-400">
+                            <div className="flex items-center gap-2 text-xs">
+                              <Code2 size={14} />
+                              <span>Generated Python Code</span>
+                            </div>
+                            <button
+                              onClick={() => copyCode(msg.id, msg.code!)}
+                              className="flex items-center gap-1 text-xs hover:text-white transition-colors"
+                            >
+                              {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedId === msg.id ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+                          <pre className="bg-gray-950 text-gray-300 p-4 overflow-x-auto text-xs leading-relaxed">
+                            <code>{msg.code}</code>
+                          </pre>
+                        </div>
+                      )}
+
+                      {/* Results */}
+                      {msg.results && (
+                        <Tabs
+                          tabs={[
+                            ...(msg.results.tableData ? [{ id: 'table', label: 'Table', icon: <TableProperties size={14} /> }] : []),
+                            ...(msg.results.chartBars ? [{ id: 'chart', label: 'Chart', icon: <BarChart3 size={14} /> }] : []),
+                            ...(msg.results.stats ? [{ id: 'stats', label: 'Statistics', icon: <TrendingUp size={14} /> }] : []),
+                          ]}
+                          className="rounded-xl border border-border overflow-hidden bg-card"
+                        >
+                          {(activeTab) => (
+                            <div className="px-4 pb-4">
+                              {activeTab === 'table' && msg.results?.tableData && (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border">
+                                        {msg.results.tableData.headers.map((h, i) => (
+                                          <th key={i} className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                                            {h}
+                                          </th>
                                         ))}
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
+                                    </thead>
+                                    <tbody>
+                                      {msg.results.tableData.rows.map((row, ri) => (
+                                        <tr key={ri} className="border-b border-border/50 hover:bg-muted">
+                                          {row.map((cell, ci) => (
+                                            <td key={ci} className="px-3 py-2 text-foreground">
+                                              {cell}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
 
-                            {activeTab === 'chart' && msg.results?.chartBars && (
-                              <div className="space-y-3">
-                                <p className="text-xs text-text-secondary font-medium uppercase tracking-wider">Distribution</p>
-                                {msg.results.chartBars.map((bar, i) => (
-                                  <div key={i} className="space-y-1">
-                                    <div className="flex items-center justify-between text-sm">
-                                      <span className="text-text">{bar.label}</span>
-                                      <span className="font-medium text-text">{bar.value.toLocaleString()}</span>
+                              {activeTab === 'chart' && msg.results?.chartBars && (
+                                <div className="space-y-3">
+                                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distribution</p>
+                                  {msg.results.chartBars.map((bar, i) => (
+                                    <div key={i} className="space-y-1">
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-foreground">{bar.label}</span>
+                                        <span className="font-medium text-foreground">{bar.value.toLocaleString()}</span>
+                                      </div>
+                                      <div className="h-5 bg-border rounded-md overflow-hidden">
+                                        <div
+                                          className="h-full rounded-md transition-all duration-700"
+                                          style={{
+                                            width: `${(bar.value / maxBarValue(msg.results!.chartBars)) * 100}%`,
+                                            backgroundColor: bar.color,
+                                          }}
+                                        />
+                                      </div>
                                     </div>
-                                    <div className="h-5 bg-border rounded-md overflow-hidden">
-                                      <div
-                                        className="h-full rounded-md transition-all duration-700"
-                                        style={{
-                                          width: `${(bar.value / maxBarValue(msg.results!.chartBars)) * 100}%`,
-                                          backgroundColor: bar.color,
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                                  ))}
+                                </div>
+                              )}
 
-                            {activeTab === 'stats' && msg.results?.stats && (
-                              <div className="grid grid-cols-2 gap-3">
-                                {msg.results.stats.map((stat, i) => (
-                                  <div key={i} className="p-3 rounded-lg bg-surface-alt border border-border">
-                                    <p className="text-xs text-text-secondary">{stat.label}</p>
-                                    <p className="text-lg font-bold text-text mt-0.5">{stat.value}</p>
-                                    {stat.change !== undefined && (
-                                      <p className={`text-xs mt-0.5 ${stat.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {stat.change >= 0 ? '+' : ''}{stat.change}%
-                                      </p>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </Tabs>
+                              {activeTab === 'stats' && msg.results?.stats && (
+                                <div className="grid grid-cols-2 gap-3">
+                                  {msg.results.stats.map((stat, i) => (
+                                    <div key={i} className="p-3 rounded-lg bg-muted border border-border">
+                                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                                      <p className="text-lg font-bold text-foreground mt-0.5">{stat.value}</p>
+                                      {stat.change !== undefined && (
+                                        <p className={`text-xs mt-0.5 ${stat.change >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                          {stat.change >= 0 ? '+' : ''}{stat.change}%
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Tabs>
+                      )}
+                    </div>
+
+                    {msg.role === 'user' && (
+                      <div className="p-2 rounded-lg bg-primary text-white h-fit shrink-0 mt-1">
+                        <User size={16} />
+                      </div>
                     )}
                   </div>
+                ))}
 
-                  {msg.role === 'user' && (
-                    <div className="p-2 rounded-lg bg-primary text-white h-fit shrink-0 mt-1">
-                      <User size={16} />
+                {/* Loading indicator */}
+                {loading && (
+                  <div className="flex gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0">
+                      <Bot size={16} />
                     </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Loading indicator */}
-              {loading && (
-                <div className="flex gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary h-fit shrink-0">
-                    <Bot size={16} />
-                  </div>
-                  <div className="bg-surface-alt border border-border rounded-xl rounded-bl-sm px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm text-text-secondary">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Analyzing data with Gemini AI...</span>
+                    <div className="bg-muted border border-border rounded-xl rounded-bl-sm px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Analyzing data with Gemini AI...</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Chat Input */}
-            <div className="border-t border-border p-4">
-              <div className="flex items-center gap-3">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={files.length > 0 ? 'Describe what you want to analyze...' : 'Upload a file first...'}
-                  disabled={files.length === 0 || loading}
-                  className="flex-1 px-4 py-2.5 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
-                />
-                <Button
-                  onClick={() => sendMessage(inputValue)}
-                  disabled={!inputValue.trim() || loading || files.length === 0}
-                  icon={loading ? undefined : <Send size={16} />}
-                  loading={loading}
-                >
-                  Send
-                </Button>
+                <div ref={chatEndRef} />
               </div>
-              <p className="text-xs text-text-secondary mt-2 px-1">
-                Press Enter to send. AI will generate Python code and show results from your data.
-              </p>
-            </div>
-          </Card>
+
+              {/* Chat Input */}
+              <div className="border-t border-border p-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={files.length > 0 ? 'Describe what you want to analyze...' : 'Upload a file first...'}
+                    disabled={files.length === 0 || loading}
+                    className="flex-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50"
+                  />
+                  <Button
+                    onClick={() => sendMessage(inputValue)}
+                    disabled={!inputValue.trim() || loading || files.length === 0}
+                    icon={loading ? undefined : <Send size={16} />}
+                    loading={loading}
+                  >
+                    Send
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 px-1">
+                  Press Enter to send. AI will generate Python code and show results from your data.
+                </p>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+    </MotionPage>
   )
 }

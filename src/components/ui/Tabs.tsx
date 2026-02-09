@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
 import { cn } from '../../lib/utils'
-import { defaultTransition } from '../../lib/animations'
 
 interface Tab {
   id: string
@@ -27,54 +25,24 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-1 border-b border-border relative">
-        {/* Animated underline indicator */}
-        {tabs.map((tab) => {
-          if (activeTab === tab.id) {
-            return (
-              <motion.div
-                key={`indicator-${tab.id}`}
-                layoutId="tab-underline"
-                className="absolute bottom-0 h-0.5 bg-primary"
-                transition={defaultTransition}
-                style={{
-                  left: 0,
-                  right: 0,
-                }}
-              />
-            )
-          }
-          return null
-        })}
-
+      <div className="flex items-center gap-1 border-b border-border">
         {tabs.map((tab) => (
-          <motion.button
+          <button
             key={tab.id}
             onClick={() => handleChange(tab.id)}
-            whileHover={{ opacity: 0.8 }}
-            whileTap={{ scale: 0.98 }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors relative z-10',
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
               activeTab === tab.id
-                ? 'text-primary'
-                : 'text-text-secondary hover:text-text',
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
             )}
           >
             {tab.icon}
             {tab.label}
-          </motion.button>
+          </button>
         ))}
       </div>
-
-      <motion.div
-        key={activeTab}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={defaultTransition}
-        className="pt-4"
-      >
-        {children(activeTab)}
-      </motion.div>
+      <div className="pt-4">{children(activeTab)}</div>
     </div>
   )
 }

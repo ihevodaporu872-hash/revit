@@ -21,6 +21,7 @@ import { Badge } from '../ui/Badge'
 import { Table } from '../ui/Table'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
+import { MotionPage } from '../MotionPage'
 
 // ---- Types ----
 
@@ -185,9 +186,9 @@ function generateMockReport(fileName: string, rules: ValidationRule[]): Validati
 // ---- Helpers ----
 
 function scoreColor(score: number): string {
-  if (score >= 90) return 'text-green-600'
-  if (score >= 70) return 'text-amber-500'
-  return 'text-red-600'
+  if (score >= 90) return 'text-success'
+  if (score >= 70) return 'text-warning'
+  return 'text-destructive'
 }
 
 function scoreBgColor(score: number): string {
@@ -202,9 +203,9 @@ function severityBadge(severity: ValidationIssue['severity']) {
 }
 
 function statusIcon(status: RuleResult['status']) {
-  if (status === 'pass') return <CheckCircle2 size={20} className="text-green-600" />
-  if (status === 'warning') return <AlertTriangle size={20} className="text-amber-500" />
-  return <XCircle size={20} className="text-red-600" />
+  if (status === 'pass') return <CheckCircle2 size={20} className="text-success" />
+  if (status === 'warning') return <AlertTriangle size={20} className="text-warning" />
+  return <XCircle size={20} className="text-destructive" />
 }
 
 // ---- Component ----
@@ -327,22 +328,23 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
     { key: 'element', header: 'Element', className: 'font-mono text-xs' },
     { key: 'rule', header: 'Rule' },
     { key: 'description', header: 'Description' },
-    { key: 'suggestion', header: 'Suggestion', className: 'text-text-secondary' },
+    { key: 'suggestion', header: 'Suggestion', className: 'text-muted-foreground' },
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text flex items-center gap-3">
-            <ShieldCheck size={28} className="text-primary" />
-            BIM Validation
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Validate IFC models against industry standards and custom rules
-          </p>
-        </div>
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+              <ShieldCheck size={28} className="text-primary" />
+              BIM Validation
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Validate IFC models against industry standards and custom rules
+            </p>
+          </div>
         {report && (
           <div className="flex gap-2">
             <Button variant="outline" icon={<Download size={16} />} onClick={() => exportReport('html')}>
@@ -380,13 +382,13 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
         {/* Validation Rules */}
         <Card title="Validation Rules" subtitle="Select rules to check" actions={
-          <span className="text-xs text-text-secondary">{rules.filter((r) => r.checked).length}/{rules.length} selected</span>
+          <span className="text-xs text-muted-foreground">{rules.filter((r) => r.checked).length}/{rules.length} selected</span>
         }>
           <div className="space-y-3">
             {rules.map((rule) => (
               <label
                 key={rule.id}
-                className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-surface-alt transition-colors cursor-pointer"
+                className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -395,8 +397,8 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                   className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text">{rule.label}</p>
-                  <p className="text-xs text-text-secondary mt-0.5">{rule.description}</p>
+                  <p className="text-sm font-medium text-foreground">{rule.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{rule.description}</p>
                 </div>
               </label>
             ))}
@@ -442,28 +444,28 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
               {/* Score Summary */}
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-text">Overall Validation Score</h3>
-                <p className="text-sm text-text-secondary mt-1">
-                  File: <span className="font-medium text-text">{report.fileName}</span> |
+                <h3 className="text-lg font-semibold text-foreground">Overall Validation Score</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  File: <span className="font-medium text-foreground">{report.fileName}</span> |
                   Validated: {new Date(report.timestamp).toLocaleString()} |
                   Rules checked: {report.ruleResults.length}
                 </p>
                 <div className="flex gap-4 mt-3">
                   <div className="flex items-center gap-1.5 text-sm">
-                    <CheckCircle2 size={14} className="text-green-600" />
-                    <span className="text-text-secondary">
+                    <CheckCircle2 size={14} className="text-success" />
+                    <span className="text-muted-foreground">
                       {report.ruleResults.filter((r) => r.status === 'pass').length} Passed
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm">
-                    <AlertTriangle size={14} className="text-amber-500" />
-                    <span className="text-text-secondary">
+                    <AlertTriangle size={14} className="text-warning" />
+                    <span className="text-muted-foreground">
                       {report.ruleResults.filter((r) => r.status === 'warning').length} Warnings
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm">
-                    <XCircle size={14} className="text-red-600" />
-                    <span className="text-text-secondary">
+                    <XCircle size={14} className="text-destructive" />
+                    <span className="text-muted-foreground">
                       {report.ruleResults.filter((r) => r.status === 'fail').length} Failed
                     </span>
                   </div>
@@ -485,7 +487,7 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
             {report.ruleResults.map((result) => (
               <div
                 key={result.ruleId}
-                className="bg-surface rounded-xl border border-border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                className="bg-card rounded-xl border border-border shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setExpandedRule(expandedRule === result.ruleId ? null : result.ruleId)}
               >
                 <div className="p-5">
@@ -493,13 +495,13 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                     <div className="flex items-center gap-3">
                       {statusIcon(result.status)}
                       <div>
-                        <h4 className="font-semibold text-text">{result.ruleName}</h4>
-                        <p className="text-xs text-text-secondary mt-0.5">{result.details}</p>
+                        <h4 className="font-semibold text-foreground">{result.ruleName}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">{result.details}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xl font-bold ${scoreColor(result.score)}`}>{result.score}%</span>
-                      {expandedRule === result.ruleId ? <ChevronUp size={16} className="text-text-secondary" /> : <ChevronDown size={16} className="text-text-secondary" />}
+                      {expandedRule === result.ruleId ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
                     </div>
                   </div>
 
@@ -515,20 +517,20 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                   {expandedRule === result.ruleId && (
                     <div className="mt-4 pt-4 border-t border-border space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Total Elements</span>
-                        <span className="font-medium text-text">{result.total}</span>
+                        <span className="text-muted-foreground">Total Elements</span>
+                        <span className="font-medium text-foreground">{result.total}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Passed</span>
-                        <span className="font-medium text-green-600">{result.passed}</span>
+                        <span className="text-muted-foreground">Passed</span>
+                        <span className="font-medium text-success">{result.passed}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Failed</span>
-                        <span className="font-medium text-red-600">{result.total - result.passed}</span>
+                        <span className="text-muted-foreground">Failed</span>
+                        <span className="font-medium text-destructive">{result.total - result.passed}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Related Issues</span>
-                        <span className="font-medium text-text">
+                        <span className="text-muted-foreground">Related Issues</span>
+                        <span className="font-medium text-foreground">
                           {report.issues.filter((i) => i.rule === result.ruleName).length}
                         </span>
                       </div>
@@ -558,16 +560,16 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                 keyField="id"
               />
             ) : (
-              <div className="flex flex-col items-center py-12 text-text-secondary">
+              <div className="flex flex-col items-center py-12 text-muted-foreground">
                 <CheckCircle2 size={48} className="text-green-500 mb-3" />
-                <p className="font-medium text-text">No issues found</p>
+                <p className="font-medium text-foreground">No issues found</p>
                 <p className="text-sm">All validation rules passed successfully.</p>
               </div>
             )}
           </Card>
 
           {/* Legend */}
-          <div className="flex items-center gap-6 text-xs text-text-secondary px-1">
+          <div className="flex items-center gap-6 text-xs text-muted-foreground px-1">
             <div className="flex items-center gap-1.5">
               <Info size={12} />
               <span>Score colors: </span>
@@ -591,9 +593,9 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
       {/* Empty state */}
       {!report && !running && (
         <Card>
-          <div className="flex flex-col items-center py-16 text-text-secondary">
+          <div className="flex flex-col items-center py-16 text-muted-foreground">
             <ListChecks size={56} className="mb-4 text-primary/30" />
-            <h3 className="text-lg font-semibold text-text">No Validation Results Yet</h3>
+            <h3 className="text-lg font-semibold text-foreground">No Validation Results Yet</h3>
             <p className="text-sm mt-1 max-w-md text-center">
               Upload an IFC or Excel file, select your validation rules, and click "Run Validation" to check your BIM model against industry standards.
             </p>
@@ -610,13 +612,14 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
               <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               <BarChart3 size={28} className="absolute inset-0 m-auto text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-text">Validating Model...</h3>
-            <p className="text-sm text-text-secondary mt-1">
+            <h3 className="text-lg font-semibold text-foreground">Validating Model...</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Checking {rules.filter((r) => r.checked).length} rules against {files.length} file(s)
             </p>
           </div>
         </Card>
       )}
-    </div>
+      </div>
+    </MotionPage>
   )
 }

@@ -26,6 +26,7 @@ import { Tabs } from '../ui/Tabs'
 import { Table } from '../ui/Table'
 import { useAppStore } from '../../store/appStore'
 import { formatCurrency, formatDate } from '../../lib/utils'
+import { MotionPage } from '../MotionPage'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -341,14 +342,15 @@ export default function CostEstimatePage() {
   // ── Render ──────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">CWICR Cost Estimation</h1>
-        <p className="text-text-secondary mt-1">
-          Search 55,719 construction work items across 9 languages with AI-powered BIM classification
-        </p>
-      </div>
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">CWICR Cost Estimation</h1>
+          <p className="text-muted-foreground mt-1">
+            Search 55,719 construction work items across 9 languages with AI-powered BIM classification
+          </p>
+        </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -372,20 +374,20 @@ export default function CostEstimatePage() {
                     <div className="relative">
                       <button
                         onClick={() => setShowLangDropdown(!showLangDropdown)}
-                        className="flex items-center gap-2 px-3 py-2.5 border border-border rounded-lg hover:bg-surface-alt transition-colors text-sm min-w-[120px]"
+                        className="flex items-center gap-2 px-3 py-2.5 border border-border rounded-lg hover:bg-muted transition-colors text-sm min-w-[120px]"
                       >
                         <span className="text-base">{currentLang.flag}</span>
-                        <span className="font-medium text-text">{currentLang.code}</span>
-                        <ChevronDown size={14} className="text-text-secondary ml-auto" />
+                        <span className="font-medium text-foreground">{currentLang.code}</span>
+                        <ChevronDown size={14} className="text-muted-foreground ml-auto" />
                       </button>
                       {showLangDropdown && (
-                        <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-lg z-20 py-1 min-w-[180px]">
+                        <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-20 py-1 min-w-[180px]">
                           {LANGUAGES.map((lang) => (
                             <button
                               key={lang.code}
                               onClick={() => { setLanguage(lang.code); setShowLangDropdown(false) }}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-alt transition-colors ${
-                                language === lang.code ? 'bg-primary-light/50 text-primary' : 'text-text'
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors ${
+                                language === lang.code ? 'bg-primary/10 text-primary' : 'text-foreground'
                               }`}
                             >
                               <span className="text-base">{lang.flag}</span>
@@ -399,14 +401,14 @@ export default function CostEstimatePage() {
 
                     {/* Search input */}
                     <div className="flex-1 relative">
-                      <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                      <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         placeholder="Search work items... e.g. 'concrete wall', 'steel beam', '03.31'"
-                        className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-surface text-text placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
+                        className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
                       />
                     </div>
 
@@ -435,9 +437,9 @@ export default function CostEstimatePage() {
                 {searchResults.length === 0 && !isSearching && (
                   <Card>
                     <div className="text-center py-12">
-                      <Search size={48} className="mx-auto text-text-secondary/30 mb-3" />
-                      <p className="text-text-secondary">Search for construction work items</p>
-                      <p className="text-text-secondary/60 text-xs mt-1">
+                      <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-muted-foreground">Search for construction work items</p>
+                      <p className="text-muted-foreground/60 text-xs mt-1">
                         Try "concrete", "steel beam", "insulation", or a work item code
                       </p>
                     </div>
@@ -458,20 +460,20 @@ export default function CostEstimatePage() {
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <div
-                        className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors border-border hover:border-primary/50 hover:bg-surface-alt"
+                        className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors border-border hover:border-primary/50 hover:bg-muted"
                         onClick={() => handleClassifyUpload()}
                       >
-                        <Upload size={32} className="mx-auto text-text-secondary mb-3" />
-                        <p className="font-medium text-text">Drop Excel file with BIM elements</p>
-                        <p className="text-sm text-text-secondary mt-1">
+                        <Upload size={32} className="mx-auto text-muted-foreground mb-3" />
+                        <p className="font-medium text-foreground">Drop Excel file with BIM elements</p>
+                        <p className="text-sm text-muted-foreground mt-1">
                           Supports .xlsx with columns: Element Name, Type, Quantity
                         </p>
                       </div>
                     </div>
                     <div className="text-center px-6">
                       <Sparkles size={24} className="mx-auto text-primary mb-2" />
-                      <p className="text-xs text-text-secondary">Powered by</p>
-                      <p className="text-sm font-semibold text-text">Gemini AI</p>
+                      <p className="text-xs text-muted-foreground">Powered by</p>
+                      <p className="text-sm font-semibold text-foreground">Gemini AI</p>
                     </div>
                   </div>
 
@@ -504,10 +506,10 @@ export default function CostEstimatePage() {
                       emptyMessage="No classification results yet"
                     />
                     <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-sm text-muted-foreground">
                         Total estimated cost from classification:
                       </p>
-                      <p className="text-lg font-bold text-text">
+                      <p className="text-lg font-bold text-foreground">
                         {formatCurrency(
                           classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0),
                         )}
@@ -539,9 +541,9 @@ export default function CostEstimatePage() {
                 >
                   {costItems.length === 0 ? (
                     <div className="text-center py-12">
-                      <Calculator size={48} className="mx-auto text-text-secondary/30 mb-3" />
-                      <p className="text-text-secondary">No items added yet</p>
-                      <p className="text-text-secondary/60 text-xs mt-1">
+                      <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-muted-foreground">No items added yet</p>
+                      <p className="text-muted-foreground/60 text-xs mt-1">
                         Search for work items or classify BIM elements to add items
                       </p>
                     </div>
@@ -552,27 +554,27 @@ export default function CostEstimatePage() {
                         <table className="w-full">
                           <thead>
                             <tr className="border-b border-border">
-                              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Code</th>
-                              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Description</th>
-                              <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Unit</th>
-                              <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Unit Price</th>
-                              <th className="text-center text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Quantity</th>
-                              <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3">Total</th>
-                              <th className="text-right text-xs font-semibold text-text-secondary uppercase tracking-wider px-4 py-3 w-16"></th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Code</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Description</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit Price</th>
+                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Quantity</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Total</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-16"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {costItems.map((item) => (
-                              <tr key={item.id} className="border-b border-border/50 hover:bg-surface-alt transition-colors">
+                              <tr key={item.id} className="border-b border-border/50 hover:bg-muted transition-colors">
                                 <td className="px-4 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
-                                <td className="px-4 py-3 text-sm text-text">{item.workItem.description}</td>
+                                <td className="px-4 py-3 text-sm text-foreground">{item.workItem.description}</td>
                                 <td className="px-4 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
-                                <td className="px-4 py-3 text-sm text-text text-right">{formatCurrency(item.workItem.unitPrice)}</td>
+                                <td className="px-4 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center justify-center gap-1">
                                     <button
                                       onClick={() => updateQuantity(item.id, -1)}
-                                      className="p-1 rounded hover:bg-surface-alt text-text-secondary"
+                                      className="p-1 rounded hover:bg-muted text-muted-foreground"
                                     >
                                       <Minus size={14} />
                                     </button>
@@ -580,23 +582,23 @@ export default function CostEstimatePage() {
                                       type="number"
                                       value={item.quantity}
                                       onChange={(e) => setQuantityDirect(item.id, parseInt(e.target.value) || 0)}
-                                      className="w-16 text-center py-1 border border-border rounded text-sm bg-surface text-text"
+                                      className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
                                     />
                                     <button
                                       onClick={() => updateQuantity(item.id, 1)}
-                                      className="p-1 rounded hover:bg-surface-alt text-text-secondary"
+                                      className="p-1 rounded hover:bg-muted text-muted-foreground"
                                     >
                                       <Plus size={14} />
                                     </button>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-sm font-medium text-text text-right">
+                                <td className="px-4 py-3 text-sm font-medium text-foreground text-right">
                                   {formatCurrency(item.total)}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <button
                                     onClick={() => removeCostItem(item.id)}
-                                    className="p-1 rounded hover:bg-red-50 text-text-secondary hover:text-danger transition-colors"
+                                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -611,11 +613,11 @@ export default function CostEstimatePage() {
                       <div className="mt-4 pt-4 border-t-2 border-border">
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="text-sm text-text-secondary">{costItems.length} line items</p>
+                            <p className="text-sm text-muted-foreground">{costItems.length} line items</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-text-secondary">Grand Total</p>
-                            <p className="text-2xl font-bold text-text">{formatCurrency(grandTotal)}</p>
+                            <p className="text-sm text-muted-foreground">Grand Total</p>
+                            <p className="text-2xl font-bold text-foreground">{formatCurrency(grandTotal)}</p>
                           </div>
                         </div>
                       </div>
@@ -651,6 +653,7 @@ export default function CostEstimatePage() {
           return null
         }}
       </Tabs>
-    </div>
+      </div>
+    </MotionPage>
   )
 }

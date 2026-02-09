@@ -23,6 +23,7 @@ import { Table } from '../ui/Table'
 import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { formatDate } from '../../lib/utils'
+import { MotionPage } from '../MotionPage'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -196,7 +197,7 @@ export default function ConverterPage() {
     { key: 'fileName', header: 'File', render: (j: ConversionJob) => (
       <div>
         <p className="font-medium">{j.fileName}</p>
-        <p className="text-xs text-text-secondary">{j.fileSize}</p>
+        <p className="text-xs text-muted-foreground">{j.fileSize}</p>
       </div>
     )},
     { key: 'inputFormat', header: 'Input', render: (j: ConversionJob) => <Badge variant="default">{j.inputFormat}</Badge> },
@@ -206,12 +207,12 @@ export default function ConverterPage() {
     { key: 'status', header: 'Status', render: (j: ConversionJob) => (
       <div className="flex items-center gap-2">
         {statusBadge(j.status)}
-        {j.status === 'converting' && <span className="text-xs text-text-secondary">{j.progress}%</span>}
+        {j.status === 'converting' && <span className="text-xs text-muted-foreground">{j.progress}%</span>}
       </div>
     )},
     { key: 'progress', header: 'Progress', render: (j: ConversionJob) => (
       <div className="w-32">
-        <div className="h-2 bg-surface-alt rounded-full overflow-hidden">
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               j.status === 'failed' ? 'bg-danger' : j.status === 'completed' ? 'bg-green-500' : 'bg-primary'
@@ -222,7 +223,7 @@ export default function ConverterPage() {
       </div>
     )},
     { key: 'duration', header: 'Duration', render: (j: ConversionJob) => (
-      <span className="text-text-secondary">{j.duration || '—'}</span>
+      <span className="text-muted-foreground">{j.duration || '—'}</span>
     )},
     { key: 'actions', header: 'Actions', render: (j: ConversionJob) => (
       <div className="flex items-center gap-1">
@@ -270,14 +271,15 @@ export default function ConverterPage() {
   // ── Render ──────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">CAD/BIM Converter</h1>
-        <p className="text-text-secondary mt-1">
-          Convert Revit, IFC, DWG, and DGN files to Excel, 3D DAE, or PDF formats
-        </p>
-      </div>
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">CAD/BIM Converter</h1>
+          <p className="text-muted-foreground mt-1">
+            Convert Revit, IFC, DWG, and DGN files to Excel, 3D DAE, or PDF formats
+          </p>
+        </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -317,16 +319,16 @@ export default function ConverterPage() {
                         onClick={() => setOutputFormat(fmt.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
                           outputFormat === fmt.id
-                            ? 'border-primary bg-primary-light/50'
-                            : 'border-border hover:border-primary/30 hover:bg-surface-alt'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/30 hover:bg-muted'
                         }`}
                       >
-                        <div className={`p-2 rounded-lg ${outputFormat === fmt.id ? 'bg-primary text-white' : 'bg-surface-alt text-text-secondary'}`}>
+                        <div className={`p-2 rounded-lg ${outputFormat === fmt.id ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
                           {fmt.icon}
                         </div>
                         <div>
-                          <p className="font-medium text-sm text-text">{fmt.label}</p>
-                          <p className="text-xs text-text-secondary">{fmt.description}</p>
+                          <p className="font-medium text-sm text-foreground">{fmt.label}</p>
+                          <p className="text-xs text-muted-foreground">{fmt.description}</p>
                         </div>
                       </button>
                     ))}
@@ -424,6 +426,7 @@ export default function ConverterPage() {
           )
         }
       </Tabs>
-    </div>
+      </div>
+    </MotionPage>
   )
 }

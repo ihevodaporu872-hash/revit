@@ -24,6 +24,7 @@ import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { useAppStore } from '../../store/appStore'
+import { MotionPage } from '../MotionPage'
 
 // ---- Types ----
 
@@ -77,14 +78,14 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; variant: 'danger' |
 const TEAM_MEMBERS = ['Alexei Petrov', 'Maria Chen', 'David Kim', 'Sarah Johnson', 'Oleg Novak', 'Lena Vogt']
 
 const TAG_COLORS: Record<string, string> = {
-  BIM: 'bg-blue-100 text-blue-700',
-  'MEP': 'bg-purple-100 text-purple-700',
-  Structural: 'bg-red-100 text-red-700',
-  Architecture: 'bg-green-100 text-green-700',
-  QTO: 'bg-amber-100 text-amber-700',
-  Coordination: 'bg-cyan-100 text-cyan-700',
-  Documentation: 'bg-gray-100 text-gray-700',
-  Urgent: 'bg-red-100 text-red-700',
+  BIM: 'bg-primary/10 text-primary',
+  'MEP': 'bg-chart-3/10 text-chart-3',
+  Structural: 'bg-destructive/10 text-destructive',
+  Architecture: 'bg-success/10 text-success',
+  QTO: 'bg-warning/10 text-warning',
+  Coordination: 'bg-chart-3/10 text-chart-3',
+  Documentation: 'bg-muted text-muted-foreground',
+  Urgent: 'bg-destructive/10 text-destructive',
 }
 
 // ---- Mock Data ----
@@ -291,469 +292,471 @@ export default function ProjectMgmtPage() {
   const isOverdue = (task: Task) => task.status !== 'done' && new Date(task.dueDate) < new Date()
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text flex items-center gap-3">
-            <LayoutDashboard size={28} className="text-primary" />
-            Project Management
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Track tasks, coordinate team, and manage project timeline
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Telegram status */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt border border-border">
-            <BotMessageSquare size={16} className={telegramConnected ? 'text-green-600' : 'text-text-secondary'} />
-            <span className="text-xs font-medium text-text-secondary">
-              Telegram Bot: {telegramConnected ? 'Connected' : 'Disconnected'}
-            </span>
-            <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+    <MotionPage>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+              <LayoutDashboard size={28} className="text-primary" />
+              Project Management
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Track tasks, coordinate team, and manage project timeline
+            </p>
           </div>
-          <Button
-            variant="outline"
-            icon={<Filter size={16} />}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            Filters
-          </Button>
-          <Button icon={<Plus size={16} />} onClick={() => setShowAddDialog(true)}>
-            Add Task
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Tasks" value={totalTasks} icon={ListTodo} color="primary" />
-        <StatCard label="Completed" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'completion rate' }} />
-        <StatCard label="Overdue" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
-        <StatCard label="Team Members" value={teamMembers} icon={Users} color="primary" />
-      </div>
-
-      {/* Filters */}
-      {showFilters && (
-        <Card>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-text-secondary">Assignee:</label>
-              <select
-                value={filterAssignee}
-                onChange={(e) => setFilterAssignee(e.target.value)}
-                className="px-3 py-1.5 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">All</option>
-                {TEAM_MEMBERS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
+          <div className="flex items-center gap-3">
+            {/* Telegram status */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border">
+              <BotMessageSquare size={16} className={telegramConnected ? 'text-success' : 'text-muted-foreground'} />
+              <span className="text-xs font-medium text-muted-foreground">
+                Telegram Bot: {telegramConnected ? 'Connected' : 'Disconnected'}
+              </span>
+              <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-text-secondary">Priority:</label>
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value as TaskPriority | '')}
-                className="px-3 py-1.5 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">All</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            {(filterAssignee || filterPriority) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setFilterAssignee(''); setFilterPriority('') }}
-              >
-                Clear Filters
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              icon={<Filter size={16} />}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              Filters
+            </Button>
+            <Button icon={<Plus size={16} />} onClick={() => setShowAddDialog(true)}>
+              Add Task
+            </Button>
           </div>
-        </Card>
-      )}
+        </div>
 
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATUS_COLUMNS.map((col) => {
-          const columnTasks = getColumnTasks(col.id)
-          return (
-            <div key={col.id} className="space-y-3">
-              {/* Column Header */}
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
-                  <h3 className="font-semibold text-text text-sm">{col.label}</h3>
-                  <span className="text-xs text-text-secondary bg-surface-alt px-2 py-0.5 rounded-full">
-                    {columnTasks.length}
-                  </span>
-                </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Total Tasks" value={totalTasks} icon={ListTodo} color="primary" />
+          <StatCard label="Completed" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'completion rate' }} />
+          <StatCard label="Overdue" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
+          <StatCard label="Team Members" value={teamMembers} icon={Users} color="primary" />
+        </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <Card>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Assignee:</label>
+                <select
+                  value={filterAssignee}
+                  onChange={(e) => setFilterAssignee(e.target.value)}
+                  className="px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="">All</option>
+                  {TEAM_MEMBERS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">Priority:</label>
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value as TaskPriority | '')}
+                  className="px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="">All</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              {(filterAssignee || filterPriority) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFilterAssignee(''); setFilterPriority('') }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </Card>
+        )}
 
-              {/* Task Cards */}
-              <div className="space-y-3 min-h-[200px]">
-                {columnTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => setSelectedTask(task)}
-                    className="bg-surface rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
-                  >
-                    {/* Drag handle */}
-                    <div className="flex items-start gap-2">
-                      <GripVertical size={14} className="text-text-secondary/40 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="flex-1 min-w-0">
-                        {/* Priority + Title */}
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-medium text-text leading-snug">{task.title}</h4>
-                          <Badge variant={PRIORITY_CONFIG[task.priority].variant} className="shrink-0">
-                            {PRIORITY_CONFIG[task.priority].label}
-                          </Badge>
-                        </div>
+        {/* Kanban Board */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {STATUS_COLUMNS.map((col) => {
+            const columnTasks = getColumnTasks(col.id)
+            return (
+              <div key={col.id} className="space-y-3">
+                {/* Column Header */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
+                    <h3 className="font-semibold text-foreground text-sm">{col.label}</h3>
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                      {columnTasks.length}
+                    </span>
+                  </div>
+                </div>
 
-                        {/* Tags */}
-                        {task.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {task.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-gray-100 text-gray-600'}`}
-                              >
-                                {tag}
-                              </span>
-                            ))}
+                {/* Task Cards */}
+                <div className="space-y-3 min-h-[200px]">
+                  {columnTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => setSelectedTask(task)}
+                      className="bg-card rounded-xl border border-border shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
+                    >
+                      {/* Drag handle */}
+                      <div className="flex items-start gap-2">
+                        <GripVertical size={14} className="text-muted-foreground/40 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex-1 min-w-0">
+                          {/* Priority + Title */}
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-sm font-medium text-foreground leading-snug">{task.title}</h4>
+                            <Badge variant={PRIORITY_CONFIG[task.priority].variant} className="shrink-0">
+                              {PRIORITY_CONFIG[task.priority].label}
+                            </Badge>
                           </div>
-                        )}
 
-                        {/* Footer */}
-                        <div className="flex items-center justify-between mt-3 text-xs text-text-secondary">
-                          <div className="flex items-center gap-1.5">
-                            <User size={12} />
-                            <span>{task.assignee.split(' ')[0]}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {task.comments.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <MessageSquare size={12} />
-                                <span>{task.comments.length}</span>
+                          {/* Tags */}
+                          {task.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {task.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-muted text-muted-foreground'}`}
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <User size={12} />
+                              <span>{task.assignee.split(' ')[0]}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {task.comments.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare size={12} />
+                                  <span>{task.comments.length}</span>
+                                </div>
+                              )}
+                              <div className={`flex items-center gap-1 ${isOverdue(task) ? 'text-destructive font-medium' : ''}`}>
+                                <Calendar size={12} />
+                                <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               </div>
-                            )}
-                            <div className={`flex items-center gap-1 ${isOverdue(task) ? 'text-red-600 font-medium' : ''}`}>
-                              <Calendar size={12} />
-                              <span>{new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-
-                {columnTasks.length === 0 && (
-                  <div className="flex items-center justify-center h-32 border-2 border-dashed border-border rounded-xl text-text-secondary text-sm">
-                    No tasks
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Timeline / Gantt */}
-      <Card title="Project Timeline" subtitle="Simplified Gantt view of active tasks">
-        <div className="space-y-2">
-          {/* Time axis */}
-          <div className="flex items-center justify-between text-xs text-text-secondary px-1 mb-3">
-            <span>Feb 1</span>
-            <span>Feb 8</span>
-            <span>Feb 15</span>
-            <span>Feb 22</span>
-            <span>Mar 1</span>
-          </div>
-
-          {GANTT_ITEMS.map((item) => (
-            <div key={item.id} className="flex items-center gap-3">
-              <div className="w-36 shrink-0 text-right">
-                <p className="text-xs font-medium text-text truncate">{item.title}</p>
-                <p className="text-[10px] text-text-secondary">{item.assignee}</p>
-              </div>
-              <div className="flex-1 h-7 bg-surface-alt rounded-md relative border border-border overflow-hidden">
-                {/* Grid lines */}
-                <div className="absolute inset-0 flex">
-                  {[0, 25, 50, 75].map((pos) => (
-                    <div key={pos} className="h-full border-r border-border/30" style={{ width: '25%' }} />
                   ))}
-                </div>
-                {/* Bar */}
-                <div
-                  className="absolute top-1 bottom-1 rounded-md transition-all"
-                  style={{
-                    left: `${item.startPercent}%`,
-                    width: `${item.widthPercent}%`,
-                    backgroundColor: item.color,
-                    opacity: 0.85,
-                  }}
-                >
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white truncate px-2">
-                    {item.widthPercent > 15 ? item.title : ''}
-                  </span>
-                </div>
-                {/* Today marker */}
-                <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10" style={{ left: '27%' }}>
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-red-500 font-bold whitespace-nowrap">
-                    Today
-                  </div>
+
+                  {columnTasks.length === 0 && (
+                    <div className="flex items-center justify-center h-32 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm">
+                      No tasks
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
-      </Card>
 
-      {/* Add Task Dialog */}
-      {showAddDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddDialog(false)}>
-          <div className="bg-surface rounded-2xl border border-border shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h3 className="text-lg font-semibold text-text">New Task</h3>
-              <button onClick={() => setShowAddDialog(false)} className="p-1 hover:bg-surface-alt rounded-lg transition-colors">
-                <X size={18} className="text-text-secondary" />
-              </button>
+        {/* Timeline / Gantt */}
+        <Card title="Project Timeline" subtitle="Simplified Gantt view of active tasks">
+          <div className="space-y-2">
+            {/* Time axis */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-3">
+              <span>Feb 1</span>
+              <span>Feb 8</span>
+              <span>Feb 15</span>
+              <span>Feb 22</span>
+              <span>Mar 1</span>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Title *</label>
-                <input
-                  type="text"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Enter task title..."
-                  className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Description</label>
-                <textarea
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Describe the task..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-              </div>
-
-              {/* Assignee + Priority */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">Assignee</label>
-                  <select
-                    value={newAssignee}
-                    onChange={(e) => setNewAssignee(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
+            {GANTT_ITEMS.map((item) => (
+              <div key={item.id} className="flex items-center gap-3">
+                <div className="w-36 shrink-0 text-right">
+                  <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.assignee}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">Priority</label>
-                  <select
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                    className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Due Date */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Due Date</label>
-                <input
-                  type="date"
-                  value={newDueDate}
-                  onChange={(e) => setNewDueDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Tags</label>
-                <div className="flex flex-wrap gap-2">
-                  {Object.keys(TAG_COLORS).map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => toggleTag(tag)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                        newTags.includes(tag)
-                          ? 'border-primary bg-primary/10 text-primary font-medium'
-                          : 'border-border text-text-secondary hover:border-primary/30'
-                      }`}
-                    >
-                      <Tag size={10} className="inline mr-1" />
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={addTask} icon={<Plus size={16} />}>Create Task</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Task Detail Drawer */}
-      {selectedTask && (
-        <div className="fixed inset-0 bg-black/50 flex justify-end z-50" onClick={() => setSelectedTask(null)}>
-          <div className="bg-surface w-full max-w-lg h-full overflow-y-auto shadow-2xl border-l border-border" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-surface z-10">
-              <div className="flex items-center gap-3">
-                <Badge variant={PRIORITY_CONFIG[selectedTask.priority].variant}>
-                  {PRIORITY_CONFIG[selectedTask.priority].label}
-                </Badge>
-                <Badge variant={selectedTask.status === 'done' ? 'success' : 'default'}>
-                  {STATUS_COLUMNS.find((c) => c.id === selectedTask.status)?.label}
-                </Badge>
-              </div>
-              <button onClick={() => setSelectedTask(null)} className="p-1 hover:bg-surface-alt rounded-lg transition-colors">
-                <X size={18} className="text-text-secondary" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Title & Description */}
-              <div>
-                <h2 className="text-xl font-bold text-text">{selectedTask.title}</h2>
-                <p className="text-sm text-text-secondary mt-2 leading-relaxed">{selectedTask.description}</p>
-              </div>
-
-              {/* Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-surface-alt rounded-lg border border-border">
-                  <p className="text-xs text-text-secondary">Assignee</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User size={14} className="text-primary" />
-                    <span className="text-sm font-medium text-text">{selectedTask.assignee}</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-surface-alt rounded-lg border border-border">
-                  <p className="text-xs text-text-secondary">Due Date</p>
-                  <div className={`flex items-center gap-2 mt-1 ${isOverdue(selectedTask) ? 'text-red-600' : ''}`}>
-                    <Calendar size={14} className={isOverdue(selectedTask) ? 'text-red-600' : 'text-primary'} />
-                    <span className="text-sm font-medium">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-surface-alt rounded-lg border border-border">
-                  <p className="text-xs text-text-secondary">Created</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock size={14} className="text-primary" />
-                    <span className="text-sm font-medium text-text">{new Date(selectedTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-surface-alt rounded-lg border border-border">
-                  <p className="text-xs text-text-secondary">Comments</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <MessageSquare size={14} className="text-primary" />
-                    <span className="text-sm font-medium text-text">{selectedTask.comments.length}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tags */}
-              {selectedTask.tags.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Tags</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedTask.tags.map((tag) => (
-                      <span key={tag} className={`text-xs px-2 py-1 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-gray-100 text-gray-600'}`}>
-                        {tag}
-                      </span>
+                <div className="flex-1 h-7 bg-muted rounded-md relative border border-border overflow-hidden">
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 flex">
+                    {[0, 25, 50, 75].map((pos) => (
+                      <div key={pos} className="h-full border-r border-border/30" style={{ width: '25%' }} />
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Move Task */}
-              <div>
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Move To</p>
-                <div className="flex gap-2">
-                  {STATUS_COLUMNS.filter((c) => c.id !== selectedTask.status).map((col) => (
-                    <Button
-                      key={col.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => moveTask(selectedTask.id, col.id)}
-                      icon={<ArrowRight size={12} />}
-                    >
-                      {col.label}
-                    </Button>
-                  ))}
+                  {/* Bar */}
+                  <div
+                    className="absolute top-1 bottom-1 rounded-md transition-all"
+                    style={{
+                      left: `${item.startPercent}%`,
+                      width: `${item.widthPercent}%`,
+                      backgroundColor: item.color,
+                      opacity: 0.85,
+                    }}
+                  >
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white truncate px-2">
+                      {item.widthPercent > 15 ? item.title : ''}
+                    </span>
+                  </div>
+                  {/* Today marker */}
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10" style={{ left: '27%' }}>
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-red-500 font-bold whitespace-nowrap">
+                      Today
+                    </div>
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        </Card>
 
-              {/* Comments */}
-              <div>
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
-                  Comments ({selectedTask.comments.length})
-                </p>
+        {/* Add Task Dialog */}
+        {showAddDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddDialog(false)}>
+            <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-foreground">New Task</h3>
+                <button onClick={() => setShowAddDialog(false)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+                  <X size={18} className="text-muted-foreground" />
+                </button>
+              </div>
 
-                {selectedTask.comments.length > 0 ? (
-                  <div className="space-y-3">
-                    {selectedTask.comments.map((comment) => (
-                      <div key={comment.id} className="p-3 bg-surface-alt rounded-lg border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-semibold text-text">{comment.author}</span>
-                          <span className="text-[10px] text-text-secondary">
-                            {new Date(comment.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-text-secondary">{comment.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-secondary italic">No comments yet.</p>
-                )}
-
-                {/* Add comment */}
-                <div className="flex items-center gap-2 mt-3">
+              <div className="p-6 space-y-4">
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Title *</label>
                   <input
                     type="text"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') addComment() }}
-                    placeholder="Add a comment..."
-                    className="flex-1 px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="Enter task title..."
+                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
-                  <Button
-                    size="sm"
-                    icon={<SendIcon size={14} />}
-                    onClick={addComment}
-                    disabled={!commentText.trim()}
-                  >
-                    Send
-                  </Button>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
+                  <textarea
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Describe the task..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                  />
+                </div>
+
+                {/* Assignee + Priority */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Assignee</label>
+                    <select
+                      value={newAssignee}
+                      onChange={(e) => setNewAssignee(e.target.value)}
+                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Priority</label>
+                    <select
+                      value={newPriority}
+                      onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
+                      className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Due Date */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Due Date</label>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(TAG_COLORS).map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                          newTags.includes(tag)
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-border text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        <Tag size={10} className="inline mr-1" />
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+                <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+                <Button onClick={addTask} icon={<Plus size={16} />}>Create Task</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Task Detail Drawer */}
+        {selectedTask && (
+          <div className="fixed inset-0 bg-black/50 flex justify-end z-50" onClick={() => setSelectedTask(null)}>
+            <div className="bg-card w-full max-w-lg h-full overflow-y-auto shadow-2xl border-l border-border" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
+                <div className="flex items-center gap-3">
+                  <Badge variant={PRIORITY_CONFIG[selectedTask.priority].variant}>
+                    {PRIORITY_CONFIG[selectedTask.priority].label}
+                  </Badge>
+                  <Badge variant={selectedTask.status === 'done' ? 'success' : 'default'}>
+                    {STATUS_COLUMNS.find((c) => c.id === selectedTask.status)?.label}
+                  </Badge>
+                </div>
+                <button onClick={() => setSelectedTask(null)} className="p-1 hover:bg-muted rounded-lg transition-colors">
+                  <X size={18} className="text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Title & Description */}
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">{selectedTask.title}</h2>
+                  <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{selectedTask.description}</p>
+                </div>
+
+                {/* Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">Assignee</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <User size={14} className="text-primary" />
+                      <span className="text-sm font-medium text-foreground">{selectedTask.assignee}</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">Due Date</p>
+                    <div className={`flex items-center gap-2 mt-1 ${isOverdue(selectedTask) ? 'text-destructive' : ''}`}>
+                      <Calendar size={14} className={isOverdue(selectedTask) ? 'text-destructive' : 'text-primary'} />
+                      <span className="text-sm font-medium">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">Created</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Clock size={14} className="text-primary" />
+                      <span className="text-sm font-medium text-foreground">{new Date(selectedTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">Comments</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <MessageSquare size={14} className="text-primary" />
+                      <span className="text-sm font-medium text-foreground">{selectedTask.comments.length}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                {selectedTask.tags.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedTask.tags.map((tag) => (
+                        <span key={tag} className={`text-xs px-2 py-1 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-muted text-muted-foreground'}`}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Move Task */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Move To</p>
+                  <div className="flex gap-2">
+                    {STATUS_COLUMNS.filter((c) => c.id !== selectedTask.status).map((col) => (
+                      <Button
+                        key={col.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => moveTask(selectedTask.id, col.id)}
+                        icon={<ArrowRight size={12} />}
+                      >
+                        {col.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comments */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    Comments ({selectedTask.comments.length})
+                  </p>
+
+                  {selectedTask.comments.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedTask.comments.map((comment) => (
+                        <div key={comment.id} className="p-3 bg-muted rounded-lg border border-border">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-foreground">{comment.author}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(comment.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{comment.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No comments yet.</p>
+                  )}
+
+                  {/* Add comment */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <input
+                      type="text"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addComment() }}
+                      placeholder="Add a comment..."
+                      className="flex-1 px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <Button
+                      size="sm"
+                      icon={<SendIcon size={14} />}
+                      onClick={addComment}
+                      disabled={!commentText.trim()}
+                    >
+                      Send
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </MotionPage>
   )
 }
