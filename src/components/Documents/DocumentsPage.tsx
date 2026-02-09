@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Plus, Send, ClipboardList, FileCheck2,
   MessageSquareText, Clock, AlertTriangle, Search,
@@ -21,6 +22,14 @@ import {
   generateMeetingMinutes,
 } from '../../services/api'
 import { MotionPage } from '../MotionPage'
+import {
+  staggerContainer,
+  fadeInUp,
+  scaleIn,
+  listItem,
+  modalOverlay,
+  modalContent,
+} from '../../lib/animations'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -48,6 +57,26 @@ const MOCK_SUBMITTALS: (Submittal & Record<string, unknown>)[] = [
   { id: '4', number: 'SUB-004', description: 'Elevator Cab Finishes', status: 'Resubmit', specSection: '14 21 00', dueDate: '2026-02-10', contractor: 'Vertical Transit Co.', createdAt: '2026-01-12' },
   { id: '5', number: 'SUB-005', description: 'Waterproofing Membrane Data', status: 'Rejected', specSection: '07 10 00', dueDate: '2026-02-08', contractor: 'SealTight LLC', createdAt: '2026-01-25' },
 ]
+
+// ─── File type icon color map ─────────────────────────────────────────────────
+
+const fileTypeIconColor: Record<string, string> = {
+  Drawing: 'text-primary',
+  Report: 'text-warning',
+  Specification: 'text-success',
+  Plan: 'text-info',
+  Submittal: 'text-chart-3',
+}
+
+// ─── Submittal status indicator dot colors ────────────────────────────────────
+
+const submittalStatusDotColor: Record<Submittal['status'], string> = {
+  Pending: 'bg-primary',
+  Submitted: 'bg-info',
+  Approved: 'bg-success',
+  Rejected: 'bg-destructive',
+  Resubmit: 'bg-warning',
+}
 
 // ─── Status badge helpers ─────────────────────────────────────────────────────
 
@@ -125,7 +154,7 @@ function DocumentsTab() {
   const columns = [
     { key: 'name', header: 'Name', render: (d: typeof documents[0]) => (
       <div className="flex items-center gap-2">
-        <FileText size={16} className="text-primary shrink-0" />
+        <FileText size={16} className={`${fileTypeIconColor[d.type as string] || 'text-primary'} shrink-0`} />
         <span className="font-medium">{d.name}</span>
       </div>
     )},
@@ -166,25 +195,34 @@ function DocumentsTab() {
         </Button>
       </div>
 
-      {showUpload && (
-        <Card>
-          <FileUpload
-            accept=".pdf,.dwg,.ifc,.xlsx,.docx,.png,.jpg"
-            multiple
-            onFilesSelected={handleUpload}
-            label="Upload project documents"
-            description="PDF, DWG, IFC, Excel, Word, Images up to 500MB"
-          />
-          {uploading && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-              <Loader2 size={14} className="animate-spin" />
-              Uploading...
-            </div>
-          )}
-        </Card>
-      )}
+      <AnimatePresence>
+        {showUpload && (
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <Card hover>
+              <FileUpload
+                accept=".pdf,.dwg,.ifc,.xlsx,.docx,.png,.jpg"
+                multiple
+                onFilesSelected={handleUpload}
+                label="Upload project documents"
+                description="PDF, DWG, IFC, Excel, Word, Images up to 500MB"
+              />
+              {uploading && (
+                <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin" />
+                  Uploading...
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <Card>
+      <Card hover>
         <Table columns={columns} data={filtered} emptyMessage="No documents found" />
       </Card>
     </div>
@@ -257,61 +295,70 @@ function RFITab() {
         </Button>
       </div>
 
-      {showForm && (
-        <Card title="Create New RFI">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-1">Subject</label>
-              <input
-                type="text"
-                value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                placeholder="Describe the request for information..."
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value as RFI['priority'] })}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Assigned To</label>
-              <input
-                type="text"
-                value={form.assignedTo}
-                onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
-                placeholder="Name of assignee"
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Due Date</label>
-              <input
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleCreate} loading={submitting} icon={<Send size={16} />}>
-                Create RFI
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            variants={fadeInUp}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <Card title="Create New RFI" hover>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-foreground mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={form.subject}
+                    onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                    placeholder="Describe the request for information..."
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
+                  <select
+                    value={form.priority}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value as RFI['priority'] })}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Assigned To</label>
+                  <input
+                    type="text"
+                    value={form.assignedTo}
+                    onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
+                    placeholder="Name of assignee"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleCreate} loading={submitting} icon={<Send size={16} />}>
+                    Create RFI
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <Card>
+      <Card hover>
         <Table columns={columns} data={rfis} emptyMessage="No RFIs found" />
       </Card>
     </div>
@@ -326,7 +373,12 @@ function SubmittalsTab() {
       <span className="font-mono font-medium text-primary">{s.number}</span>
     )},
     { key: 'description', header: 'Description' },
-    { key: 'status', header: 'Status', render: (s: typeof submittals[0]) => submittalStatusBadge(s.status) },
+    { key: 'status', header: 'Status', render: (s: typeof submittals[0]) => (
+      <div className="flex items-center gap-2">
+        <span className={`inline-block w-2 h-2 rounded-full ${submittalStatusDotColor[s.status]} shrink-0`} />
+        {submittalStatusBadge(s.status)}
+      </div>
+    )},
     { key: 'specSection', header: 'Spec Section', render: (s: typeof submittals[0]) => (
       <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{s.specSection}</span>
     )},
@@ -341,7 +393,7 @@ function SubmittalsTab() {
           {submittals.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length} submittals awaiting action
         </p>
       </div>
-      <Card>
+      <Card hover>
         <Table columns={columns} data={submittals} emptyMessage="No submittals found" />
       </Card>
     </div>
@@ -402,7 +454,7 @@ Review and edit as needed before distribution.`
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card title="Meeting Notes" subtitle="Enter raw notes from the meeting">
+      <Card title="Meeting Notes" subtitle="Enter raw notes from the meeting" hover>
         <div className="space-y-4">
           <textarea
             value={notes}
@@ -424,12 +476,20 @@ Review and edit as needed before distribution.`
         </div>
       </Card>
 
-      <Card title="Formatted Minutes" subtitle="AI-generated meeting minutes preview">
+      <Card title="Formatted Minutes" subtitle="AI-generated meeting minutes preview" hover>
         {minutes ? (
           <div className="space-y-4">
-            <pre className="whitespace-pre-wrap text-sm text-foreground font-mono bg-muted p-4 rounded-lg border border-border max-h-[500px] overflow-y-auto leading-relaxed">
-              {minutes}
-            </pre>
+            <AnimatePresence>
+              <motion.pre
+                key="minutes-output"
+                variants={fadeInUp}
+                initial="hidden"
+                animate="visible"
+                className="whitespace-pre-wrap text-sm text-foreground font-mono bg-muted p-4 rounded-lg border border-border max-h-[500px] overflow-y-auto leading-relaxed"
+              >
+                {minutes}
+              </motion.pre>
+            </AnimatePresence>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -499,7 +559,12 @@ export default function DocumentsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
           <StatCard
             label="Total Documents"
             value={totalDocs}
@@ -526,7 +591,7 @@ export default function DocumentsPage() {
             color="danger"
             trend={{ value: 5, label: 'vs last week' }}
           />
-        </div>
+        </motion.div>
 
         {/* Tabs */}
         <Tabs tabs={tabs} defaultTab="documents">
