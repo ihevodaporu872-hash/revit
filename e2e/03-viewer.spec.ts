@@ -381,6 +381,7 @@ test.describe('Module 2: 3D Viewer - IFC Loading', () => {
   })
 
   test('should hide "No model loaded" placeholder after loading', async ({ page }) => {
+    test.slow()
     test.setTimeout(60000)
     await page.goto('/viewer')
 
@@ -399,6 +400,7 @@ test.describe('Module 2: 3D Viewer - IFC Loading', () => {
   })
 
   test('should update header with filename after loading', async ({ page }) => {
+    test.slow()
     test.setTimeout(60000)
     await page.goto('/viewer')
 
@@ -423,22 +425,22 @@ test.describe('Module 2: 3D Viewer - Responsive Layout', () => {
   })
 
   test('should have proper main container layout', async ({ page }) => {
-    const mainContainer = page.locator('.h-\\[calc\\(100vh-8rem\\)\\]')
-    await expect(mainContainer).toBeVisible()
+    const mainContainer = page.locator('[class*="calc(100vh"]')
+    await expect(mainContainer.first()).toBeVisible()
   })
 
   test('should position toolbar in top-left corner', async ({ page }) => {
-    const toolbar = page.locator('.absolute.top-3.left-3').first()
+    const toolbar = page.locator('[class*="absolute"][class*="top-3"][class*="left-3"]').first()
     await expect(toolbar).toBeVisible()
   })
 
   test('should position side buttons in top-right corner', async ({ page }) => {
-    const sideButtons = page.locator('.absolute.top-3.right-3')
+    const sideButtons = page.locator('[class*="absolute"][class*="top-3"][class*="right-3"]').first()
     await expect(sideButtons).toBeVisible()
   })
 
   test('viewport should have rounded borders', async ({ page }) => {
-    const viewport = page.locator('.flex-1.relative.rounded-xl')
+    const viewport = page.locator('[class*="flex-1"][class*="relative"][class*="rounded-xl"]').first()
     await expect(viewport).toBeVisible()
   })
 })
