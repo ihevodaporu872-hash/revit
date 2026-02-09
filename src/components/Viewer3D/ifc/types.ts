@@ -114,6 +114,8 @@ export interface ClipBoxState {
 
 // ── Measure Tool ─────────────────────────────────────────────────────
 
+export type MeasureMode = 'distance' | 'area'
+
 export interface MeasurePoint {
   position: import('three').Vector3
   expressID: number | null
@@ -124,6 +126,13 @@ export interface Measurement {
   pointA: MeasurePoint
   pointB: MeasurePoint
   distance: number
+  visualGroup: import('three').Group
+}
+
+export interface AreaMeasurement {
+  id: string
+  points: MeasurePoint[]
+  area: number
   visualGroup: import('three').Group
 }
 

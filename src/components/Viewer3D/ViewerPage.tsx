@@ -38,7 +38,7 @@ import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
 import { MotionPage } from '../MotionPage'
 import { IFCService } from './ifc/ifcService'
-import type { IFCSpatialNode, IFCModelStats, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode } from './ifc/types'
+import type { IFCSpatialNode, IFCModelStats, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode } from './ifc/types'
 import { useViewerHighlight } from './useViewerHighlight'
 import { useSearchSets } from './useSearchSets'
 import { SearchSetsPanel } from './SearchSetsPanel'
@@ -57,6 +57,8 @@ import { AppearanceProfilerPanel } from './AppearanceProfilerPanel'
 import { useExcelExport } from './useExcelExport'
 import { ExportDialog } from './ExportDialog'
 import { useBoxSelect } from './useBoxSelect'
+import { useWireframe } from './useWireframe'
+import { ColorPickerPopover } from './ColorPickerPopover'
 import {
   fadeInUp,
   fadeInLeft,
@@ -87,7 +89,7 @@ interface TreeNode {
 }
 
 type ToolMode = 'select' | 'pan' | 'rotate' | 'zoom' | 'measure' | 'section'
-type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler'
+type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler' | 'models'
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -96,6 +98,7 @@ export default function ViewerPage() {
   const {
     savedSets, activeDisplay, selectedElementIds, setSelectedElementIds,
     setActiveDisplay, addToSelection, addViewpoint, activeProfile, setActiveProfile,
+    customColors, setCustomColor, clearCustomColor,
   } = useViewerStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -106,8 +109,7 @@ export default function ViewerPage() {
   const frameIdRef = useRef<number>(0)
   const ifcServiceRef = useRef<IFCService | null>(null)
   const modelGroupRef = useRef<THREE.Group | null>(null)
-  const selectedMeshRef = useRef<THREE.Mesh | null>(null)
-  const originalMaterialRef = useRef<THREE.Material | THREE.Material[] | null>(null)
+  const selectedMeshesRef = useRef<Map<number, { mesh: THREE.Mesh; originalMaterial: THREE.Material | THREE.Material[] }>>(new Map())
   const annotationCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const [isModelLoaded, setIsModelLoaded] = useState(false)
@@ -120,6 +122,7 @@ export default function ViewerPage() {
   const [modelFile, setModelFile] = useState<string | null>(null)
   const [modelStats, setModelStats] = useState<IFCModelStats | null>(null)
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress | null>(null)
+  const [loadedModels, setLoadedModels] = useState<{ modelID: number; fileName: string; visible: boolean }[]>([])
 
   // Drawing / Annotations state
   const [isDrawingMode, setIsDrawingMode] = useState(false)
@@ -132,6 +135,15 @@ export default function ViewerPage() {
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
+
+  // Measure mode state
+  const [measureMode, setMeasureMode] = useState<MeasureMode>('distance')
+
+  // Wireframe state
+  const [isWireframe, setIsWireframe] = useState(false)
+
+  // Color picker state
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   // Profiler state
   const [isProfilerProcessing, setIsProfilerProcessing] = useState(false)
@@ -165,23 +177,52 @@ export default function ViewerPage() {
   const { buildProfile, clearProfile } = useAppearanceProfiler()
 
   const { exportToExcel } = useExcelExport()
+  const wireframe = useWireframe()
+
+  const clearAllSelections = useCallback(() => {
+    selectedMeshesRef.current.forEach(({ mesh, originalMaterial }) => {
+      mesh.material = originalMaterial
+    })
+    selectedMeshesRef.current.clear()
+  }, [])
+
+  const highlightMesh = useCallback((expressID: number, mesh: THREE.Mesh) => {
+    if (selectedMeshesRef.current.has(expressID)) return
+    selectedMeshesRef.current.set(expressID, { mesh, originalMaterial: mesh.material })
+    const mat = (mesh.material as THREE.MeshPhysicalMaterial).clone()
+    mat.emissive = new THREE.Color(0x3b82f6)
+    mat.emissiveIntensity = 0.5
+    mesh.material = mat
+  }, [])
 
   const handleBoxSelect = useCallback((ids: number[], additive: boolean) => {
-    if (additive) {
-      addToSelection(ids)
-    } else {
+    if (!additive) {
+      clearAllSelections()
       setSelectedElementIds(ids)
+    } else {
+      addToSelection(ids)
     }
+
+    // Visually highlight all selected meshes
+    const service = ifcServiceRef.current
+    if (service) {
+      ids.forEach((id) => {
+        const mesh = service.getMesh(id)
+        if (mesh) highlightMesh(id, mesh)
+      })
+    }
+
     if (ids.length > 0) {
       setShowProperties(true)
+      const totalSelected = additive ? selectedElementIds.length + ids.length : ids.length
       setSelectedElement({
         id: ids[0],
-        type: `${ids.length} elements selected`,
-        name: `Multi-selection (${ids.length})`,
+        type: `${totalSelected} elements selected`,
+        name: `Multi-selection (${totalSelected})`,
         properties: [],
       })
     }
-  }, [addToSelection, setSelectedElementIds])
+  }, [addToSelection, setSelectedElementIds, clearAllSelections, highlightMesh, selectedElementIds])
 
   useBoxSelect({
     containerRef,
@@ -229,7 +270,7 @@ export default function ViewerPage() {
     controls.maxDistance = 500
     controlsRef.current = controls
 
-    const gridHelper = new THREE.GridHelper(100, 100, 0x333355, 0x222244)
+    const gridHelper = new THREE.GridHelper(100, 100, 0x555588, 0x444466)
     scene.add(gridHelper)
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
@@ -354,6 +395,20 @@ export default function ViewerPage() {
     if (controls) controls.enabled = !isDrawingMode
   }, [isDrawingMode])
 
+  // Auto-clear annotations on orbit start (if not drawing)
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!controls) return
+    const handleOrbitStart = () => {
+      if (!isDrawingMode && annotations.hasAnnotations()) {
+        annotations.clearAll()
+        addNotification('info', 'Annotations cleared — save as viewpoint to keep')
+      }
+    }
+    controls.addEventListener('start', handleOrbitStart)
+    return () => controls.removeEventListener('start', handleOrbitStart)
+  }, [isDrawingMode, annotations, addNotification])
+
   // ── Convert spatial tree ─────────────────────────────────
 
   const convertToTreeNodes = (node: IFCSpatialNode, depth = 0): TreeNode => {
@@ -398,42 +453,50 @@ export default function ViewerPage() {
 
   // ── Select element by raycasting ────────────────────────
 
-  const selectElement = useCallback(async (expressID: number) => {
+  const selectElement = useCallback(async (expressID: number, ctrlKey = false) => {
     const service = ifcServiceRef.current
     if (!service) return
 
-    // Remove previous highlight
-    if (selectedMeshRef.current && originalMaterialRef.current) {
-      selectedMeshRef.current.material = originalMaterialRef.current
+    if (!ctrlKey) {
+      clearAllSelections()
     }
 
-    // Highlight new mesh
+    // Highlight mesh
     const mesh = service.getMesh(expressID)
     if (mesh) {
-      selectedMeshRef.current = mesh
-      originalMaterialRef.current = mesh.material
-      const mat = (mesh.material as THREE.MeshPhysicalMaterial).clone()
-      mat.emissive = new THREE.Color(0x3b82f6)
-      mat.emissiveIntensity = 0.5
-      mesh.material = mat
+      highlightMesh(expressID, mesh)
     }
 
     // Load properties
     const info = await service.getElementProperties(expressID)
     if (info) {
-      setSelectedElement({
-        id: info.expressID,
-        type: info.type,
-        name: info.name,
-        properties: info.properties,
-        material: info.material,
-        volume: info.volume,
-        area: info.area,
-      })
+      if (ctrlKey) {
+        const newIds = [...new Set([...selectedElementIds, expressID])]
+        setSelectedElementIds(newIds)
+        setSelectedElement({
+          id: info.expressID,
+          type: newIds.length > 1 ? `${newIds.length} elements selected` : info.type,
+          name: newIds.length > 1 ? `Multi-selection (${newIds.length})` : info.name,
+          properties: newIds.length > 1 ? [] : info.properties,
+          material: newIds.length > 1 ? undefined : info.material,
+          volume: newIds.length > 1 ? undefined : info.volume,
+          area: newIds.length > 1 ? undefined : info.area,
+        })
+      } else {
+        setSelectedElement({
+          id: info.expressID,
+          type: info.type,
+          name: info.name,
+          properties: info.properties,
+          material: info.material,
+          volume: info.volume,
+          area: info.area,
+        })
+        setSelectedElementIds([expressID])
+      }
       setShowProperties(true)
-      setSelectedElementIds([expressID])
     }
-  }, [setSelectedElementIds])
+  }, [setSelectedElementIds, selectedElementIds, clearAllSelections, highlightMesh])
 
   // ── Canvas click handler ────────────────────────────────
 
@@ -443,7 +506,11 @@ export default function ViewerPage() {
 
       // Measure tool click
       if (activeTool === 'measure') {
-        measureTool.handleMeasureClick(event)
+        if (event.detail === 2) {
+          measureTool.handleMeasureDoubleClick(event)
+        } else {
+          measureTool.handleMeasureClick(event)
+        }
         return
       }
 
@@ -467,20 +534,17 @@ export default function ViewerPage() {
         const hit = intersects[0].object
         const expressID = hit.userData.expressID
         if (expressID !== undefined) {
-          selectElement(expressID)
+          selectElement(expressID, event.ctrlKey || event.metaKey)
         }
       } else {
-        // Deselect
-        if (selectedMeshRef.current && originalMaterialRef.current) {
-          selectedMeshRef.current.material = originalMaterialRef.current
-          selectedMeshRef.current = null
-          originalMaterialRef.current = null
-        }
+        // Deselect all
+        clearAllSelections()
         setSelectedElement(null)
         setShowProperties(false)
+        setSelectedElementIds([])
       }
     },
-    [activeTool, selectElement, isDrawingMode, measureTool],
+    [activeTool, selectElement, isDrawingMode, measureTool, clearAllSelections, setSelectedElementIds],
   )
 
   useEffect(() => {
@@ -501,15 +565,15 @@ export default function ViewerPage() {
       const scene = sceneRef.current
       if (!scene) return
 
-      // Remove previous model
-      if (modelGroupRef.current) {
-        scene.remove(modelGroupRef.current)
-        modelGroupRef.current = null
+      // For multi-file: if no model loaded yet, create a parent group
+      if (!modelGroupRef.current) {
+        const parentGroup = new THREE.Group()
+        parentGroup.name = 'IFCModels'
+        scene.add(parentGroup)
+        modelGroupRef.current = parentGroup
       }
-      ifcServiceRef.current?.disposeModel()
 
       setLoadingProgress({ stage: 'init', percent: 0, message: 'Initializing...' })
-      setIsModelLoaded(false)
 
       try {
         // Init service if needed
@@ -524,19 +588,19 @@ export default function ViewerPage() {
           setLoadingProgress(p)
         })
 
-        scene.add(result.group)
-        modelGroupRef.current = result.group
+        modelGroupRef.current.add(result.group)
 
-        fitToModel(result.group)
-        sectionPlanes.initBounds(result.group)
+        fitToModel(modelGroupRef.current)
+        sectionPlanes.initBounds(modelGroupRef.current)
 
         const treeNodes = convertToTreeNodes(result.tree)
-        setTreeData([treeNodes])
+        setTreeData((prev) => [...prev, treeNodes])
         setModelStats(result.stats)
         setModelFile(file.name)
         setIsModelLoaded(true)
         setShowLeftPanel(true)
         setLoadingProgress(null)
+        setLoadedModels(ifcServiceRef.current.getLoadedModels())
 
         addNotification('success', `Model loaded: ${result.stats.totalElements} elements`)
       } catch (err) {
@@ -789,6 +853,7 @@ export default function ViewerPage() {
     { id: 'sets', icon: <Bookmark size={14} />, label: 'Sets' },
     { id: 'viewpoints', icon: <Camera size={14} />, label: 'Views' },
     { id: 'profiler', icon: <Palette size={14} />, label: 'Profiler' },
+    { id: 'models', icon: <Box size={14} />, label: 'Models' },
   ]
 
   // ── Render ──────────────────────────────────────────────
@@ -895,13 +960,65 @@ export default function ViewerPage() {
                   <SearchSetsPanel selectedIds={selectedElementIds} />
                 ) : leftTab === 'viewpoints' ? (
                   <ViewpointsPanel onRestore={handleRestoreViewpoint} />
-                ) : (
+                ) : leftTab === 'profiler' ? (
                   <AppearanceProfilerPanel
                     activeProfile={activeProfile}
                     onApply={handleApplyProfile}
                     onClear={handleClearProfile}
                     isProcessing={isProfilerProcessing}
                   />
+                ) : (
+                  /* Models tab */
+                  <div className="flex-1 overflow-y-auto py-2">
+                    {loadedModels.length === 0 ? (
+                      <p className="px-4 py-6 text-xs text-muted-foreground/60 text-center">
+                        No models loaded
+                      </p>
+                    ) : (
+                      <div className="space-y-1 px-2">
+                        {loadedModels.map((model) => (
+                          <div key={model.modelID} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-muted group">
+                            <Box size={14} className="text-primary shrink-0" />
+                            <span className="flex-1 text-xs font-medium text-foreground truncate">{model.fileName}</span>
+                            <button
+                              title={model.visible ? 'Hide' : 'Show'}
+                              onClick={() => {
+                                ifcServiceRef.current?.setModelVisibility(model.modelID, !model.visible)
+                                setLoadedModels(ifcServiceRef.current?.getLoadedModels() || [])
+                              }}
+                              className="p-1 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              {model.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                            </button>
+                            <button
+                              title="Remove model"
+                              onClick={() => {
+                                const scene = sceneRef.current
+                                if (scene && ifcServiceRef.current) {
+                                  ifcServiceRef.current.removeModel(model.modelID, scene)
+                                  setLoadedModels(ifcServiceRef.current.getLoadedModels())
+                                  if (ifcServiceRef.current.getLoadedModels().length === 0) {
+                                    setIsModelLoaded(false)
+                                    setTreeData([])
+                                    setModelFile(null)
+                                    setModelStats(null)
+                                    if (modelGroupRef.current) {
+                                      scene.remove(modelGroupRef.current)
+                                      modelGroupRef.current = null
+                                    }
+                                  }
+                                  addNotification('info', `Removed: ${model.fileName}`)
+                                }
+                              }}
+                              className="p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </motion.div>
             )}
@@ -1015,6 +1132,25 @@ export default function ViewerPage() {
                 {isModelLoaded ? <Eye size={18} /> : <EyeOff size={18} />}
               </motion.button>
               <motion.button
+                title={isWireframe ? 'Solid Mode' : 'Wireframe Mode'}
+                onClick={() => {
+                  const next = !isWireframe
+                  setIsWireframe(next)
+                  wireframe.toggle(modelGroupRef.current, next)
+                }}
+                whileTap={{ scale: 0.95 }}
+                disabled={!isModelLoaded}
+                className={`p-2 rounded-lg backdrop-blur-md ring-1 shadow-lg transition-colors ${
+                  isWireframe
+                    ? 'bg-primary text-white ring-primary/50'
+                    : isModelLoaded
+                      ? 'bg-card/80 ring-border text-muted-foreground hover:text-foreground'
+                      : 'bg-card/80 ring-border text-muted-foreground/30 cursor-not-allowed'
+                }`}
+              >
+                <Grid3x3 size={18} />
+              </motion.button>
+              <motion.button
                 title={isDrawingMode ? 'Exit Drawing Mode' : 'Drawing Mode'}
                 onClick={() => setIsDrawingMode(!isDrawingMode)}
                 whileTap={{ scale: 0.95 }}
@@ -1068,6 +1204,8 @@ export default function ViewerPage() {
                 hasPendingPoint={measureTool.hasPendingPoint}
                 onDelete={measureTool.deleteMeasurement}
                 onClearAll={measureTool.clearAllMeasurements}
+                mode={measureMode}
+                onModeChange={(m) => { setMeasureMode(m); measureTool.setMode(m) }}
               />
             )}
 
@@ -1168,6 +1306,15 @@ export default function ViewerPage() {
                 <div className="flex-1 overflow-y-auto">
                   <div className="px-4 py-3 border-b border-border bg-muted/50">
                     <p className="text-sm font-medium text-foreground">{selectedElement.name}</p>
+                    {selectedElementIds.length > 1 && (
+                      <button
+                        onClick={() => { setShowLeftPanel(true); setLeftTab('sets') }}
+                        className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+                      >
+                        <Bookmark size={12} />
+                        Create Search Set ({selectedElementIds.length})
+                      </button>
+                    )}
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-card rounded-lg p-2 border border-border">
                         <p className="text-muted-foreground">Express ID</p>
@@ -1194,6 +1341,45 @@ export default function ViewerPage() {
                       <div className="mt-2 text-xs">
                         <span className="text-muted-foreground">Material: </span>
                         <span className="text-foreground font-medium">{selectedElement.material}</span>
+                      </div>
+                    )}
+                    {/* Color button */}
+                    {selectedElementIds.length === 1 && (
+                      <div className="relative mt-2">
+                        <button
+                          onClick={() => setShowColorPicker(!showColorPicker)}
+                          className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition-colors"
+                        >
+                          <Palette size={10} />
+                          <span>Color</span>
+                          {customColors[`el-${selectedElement.id}`] && (
+                            <div className="w-3 h-3 rounded-sm border border-border" style={{ backgroundColor: customColors[`el-${selectedElement.id}`] }} />
+                          )}
+                        </button>
+                        {showColorPicker && (
+                          <ColorPickerPopover
+                            currentColor={customColors[`el-${selectedElement.id}`]}
+                            onApply={(color) => {
+                              setCustomColor(`el-${selectedElement.id}`, color)
+                              // Apply color visually to mesh
+                              const mesh = ifcServiceRef.current?.getMesh(selectedElement.id)
+                              if (mesh && mesh.material instanceof THREE.MeshPhysicalMaterial) {
+                                const mat = mesh.material.clone()
+                                mat.color.set(color)
+                                mesh.material = mat
+                              }
+                            }}
+                            onClear={() => {
+                              clearCustomColor(`el-${selectedElement.id}`)
+                              // Restore original — re-select to refresh
+                              const entry = selectedMeshesRef.current.get(selectedElement.id)
+                              if (entry) {
+                                entry.mesh.material = entry.originalMaterial
+                              }
+                            }}
+                            onClose={() => setShowColorPicker(false)}
+                          />
+                        )}
                       </div>
                     )}
                   </div>

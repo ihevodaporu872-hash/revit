@@ -11,7 +11,7 @@ interface SearchSetsPanelProps {
 
 export function SearchSetsPanel({ selectedIds }: SearchSetsPanelProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const { savedSets, activeDisplay, addSet, updateSet, deleteSet, setActiveDisplay } = useViewerStore()
+  const { savedSets, activeDisplay, addSet, updateSet, deleteSet, setActiveDisplay, addElementsToSet, removeElementsFromSet } = useViewerStore()
 
   const selectionSets = savedSets.filter((s) => s.type === 'selection')
   const searchSets = savedSets.filter((s) => s.type === 'search')
@@ -19,6 +19,22 @@ export function SearchSetsPanel({ selectedIds }: SearchSetsPanelProps) {
   const handleCreate = (set: SavedSet) => {
     addSet(set)
   }
+
+  const renderSetItem = (set: SavedSet) => (
+    <SearchSetItem
+      key={set.id}
+      set={set}
+      isActive={activeDisplay?.setId === set.id}
+      activeMode={activeDisplay?.setId === set.id ? activeDisplay.mode : null}
+      onDisplay={(mode) => setActiveDisplay({ setId: set.id, mode })}
+      onClearDisplay={() => setActiveDisplay(null)}
+      onRename={(name) => updateSet(set.id, { name })}
+      onDelete={() => deleteSet(set.id)}
+      selectedCount={selectedIds.length}
+      onAddSelected={set.type === 'selection' ? () => addElementsToSet(set.id, selectedIds) : undefined}
+      onRemoveSelected={set.type === 'selection' ? () => removeElementsFromSet(set.id, selectedIds) : undefined}
+    />
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -46,18 +62,7 @@ export function SearchSetsPanel({ selectedIds }: SearchSetsPanelProps) {
               Select elements and save as a set
             </p>
           ) : (
-            selectionSets.map((set) => (
-              <SearchSetItem
-                key={set.id}
-                set={set}
-                isActive={activeDisplay?.setId === set.id}
-                activeMode={activeDisplay?.setId === set.id ? activeDisplay.mode : null}
-                onDisplay={(mode) => setActiveDisplay({ setId: set.id, mode })}
-                onClearDisplay={() => setActiveDisplay(null)}
-                onRename={(name) => updateSet(set.id, { name })}
-                onDelete={() => deleteSet(set.id)}
-              />
-            ))
+            selectionSets.map(renderSetItem)
           )}
         </div>
 
@@ -72,18 +77,7 @@ export function SearchSetsPanel({ selectedIds }: SearchSetsPanelProps) {
               Create search criteria to find elements
             </p>
           ) : (
-            searchSets.map((set) => (
-              <SearchSetItem
-                key={set.id}
-                set={set}
-                isActive={activeDisplay?.setId === set.id}
-                activeMode={activeDisplay?.setId === set.id ? activeDisplay.mode : null}
-                onDisplay={(mode) => setActiveDisplay({ setId: set.id, mode })}
-                onClearDisplay={() => setActiveDisplay(null)}
-                onRename={(name) => updateSet(set.id, { name })}
-                onDelete={() => deleteSet(set.id)}
-              />
-            ))
+            searchSets.map(renderSetItem)
           )}
         </div>
       </div>

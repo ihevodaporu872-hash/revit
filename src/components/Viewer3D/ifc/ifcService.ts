@@ -8,12 +8,25 @@ async function getWebIFC() {
   return WebIFC
 }
 
+interface LoadedModel {
+  modelID: number
+  fileName: string
+  group: THREE.Group
+  visible: boolean
+}
+
 export class IFCService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private api: any = null
-  private modelID = -1
+  private models = new Map<number, LoadedModel>()
   private elementMap = new Map<number, THREE.Mesh>()
   private disposed = false
+
+  // Legacy single-model accessor (returns first model ID)
+  private get modelID(): number {
+    if (this.models.size === 0) return -1
+    return this.models.keys().next().value!
+  }
 
   async init(): Promise<void> {
     const wif = await getWebIFC()
@@ -35,24 +48,20 @@ export class IFCService {
 
     onProgress?.({ stage: 'parsing', percent: 20, message: 'Parsing IFC data...' })
 
-    this.modelID = this.api.OpenModel(data, {
+    const modelID = this.api.OpenModel(data, {
       COORDINATE_TO_ORIGIN: true,
       CIRCLE_SEGMENTS: 16,
     })
 
-    if (this.modelID === -1) throw new Error('Failed to open IFC model')
+    if (modelID === -1) throw new Error('Failed to open IFC model')
 
     onProgress?.({ stage: 'geometry', percent: 30, message: 'Loading geometry...' })
 
     const group = new THREE.Group()
-    group.name = 'IFCModel'
-    this.elementMap.clear()
+    group.name = `IFCModel-${file.name}`
 
-    // Stream all meshes for better progress tracking
-    const allLines = this.api.GetAllLines(this.modelID)
-    const totalLines = allLines.size()
-
-    const flatMeshes = this.api.LoadAllGeometry(this.modelID)
+    // Stream all meshes
+    const flatMeshes = this.api.LoadAllGeometry(modelID)
     const totalMeshes = flatMeshes.size()
 
     for (let i = 0; i < totalMeshes; i++) {
@@ -67,7 +76,7 @@ export class IFCService {
       const placedGeometries = flatMesh.geometries
       for (let j = 0; j < placedGeometries.size(); j++) {
         const placed = placedGeometries.get(j)
-        const geometry = this.api.GetGeometry(this.modelID, placed.geometryExpressID)
+        const geometry = this.api.GetGeometry(modelID, placed.geometryExpressID)
 
         const verts = this.api.GetVertexArray(
           geometry.GetVertexData(),
@@ -116,6 +125,7 @@ export class IFCService {
         mesh.castShadow = true
         mesh.receiveShadow = true
         mesh.userData.expressID = expressID
+        mesh.userData.modelID = modelID
         mesh.userData.isModelPart = true
 
         group.add(mesh)
@@ -127,22 +137,30 @@ export class IFCService {
 
     onProgress?.({ stage: 'building', percent: 85, message: 'Building spatial tree...' })
 
-    const tree = await this.getSpatialTree()
+    const tree = await this.getSpatialTreeForModel(modelID)
 
     onProgress?.({ stage: 'building', percent: 90, message: 'Calculating statistics...' })
 
-    const stats = await this.calculateStats(file)
+    const stats = await this.calculateStatsForModel(modelID, file)
 
     onProgress?.({ stage: 'done', percent: 100, message: 'Model loaded!' })
+
+    // Register in models map
+    this.models.set(modelID, { modelID, fileName: file.name, group, visible: true })
 
     return { group, stats, tree, elementMap: this.elementMap }
   }
 
   async getElementProperties(expressID: number): Promise<IFCElementInfo | null> {
-    if (!this.api || this.modelID === -1) return null
+    if (!this.api) return null
+
+    // Find which model this element belongs to
+    const mesh = this.elementMap.get(expressID)
+    const mid = mesh?.userData.modelID ?? this.modelID
+    if (mid === -1) return null
 
     try {
-      const props = await this.api.properties.getItemProperties(this.modelID, expressID, false)
+      const props = await this.api.properties.getItemProperties(mid, expressID, false)
       if (!props) return null
 
       const typeName = this.api.GetNameFromTypeCode(props.type) || 'Unknown'
@@ -163,7 +181,7 @@ export class IFCService {
       let area: string | undefined
 
       try {
-        const psets = await this.api.properties.getPropertySets(this.modelID, expressID, true)
+        const psets = await this.api.properties.getPropertySets(mid, expressID, true)
         for (const pset of psets) {
           const psetName = pset.Name?.value || 'PropertySet'
           if (pset.HasProperties) {
@@ -198,7 +216,7 @@ export class IFCService {
 
       // Materials
       try {
-        const mats = await this.api.properties.getMaterialsProperties(this.modelID, expressID, true)
+        const mats = await this.api.properties.getMaterialsProperties(mid, expressID, true)
         if (mats.length > 0) {
           const matNames: string[] = []
           for (const mat of mats) {
@@ -230,12 +248,16 @@ export class IFCService {
   }
 
   async getSpatialTree(): Promise<IFCSpatialNode> {
-    if (!this.api || this.modelID === -1) {
+    return this.getSpatialTreeForModel(this.modelID)
+  }
+
+  private async getSpatialTreeForModel(modelID: number): Promise<IFCSpatialNode> {
+    if (!this.api || modelID === -1) {
       return { expressID: 0, type: 'IfcProject', children: [] }
     }
 
     try {
-      const tree = await this.api.properties.getSpatialStructure(this.modelID)
+      const tree = await this.api.properties.getSpatialStructure(modelID)
       return this.convertNode(tree)
     } catch {
       return { expressID: 0, type: 'IfcProject', children: [] }
@@ -251,22 +273,26 @@ export class IFCService {
   }
 
   async calculateStats(file: File): Promise<IFCModelStats> {
-    if (!this.api || this.modelID === -1) {
+    return this.calculateStatsForModel(this.modelID, file)
+  }
+
+  private async calculateStatsForModel(modelID: number, file: File): Promise<IFCModelStats> {
+    if (!this.api || modelID === -1) {
       return { totalElements: 0, types: 0, stories: 0, materials: 0, ifcVersion: 'Unknown', fileSize: '0 B' }
     }
 
     let ifcVersion = 'Unknown'
     try {
-      ifcVersion = this.api.GetModelSchema(this.modelID)
+      ifcVersion = this.api.GetModelSchema(modelID)
     } catch { /* ignore */ }
 
-    const allTypes = this.api.GetAllTypesOfModel(this.modelID)
+    const allTypes = this.api.GetAllTypesOfModel(modelID)
     const elementTypes = new Set<number>()
     let totalElements = 0
 
     for (const t of allTypes) {
       if (this.api.IsIfcElement(t.typeID)) {
-        const lines = this.api.GetLineIDsWithType(this.modelID, t.typeID, false)
+        const lines = this.api.GetLineIDsWithType(modelID, t.typeID, false)
         const count = lines.size()
         if (count > 0) {
           elementTypes.add(t.typeID)
@@ -279,14 +305,14 @@ export class IFCService {
     let stories = 0
     try {
       const storeyType = this.api.GetTypeCodeFromName('IFCBUILDINGSTOREY')
-      stories = this.api.GetLineIDsWithType(this.modelID, storeyType, false).size()
+      stories = this.api.GetLineIDsWithType(modelID, storeyType, false).size()
     } catch { /* ignore */ }
 
     // Count materials
     let materials = 0
     try {
       const matType = this.api.GetTypeCodeFromName('IFCMATERIAL')
-      materials = this.api.GetLineIDsWithType(this.modelID, matType, false).size()
+      materials = this.api.GetLineIDsWithType(modelID, matType, false).size()
     } catch { /* ignore */ }
 
     const fileSize = formatFileSize(file.size)
@@ -302,13 +328,67 @@ export class IFCService {
     return Array.from(this.elementMap.keys())
   }
 
-  disposeModel(): void {
-    if (this.api && this.modelID !== -1) {
-      try {
-        this.api.CloseModel(this.modelID)
-      } catch { /* ignore */ }
-      this.modelID = -1
+  // ── Multi-model methods ──────────────────────────────
+
+  getLoadedModels(): { modelID: number; fileName: string; visible: boolean }[] {
+    return Array.from(this.models.values()).map((m) => ({
+      modelID: m.modelID,
+      fileName: m.fileName,
+      visible: m.visible,
+    }))
+  }
+
+  setModelVisibility(modelID: number, visible: boolean): void {
+    const model = this.models.get(modelID)
+    if (model) {
+      model.group.visible = visible
+      model.visible = visible
     }
+  }
+
+  removeModel(modelID: number, scene: THREE.Scene): void {
+    const model = this.models.get(modelID)
+    if (!model) return
+
+    // Remove group from scene
+    scene.remove(model.group)
+
+    // Remove element map entries for this model
+    model.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.userData.expressID !== undefined) {
+        this.elementMap.delete(obj.userData.expressID)
+      }
+    })
+
+    // Dispose geometry/materials
+    model.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose()
+        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose())
+        else obj.material.dispose()
+      }
+    })
+
+    // Close model in web-ifc
+    if (this.api) {
+      try { this.api.CloseModel(modelID) } catch { /* ignore */ }
+    }
+
+    this.models.delete(modelID)
+  }
+
+  getModelGroup(modelID: number): THREE.Group | undefined {
+    return this.models.get(modelID)?.group
+  }
+
+  disposeModel(): void {
+    // Dispose all models
+    this.models.forEach((model) => {
+      if (this.api) {
+        try { this.api.CloseModel(model.modelID) } catch { /* ignore */ }
+      }
+    })
+    this.models.clear()
     this.elementMap.clear()
   }
 
