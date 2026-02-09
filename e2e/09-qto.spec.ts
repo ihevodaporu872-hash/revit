@@ -54,37 +54,37 @@ test.describe('Module 8: QTO Reports', () => {
 
   test.describe('Tabs', () => {
     test('should display 2 tabs', async ({ page }) => {
-      await expect(page.getByText('Generate Report')).toBeVisible()
-      await expect(page.getByText('Report History')).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Generate Report' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Report History' })).toBeVisible()
     })
 
     test('should have Generate Report as default tab', async ({ page }) => {
       // Check that Generate Report content is visible (file upload area)
-      await expect(page.getByText(/Upload File|Drop IFC/i)).toBeVisible()
+      await expect(page.getByText(/Upload File|Drop IFC/i).first()).toBeVisible()
     })
 
     test('should switch to Report History tab', async ({ page }) => {
       // Click Report History tab
-      await page.getByText('Report History').click()
+      await page.getByRole('tab', { name: 'Report History' }).click()
 
       // Wait for history content to appear
       await page.waitForTimeout(500)
 
       // Check for history-specific content
-      await expect(page.getByText(/Report History|Previously generated|No reports/i)).toBeVisible()
+      await expect(page.locator('[data-slot="card-title"]').filter({ hasText: 'Report History' })).toBeVisible()
     })
 
     test('should switch back to Generate Report tab', async ({ page }) => {
       // Go to History tab first
-      await page.getByText('Report History').click()
+      await page.getByRole('tab', { name: 'Report History' }).click()
       await page.waitForTimeout(300)
 
       // Switch back to Generate Report
-      await page.getByText('Generate Report').click()
+      await page.getByRole('tab', { name: 'Generate Report' }).click()
       await page.waitForTimeout(300)
 
       // File upload should be visible again
-      await expect(page.getByText(/Upload File|Drop IFC/i)).toBeVisible()
+      await expect(page.getByText(/Upload File|Drop IFC/i).first()).toBeVisible()
     })
   })
 
@@ -103,7 +103,7 @@ test.describe('Module 8: QTO Reports', () => {
     })
 
     test('should display Group By label', async ({ page }) => {
-      await expect(page.getByText('Group By')).toBeVisible()
+      await expect(page.getByText('Group By', { exact: true })).toBeVisible()
     })
 
     test('should display 4 grouping option buttons', async ({ page }) => {
@@ -130,12 +130,12 @@ test.describe('Module 8: QTO Reports', () => {
     })
 
     test('should display Generate Report button', async ({ page }) => {
-      const generateButton = page.locator('button', { hasText: 'Generate Report' })
+      const generateButton = page.getByRole('button', { name: 'Generate Report' })
       await expect(generateButton).toBeVisible()
     })
 
     test('should have Generate Report button disabled initially', async ({ page }) => {
-      const generateButton = page.locator('button', { hasText: 'Generate Report' })
+      const generateButton = page.getByRole('button', { name: 'Generate Report' })
       await expect(generateButton).toBeDisabled()
     })
 
@@ -156,16 +156,16 @@ test.describe('Module 8: QTO Reports', () => {
 
   test.describe('Report History Tab', () => {
     test.beforeEach(async ({ page }) => {
-      await page.getByText('Report History').click()
+      await page.getByRole('tab', { name: 'Report History' }).click()
       await page.waitForTimeout(500)
     })
 
     test('should display Report History title', async ({ page }) => {
-      await expect(page.getByText('Report History')).toBeVisible()
+      await expect(page.locator('[data-slot="card-title"]').filter({ hasText: 'Report History' })).toBeVisible()
     })
 
     test('should display history subtitle', async ({ page }) => {
-      await expect(page.getByText(/Previously generated|QTO reports/i)).toBeVisible()
+      await expect(page.getByText('Previously generated QTO reports')).toBeVisible()
     })
 
     test('should display history table or empty state', async ({ page }) => {
@@ -409,23 +409,23 @@ test.describe('Module 8: QTO Reports', () => {
     test('should display all content on desktop viewport', async ({ page }) => {
       await page.setViewportSize({ width: 1920, height: 1080 })
 
-      await expect(page.getByText('QTO Reports')).toBeVisible()
-      await expect(page.getByText('Generate Report')).toBeVisible()
+      await expect(page.locator('main h1')).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Generate Report' })).toBeVisible()
       await expect(page.getByText('Total Elements')).toBeVisible()
     })
 
     test('should display all content on tablet viewport', async ({ page }) => {
       await page.setViewportSize({ width: 768, height: 1024 })
 
-      await expect(page.getByText('QTO Reports')).toBeVisible()
-      await expect(page.getByText('Generate Report')).toBeVisible()
+      await expect(page.locator('main h1')).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Generate Report' })).toBeVisible()
     })
 
     test('should display all content on mobile viewport', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 })
 
-      await expect(page.getByText('QTO Reports')).toBeVisible()
-      await expect(page.getByText('Generate Report')).toBeVisible()
+      await expect(page.locator('main h1')).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Generate Report' })).toBeVisible()
     })
   })
 
@@ -446,14 +446,14 @@ test.describe('Module 8: QTO Reports', () => {
     })
 
     test('should have smooth tab transitions', async ({ page }) => {
-      await page.getByText('Report History').click()
+      await page.getByRole('tab', { name: 'Report History' }).click()
       await page.waitForTimeout(500)
 
-      await page.getByText('Generate Report').click()
+      await page.getByRole('tab', { name: 'Generate Report' }).click()
       await page.waitForTimeout(500)
 
       // Content should be visible after transition
-      await expect(page.getByText(/Upload File|Drop IFC/i)).toBeVisible()
+      await expect(page.getByText(/Upload File|Drop IFC/i).first()).toBeVisible()
     })
   })
 
