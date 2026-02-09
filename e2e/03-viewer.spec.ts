@@ -27,7 +27,7 @@ test.describe('Module 2: 3D Viewer - Page Load', () => {
   })
 
   test('should display upload instruction text', async ({ page }) => {
-    await expect(page.getByText('Upload an IFC file to view and inspect 3D building models')).toBeVisible()
+    await expect(page.getByText('Upload an IFC file to view and inspect 3D building models').first()).toBeVisible()
   })
 })
 
@@ -174,8 +174,8 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     await panelBtn.click()
 
     // Panel should appear with Tree and Search Sets tabs
-    await expect(page.getByText('Tree', { exact: false })).toBeVisible()
-    await expect(page.getByText('Search Sets', { exact: false })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Tree' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Search Sets/ })).toBeVisible()
   })
 
   test('panel should have Tree tab', async ({ page }) => {
@@ -217,14 +217,14 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     // Open panel first
     const showPanelBtn = page.locator('button[title="Show Panel"]')
     await showPanelBtn.click()
-    await expect(page.getByText('Tree')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Tree' })).toBeVisible()
 
     // Click Hide Panel button
     const hidePanelBtn = page.locator('button[title="Hide Panel"]')
     await hidePanelBtn.click()
 
     // Panel should be hidden
-    await expect(page.getByText('Tree')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Tree' })).toBeHidden()
   })
 
   test('panel tabs should be switchable', async ({ page }) => {
@@ -307,7 +307,7 @@ test.describe('Module 2: 3D Viewer - IFC Loading', () => {
     await fileChooser.setFiles(samplePath)
 
     // Progress bar should appear
-    await expect(page.locator('.bg-primary.rounded-full')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('[class*="bg-primary"][class*="rounded-full"]')).toBeVisible({ timeout: 5000 })
   })
 
   test('should show loading message', async ({ page }) => {
