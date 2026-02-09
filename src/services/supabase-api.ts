@@ -413,6 +413,27 @@ export async function fetchRevitPropertiesBulk(globalIds: string[], projectId = 
   return map
 }
 
+export async function fetchRevitPropertiesByElementIds(elementIds: number[], projectId = 'default'): Promise<Map<number, RevitProperties>> {
+  const map = new Map<number, RevitProperties>()
+  if (!supabase || elementIds.length === 0) return map
+
+  const chunkSize = 500
+  for (let i = 0; i < elementIds.length; i += chunkSize) {
+    const chunk = elementIds.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('revit_element_id', chunk)
+    if (error || !data) continue
+    for (const row of data) {
+      const camel = snakeToCamel(row) as unknown as RevitProperties
+      if (row.revit_element_id) map.set(row.revit_element_id, camel)
+    }
+  }
+  return map
+}
+
 // ── Chat Sessions ──────────────────────────────────────────────────────────────
 
 export async function fetchChatSessions() {

@@ -7,6 +7,8 @@ interface Props {
   revitProps: RevitProperties | undefined
   ifcProperties: { name: string; value: string }[]
   onUploadXlsx?: () => void
+  matchSource?: 'elementId' | 'globalId'
+  tag?: string
 }
 
 interface GroupProps {
@@ -79,10 +81,15 @@ function DimensionCard({ label, value, unit }: { label: string; value: number | 
   )
 }
 
-export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx }: Props) {
+export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, matchSource, tag }: Props) {
   if (!revitProps) {
     return (
       <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 rounded">
+            Source: IFC only
+          </span>
+        </div>
         {/* IFC Properties fallback */}
         <PropertyGroup title="IFC Properties" icon={<Hash size={11} />} defaultOpen>
           <div className="space-y-0">
@@ -122,12 +129,24 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx }
     <div>
       {/* Identity */}
       <PropertyGroup title="Identity" icon={<Tag size={11} />} defaultOpen badge="Revit">
+        {matchSource && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-500 rounded">
+              Source: Revit
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              via {matchSource === 'elementId' ? 'ElementId' : 'GlobalId'}
+            </span>
+          </div>
+        )}
         <PropRow label="Name" value={revitProps.elementName} />
         <PropRow label="Type" value={revitProps.elementType} />
         <PropRow label="Category" value={revitProps.category} />
         <PropRow label="Family" value={revitProps.family} />
         <PropRow label="Family Type" value={revitProps.familyType} />
         <PropRow label="Mark" value={revitProps.mark} />
+        <PropRow label="ElementId" value={revitProps.revitElementId} />
+        <PropRow label="Tag (IFC)" value={tag} />
         <PropRow label="GlobalId" value={revitProps.globalId} />
         <PropRow label="Comments" value={revitProps.comments} />
       </PropertyGroup>

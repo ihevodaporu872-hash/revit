@@ -1445,53 +1445,74 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
     const projectId = req.body.projectId || 'default'
 
     // Column mapping: detect common Revit export column names
+    // DDC export appends type suffixes like ": String", ": Integer" to column names
     const columnMap = {
-      globalId:         ['GlobalId', 'Global Id', 'GUID', 'guid', 'GlobalID', 'Element GUID'],
-      elementName:      ['Name', 'Element Name', 'ElementName', 'name'],
-      elementType:      ['Type', 'Element Type', 'ElementType', 'type', 'Type Name'],
-      category:         ['Category', 'category', 'Revit Category'],
-      family:           ['Family', 'family', 'Family Name'],
-      familyType:       ['Family and Type', 'FamilyType', 'Family Type', 'Type Name'],
-      level:            ['Level', 'level', 'Base Level', 'Reference Level'],
-      phaseCreated:     ['Phase Created', 'PhaseCreated', 'Phase', 'phase'],
-      phaseDemolished:  ['Phase Demolished', 'PhaseDemolished'],
-      area:             ['Area', 'area', 'Surface Area'],
-      volume:           ['Volume', 'volume'],
-      length:           ['Length', 'length'],
-      width:            ['Width', 'width'],
-      height:           ['Height', 'height', 'Unconnected Height'],
-      perimeter:        ['Perimeter', 'perimeter'],
-      material:         ['Material', 'material', 'Structural Material', 'Material: Name'],
+      globalId:         ['GlobalId', 'Global Id', 'GUID', 'guid', 'GlobalID', 'Element GUID', 'IfcGUID : String', 'IfcGUID'],
+      revitElementId:   ['ID', 'ElementId', 'Element Id', 'Revit Id', 'ID : Integer'],
+      revitUniqueId:    ['UniqueId : String', 'UniqueId', 'Unique Id'],
+      typeIfcGuid:      ['Type IfcGUID : String', 'Type IfcGUID'],
+      elementName:      ['Name', 'Element Name', 'ElementName', 'name', 'Name : String'],
+      elementType:      ['Type', 'Element Type', 'ElementType', 'type', 'Type Name', 'Type : String'],
+      category:         ['Category', 'category', 'Revit Category', 'Category : String'],
+      family:           ['Family', 'family', 'Family Name', 'Family : String'],
+      familyType:       ['Family and Type', 'FamilyType', 'Family Type', 'Type Name', 'Family and Type : String'],
+      level:            ['Level', 'level', 'Base Level', 'Reference Level', 'Level : String'],
+      phaseCreated:     ['Phase Created', 'PhaseCreated', 'Phase', 'phase', 'Phase Created : String'],
+      phaseDemolished:  ['Phase Demolished', 'PhaseDemolished', 'Phase Demolished : String'],
+      area:             ['Area', 'area', 'Surface Area', 'Area : Double'],
+      volume:           ['Volume', 'volume', 'Volume : Double'],
+      length:           ['Length', 'length', 'Length : Double'],
+      width:            ['Width', 'width', 'Width : Double'],
+      height:           ['Height', 'height', 'Unconnected Height', 'Height : Double'],
+      perimeter:        ['Perimeter', 'perimeter', 'Perimeter : Double'],
+      material:         ['Material', 'material', 'Structural Material', 'Material: Name', 'Structural Material : String'],
       materialArea:     ['Material Area', 'MaterialArea', 'Material: Area'],
       materialVolume:   ['Material Volume', 'MaterialVolume', 'Material: Volume'],
-      structuralUsage:  ['Structural Usage', 'StructuralUsage'],
+      structuralUsage:  ['Structural Usage', 'StructuralUsage', 'Structural Usage : String'],
       classification:   ['Classification', 'OmniClass Number', 'Classification Code'],
       assemblyCode:     ['Assembly Code', 'AssemblyCode', 'Assembly Description'],
-      mark:             ['Mark', 'mark', 'Type Mark'],
-      comments:         ['Comments', 'comments'],
+      mark:             ['Mark', 'mark', 'Type Mark', 'Mark : String'],
+      comments:         ['Comments', 'comments', 'Comments : String'],
     }
 
-    // Detect which columns are present
+    // Detect which columns are present (case-insensitive + suffix-stripped matching)
     const sampleRow = rows[0]
     const availableCols = Object.keys(sampleRow)
     const resolvedMap = {}
     const mappedCols = new Set()
 
+    // Build lowercase lookup: normalizedName → actualColumnName
+    const colLookup = new Map()
+    for (const col of availableCols) {
+      colLookup.set(col.toLowerCase().trim(), col)
+      // Also index without type suffix (e.g., "IfcGUID : String" → "ifcguid")
+      const stripped = col.replace(/\s*:\s*(String|Integer|Double|Boolean|ElementId)$/i, '').toLowerCase().trim()
+      if (!colLookup.has(stripped)) colLookup.set(stripped, col)
+    }
+
     for (const [field, candidates] of Object.entries(columnMap)) {
       for (const candidate of candidates) {
+        // Try exact match first
         if (availableCols.includes(candidate)) {
           resolvedMap[field] = candidate
           mappedCols.add(candidate)
           break
         }
+        // Try case-insensitive match
+        const found = colLookup.get(candidate.toLowerCase().trim())
+        if (found) {
+          resolvedMap[field] = found
+          mappedCols.add(found)
+          break
+        }
       }
     }
 
-    if (!resolvedMap.globalId) {
+    if (!resolvedMap.globalId && !resolvedMap.revitElementId) {
       return res.status(400).json({
-        error: 'No GlobalId column found in the spreadsheet',
+        error: 'No GlobalId or ElementId column found in the spreadsheet',
         availableColumns: availableCols,
-        hint: 'Ensure your Revit export includes a GlobalId column',
+        hint: 'Ensure your Revit export includes a GlobalId (IfcGUID) or ID (ElementId) column',
       })
     }
 
@@ -1501,9 +1522,15 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
-      const globalId = String(row[resolvedMap.globalId] || '').trim()
+      // Try GlobalId first, fall back to generating a synthetic one from ElementId
+      let globalId = resolvedMap.globalId ? String(row[resolvedMap.globalId] || '').trim() : ''
+      const revitElementId = resolvedMap.revitElementId ? parseInt(row[resolvedMap.revitElementId], 10) : null
+      if (!globalId && revitElementId) {
+        // Use ElementId as synthetic GlobalId to allow matching
+        globalId = `REVIT_EID_${revitElementId}`
+      }
       if (!globalId) {
-        errors.push({ row: i + 2, reason: 'Missing GlobalId' })
+        errors.push({ row: i + 2, reason: 'Missing GlobalId and ElementId' })
         continue
       }
 
@@ -1529,6 +1556,9 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
       records.push({
         project_id:       projectId,
         global_id:        globalId,
+        revit_element_id: isNaN(revitElementId) ? null : revitElementId,
+        revit_unique_id:  parseStr('revitUniqueId'),
+        type_ifc_guid:    parseStr('typeIfcGuid'),
         element_name:     parseStr('elementName'),
         element_type:     parseStr('elementType'),
         category:         parseStr('category'),
@@ -1649,30 +1679,121 @@ app.post('/api/revit/properties/bulk', async (req, res) => {
     if (!supabaseServer) {
       return res.status(503).json({ error: 'Supabase not configured' })
     }
-    const { globalIds, projectId = 'default' } = req.body
+    const { globalIds, elementIds, projectId = 'default' } = req.body
 
-    if (!Array.isArray(globalIds) || globalIds.length === 0) {
-      return res.status(400).json({ error: 'globalIds array is required' })
+    const allResults = []
+
+    // Fetch by GlobalIds
+    if (Array.isArray(globalIds) && globalIds.length > 0) {
+      const { data, error } = await supabaseServer
+        .from('ifc_element_properties')
+        .select('*')
+        .eq('project_id', projectId)
+        .in('global_id', globalIds.slice(0, 1000))
+      if (!error && data) allResults.push(...data)
     }
 
-    const { data, error } = await supabaseServer
-      .from('ifc_element_properties')
-      .select('*')
-      .eq('project_id', projectId)
-      .in('global_id', globalIds.slice(0, 1000))
+    // Fetch by ElementIds (Revit ElementId / Tag)
+    if (Array.isArray(elementIds) && elementIds.length > 0) {
+      const { data, error } = await supabaseServer
+        .from('ifc_element_properties')
+        .select('*')
+        .eq('project_id', projectId)
+        .in('revit_element_id', elementIds.slice(0, 1000))
+      if (!error && data) {
+        // Deduplicate by id
+        const existingIds = new Set(allResults.map(r => r.id))
+        for (const row of data) {
+          if (!existingIds.has(row.id)) allResults.push(row)
+        }
+      }
+    }
 
-    if (error) {
-      return res.status(500).json({ error: 'Query failed', message: error.message })
+    if (allResults.length === 0 && !globalIds?.length && !elementIds?.length) {
+      return res.status(400).json({ error: 'globalIds or elementIds array is required' })
     }
 
     res.json({
-      results: data || [],
-      count: data?.length || 0,
-      requested: globalIds.length,
+      results: allResults,
+      count: allResults.length,
+      requested: (globalIds?.length || 0) + (elementIds?.length || 0),
     })
   } catch (err) {
     console.error('[Revit Props Bulk] Error:', err)
     res.status(500).json({ error: 'Failed to fetch properties', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 21. POST /api/revit/process-model — Unified .rvt upload (auto-convert + import)
+// ---------------------------------------------------------------------------
+app.post('/api/revit/process-model', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase()
+    if (ext !== '.rvt') {
+      return res.status(400).json({ error: 'Only .rvt files are accepted' })
+    }
+
+    const projectId = req.body.projectId || 'default'
+    const outputDir = path.join(UPLOADS_DIR, `rvt-${Date.now()}`)
+    await fs.mkdir(outputDir, { recursive: true })
+
+    // Run Revit converter (DDC converter produces .ifc + .xlsx + .dae)
+    const converter = CONVERTER_PATHS.rvt
+    const converterExe = path.join(converter.dir, converter.exe)
+
+    try {
+      await fs.access(converterExe)
+    } catch {
+      return res.status(503).json({
+        error: 'Revit converter not available',
+        hint: 'RvtExporter.exe not found at expected path',
+      })
+    }
+
+    const { execSync } = await import('child_process')
+    const cmd = `"${converterExe}" "${req.file.path}" "${outputDir}"`
+    console.log(`[Revit Process] Running: ${cmd}`)
+    execSync(cmd, { timeout: 300000, stdio: 'pipe' })
+
+    // Find generated files
+    const outputFiles = await fs.readdir(outputDir)
+    const ifcFile = outputFiles.find(f => f.endsWith('.ifc'))
+    const xlsxFile = outputFiles.find(f => f.endsWith('.xlsx'))
+
+    const result = {
+      ifcPath: ifcFile ? `/uploads/${path.basename(outputDir)}/${ifcFile}` : null,
+      xlsxResult: null,
+      outputFiles,
+    }
+
+    // Auto-process XLSX if found
+    if (xlsxFile && supabaseServer) {
+      try {
+        const XLSX = (await import('xlsx')).default
+        const xlsxPath = path.join(outputDir, xlsxFile)
+        const workbook = XLSX.readFile(xlsxPath)
+        const sheetName = workbook.SheetNames[0]
+        const sheet = workbook.Sheets[sheetName]
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+        result.xlsxResult = { rowCount: rows.length, fileName: xlsxFile }
+        console.log(`[Revit Process] Found ${rows.length} rows in ${xlsxFile}`)
+      } catch (xlsxErr) {
+        console.warn('[Revit Process] XLSX parsing failed:', xlsxErr.message)
+      }
+    }
+
+    // Cleanup source file
+    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+
+    res.json(result)
+  } catch (err) {
+    console.error('[Revit Process] Error:', err)
+    res.status(500).json({ error: 'Failed to process Revit model', message: err.message })
   }
 })
 
@@ -1707,6 +1828,7 @@ app.use((_req, res) => {
       'POST   /api/ai/chat',
       'GET    /api/health',
       'POST   /api/revit/upload-xlsx',
+      'POST   /api/revit/process-model',
       'GET    /api/revit/properties/:globalId',
       'POST   /api/revit/properties/bulk',
     ],

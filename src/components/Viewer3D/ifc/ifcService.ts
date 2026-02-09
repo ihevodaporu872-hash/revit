@@ -241,7 +241,10 @@ export class IFCService {
         // materials may not exist
       }
 
-      return { expressID, type: typeName, name, properties, material, volume, area }
+      const tag = props.Tag?.value ? String(props.Tag.value) : undefined
+      const globalId = props.GlobalId?.value ? String(props.GlobalId.value) : undefined
+
+      return { expressID, type: typeName, name, properties, material, volume, area, tag, globalId }
     } catch {
       return null
     }

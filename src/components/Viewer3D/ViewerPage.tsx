@@ -31,6 +31,8 @@ import {
   Palette,
   Download,
   FileSpreadsheet,
+  BarChart3,
+  CheckCircle2,
 } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -39,7 +41,7 @@ import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
 import { MotionPage } from '../MotionPage'
 import { IFCService } from './ifc/ifcService'
-import type { IFCSpatialNode, IFCModelStats, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode } from './ifc/types'
+import type { IFCSpatialNode, IFCModelStats, IFCElementInfo, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode } from './ifc/types'
 import { useViewerHighlight } from './useViewerHighlight'
 import { useSearchSets } from './useSearchSets'
 import { SearchSetsPanel } from './SearchSetsPanel'
@@ -60,6 +62,8 @@ import { ExportDialog } from './ExportDialog'
 import { useBoxSelect } from './useBoxSelect'
 import { useRevitEnrichment } from './useRevitEnrichment'
 import { RevitPropertiesPanel } from './RevitPropertiesPanel'
+import { useElementMatcher } from './useElementMatcher'
+import { MatchingReport } from './MatchingReport'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
 import {
@@ -80,6 +84,8 @@ interface SelectedElement {
   material?: string
   volume?: string
   area?: string
+  tag?: string
+  globalId?: string
 }
 
 interface TreeNode {
@@ -182,6 +188,12 @@ export default function ViewerPage() {
   const { exportToExcel } = useExcelExport()
   const wireframe = useWireframe()
   const revitEnrichment = useRevitEnrichment()
+  const elementMatcher = useElementMatcher()
+
+  // Matching state
+  const [showMatchReport, setShowMatchReport] = useState(false)
+  const [showMatchHighlight, setShowMatchHighlight] = useState(false)
+  const matchOverlayRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map())
 
   const clearAllSelections = useCallback(() => {
     selectedMeshesRef.current.forEach(({ mesh, originalMaterial }) => {
@@ -485,6 +497,8 @@ export default function ViewerPage() {
           material: newIds.length > 1 ? undefined : info.material,
           volume: newIds.length > 1 ? undefined : info.volume,
           area: newIds.length > 1 ? undefined : info.area,
+          tag: info.tag,
+          globalId: info.globalId,
         })
       } else {
         setSelectedElement({
@@ -495,6 +509,8 @@ export default function ViewerPage() {
           material: info.material,
           volume: info.volume,
           area: info.area,
+          tag: info.tag,
+          globalId: info.globalId,
         })
         setSelectedElementIds([expressID])
       }
@@ -608,24 +624,34 @@ export default function ViewerPage() {
 
         addNotification('success', `Model loaded: ${result.stats.totalElements} elements`)
 
-        // Prefetch Revit enrichment data for all GlobalIds in this model
+        // Prefetch Revit enrichment data for all GlobalIds + ElementIds in this model
         const service = ifcServiceRef.current
         if (service) {
           const allGlobalIds: string[] = []
-          const extractGlobalIds = async (node: import('./ifc/types').IFCSpatialNode) => {
+          const allElementIds: number[] = []
+          const allIfcElements: IFCElementInfo[] = []
+          const extractIds = async (node: IFCSpatialNode) => {
             const info = await service.getElementProperties(node.expressID)
             if (info) {
-              const gid = info.properties.find(p => p.name === 'GlobalId')
-              if (gid?.value) allGlobalIds.push(gid.value)
+              allIfcElements.push(info)
+              if (info.globalId) allGlobalIds.push(info.globalId)
+              if (info.tag) {
+                const tagNum = parseInt(info.tag, 10)
+                if (!isNaN(tagNum)) allElementIds.push(tagNum)
+              }
             }
             for (const child of node.children) {
-              await extractGlobalIds(child)
+              await extractIds(child)
             }
           }
           // Run in background — don't block UI
-          extractGlobalIds(result.tree).then(() => {
-            if (allGlobalIds.length > 0) {
-              revitEnrichment.prefetchBulk(allGlobalIds)
+          extractIds(result.tree).then(async () => {
+            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds)
+            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds)
+            // Auto-run matching if we have Revit data
+            const cachedProps = revitEnrichment.getAllCachedProps()
+            if (cachedProps.length > 0 && allIfcElements.length > 0) {
+              elementMatcher.runMatching(allIfcElements, cachedProps)
             }
           })
         }
@@ -664,20 +690,33 @@ export default function ViewerPage() {
           const service = ifcServiceRef.current
           if (service) {
             const allGlobalIds: string[] = []
+            const allElementIds: number[] = []
+            const allIfcElements: IFCElementInfo[] = []
             const tree = treeData
             // Quick re-prefetch from loaded model
             const extractIds = async (nodes: TreeNode[]) => {
               for (const node of nodes) {
                 const info = await service.getElementProperties(node.expressID)
                 if (info) {
-                  const gid = info.properties.find(p => p.name === 'GlobalId')
-                  if (gid?.value) allGlobalIds.push(gid.value)
+                  allIfcElements.push(info)
+                  if (info.globalId) allGlobalIds.push(info.globalId)
+                  if (info.tag) {
+                    const tagNum = parseInt(info.tag, 10)
+                    if (!isNaN(tagNum)) allElementIds.push(tagNum)
+                  }
                 }
                 if (node.children) await extractIds(node.children)
               }
             }
-            extractIds(tree).then(() => {
-              if (allGlobalIds.length > 0) revitEnrichment.prefetchBulk(allGlobalIds)
+            extractIds(tree).then(async () => {
+              if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds)
+              if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds)
+              // Run matching
+              const cachedProps = revitEnrichment.getAllCachedProps()
+              if (cachedProps.length > 0 && allIfcElements.length > 0) {
+                const result = elementMatcher.runMatching(allIfcElements, cachedProps)
+                addNotification('info', `Matching complete: ${result.totalMatched}/${result.totalIfcElements} elements matched`)
+              }
             })
           }
         } else {
@@ -688,7 +727,116 @@ export default function ViewerPage() {
       }
     }
     input.click()
-  }, [addNotification, revitEnrichment, treeData])
+  }, [addNotification, revitEnrichment, treeData, elementMatcher])
+
+  // ── Match status highlighting ────────────────────────────
+
+  const applyMatchHighlight = useCallback(() => {
+    const group = modelGroupRef.current
+    if (!group || !elementMatcher.matchResult) return
+
+    const matchMap = elementMatcher.matchResult.matchMap
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.userData.expressID !== undefined) {
+        if (!matchOverlayRef.current.has(obj.uuid)) {
+          matchOverlayRef.current.set(obj.uuid, obj.material)
+        }
+        const isMatched = matchMap.has(obj.userData.expressID)
+        const mat = (obj.material as THREE.MeshPhysicalMaterial).clone()
+        if (isMatched) {
+          mat.emissive = new THREE.Color(0x22c55e) // green
+          mat.emissiveIntensity = 0.25
+        } else {
+          mat.emissive = new THREE.Color(0xef4444) // red
+          mat.emissiveIntensity = 0.35
+        }
+        obj.material = mat
+      }
+    })
+    setShowMatchHighlight(true)
+  }, [elementMatcher.matchResult])
+
+  const clearMatchHighlight = useCallback(() => {
+    const group = modelGroupRef.current
+    if (!group) return
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.userData.expressID !== undefined) {
+        const original = matchOverlayRef.current.get(obj.uuid)
+        if (original) obj.material = original
+      }
+    })
+    matchOverlayRef.current.clear()
+    setShowMatchHighlight(false)
+  }, [])
+
+  const toggleMatchHighlight = useCallback(() => {
+    if (showMatchHighlight) {
+      clearMatchHighlight()
+    } else {
+      applyMatchHighlight()
+    }
+  }, [showMatchHighlight, applyMatchHighlight, clearMatchHighlight])
+
+  const handleExportMatchReport = useCallback(async () => {
+    const result = elementMatcher.matchResult
+    if (!result) return
+    try {
+      const XLSX = (await import('xlsx')).default
+      const wb = XLSX.utils.book_new()
+
+      // Summary sheet
+      const summaryData = [
+        ['Metric', 'Value'],
+        ['Total IFC Elements', result.totalIfcElements],
+        ['Total Revit Elements', result.totalExcelRows],
+        ['Matched (Total)', result.totalMatched],
+        ['Matched by ElementId', result.matchedByElementId],
+        ['Matched by GlobalId', result.matchedByGlobalId],
+        ['Missing in IFC (Revit-only)', result.missingInIfc.length],
+        ['Missing in Excel (IFC-only)', result.missingInExcel.length],
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Summary')
+
+      // Missing in IFC
+      if (result.missingInIfc.length > 0) {
+        const missingIfcData = result.missingInIfc.map(r => ({
+          GlobalId: r.globalId,
+          ElementId: r.revitElementId ?? '',
+          Name: r.elementName ?? '',
+          Category: r.category ?? '',
+          Type: r.elementType ?? '',
+        }))
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingIfcData), 'Missing in IFC')
+      }
+
+      // Missing in Excel
+      if (result.missingInExcel.length > 0) {
+        const missingExcelData = result.missingInExcel.map(el => ({
+          ExpressID: el.expressID,
+          Type: el.type,
+          Name: el.name,
+          Tag: el.tag ?? '',
+          GlobalId: el.globalId ?? '',
+        }))
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingExcelData), 'Missing in Excel')
+      }
+
+      // Category breakdown
+      const catData = Array.from(result.byCategory.entries()).map(([cat, d]) => ({
+        Category: cat,
+        IFC: d.ifcCount,
+        Revit: d.revitCount,
+        Matched: d.matchedCount,
+        'Match %': d.ifcCount > 0 ? `${((d.matchedCount / d.ifcCount) * 100).toFixed(1)}%` : '—',
+      }))
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catData), 'By Category')
+
+      XLSX.writeFile(wb, `matching-report-${new Date().toISOString().slice(0, 10)}.xlsx`)
+      addNotification('success', 'Matching report exported')
+    } catch (err) {
+      addNotification('error', `Export failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+    }
+  }, [elementMatcher.matchResult, addNotification])
 
   // ── Tool handlers ───────────────────────────────────────
 
@@ -967,6 +1115,29 @@ export default function ViewerPage() {
           <Button variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
             Upload Revit (.xlsx)
           </Button>
+          {elementMatcher.matchResult && (
+            <>
+              <button
+                onClick={() => setShowMatchReport(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-colors"
+              >
+                <CheckCircle2 size={14} />
+                {elementMatcher.matchResult.totalMatched}/{elementMatcher.matchResult.totalIfcElements} matched
+              </button>
+              <button
+                onClick={toggleMatchHighlight}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  showMatchHighlight
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+                title="Toggle match status visualization in 3D"
+              >
+                <BarChart3 size={14} />
+                {showMatchHighlight ? 'Hide Match' : 'Show Match'}
+              </button>
+            </>
+          )}
         </motion.div>
 
         {/* Main viewer area */}
@@ -1443,12 +1614,14 @@ export default function ViewerPage() {
 
                   {/* Revit-enriched properties panel */}
                   <RevitPropertiesPanel
-                    revitProps={(() => {
-                      const gid = selectedElement.properties.find(p => p.name === 'GlobalId')
-                      return gid ? revitEnrichment.getRevitProps(gid.value) : undefined
-                    })()}
+                    revitProps={revitEnrichment.getRevitPropsAny(selectedElement.globalId, selectedElement.tag)}
                     ifcProperties={selectedElement.properties}
                     onUploadXlsx={handleXlsxUpload}
+                    matchSource={(() => {
+                      const match = elementMatcher.getMatchForExpressId(selectedElement.id)
+                      return match?.matchedBy
+                    })()}
+                    tag={selectedElement.tag}
                   />
                 </div>
               </motion.div>
@@ -1472,6 +1645,16 @@ export default function ViewerPage() {
         isExporting={isExporting}
         exportProgress={exportProgress}
       />
+      <AnimatePresence>
+        {showMatchReport && elementMatcher.matchResult && (
+          <MatchingReport
+            result={elementMatcher.matchResult}
+            onClose={() => setShowMatchReport(false)}
+            onHighlightMatchStatus={toggleMatchHighlight}
+            onExportReport={handleExportMatchReport}
+          />
+        )}
+      </AnimatePresence>
     </MotionPage>
   )
 }

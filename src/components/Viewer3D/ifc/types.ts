@@ -14,6 +14,8 @@ export interface IFCElementInfo {
   material?: string
   volume?: string
   area?: string
+  tag?: string      // Revit ElementId from IFC Tag attribute
+  globalId?: string // IFC GlobalId extracted separately for easy access
 }
 
 export interface IFCModelStats {
@@ -140,6 +142,9 @@ export interface AreaMeasurement {
 
 export interface RevitProperties {
   globalId: string
+  revitElementId?: number
+  revitUniqueId?: string
+  typeIfcGuid?: string
   elementName?: string
   elementType?: string
   category?: string
