@@ -33,10 +33,10 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
   test.describe('Tabs', () => {
     test('should display all 4 tabs', async ({ page }) => {
-      await expect(page.getByRole('button', { name: /Semantic Search/i })).toBeVisible()
-      await expect(page.getByRole('button', { name: /AI Classification/i })).toBeVisible()
-      await expect(page.getByRole('button', { name: /Cost Calculation/i })).toBeVisible()
-      await expect(page.getByRole('button', { name: /History/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /Semantic Search/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /AI Classification/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /Cost Calculation/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /History/i })).toBeVisible()
     })
 
     test('should have Semantic Search as default active tab', async ({ page }) => {
@@ -45,37 +45,37 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
     })
 
     test('should switch to AI Classification tab', async ({ page }) => {
-      await page.getByRole('button', { name: /AI Classification/i }).click()
+      await page.getByRole('tab', { name: /AI Classification/i }).click()
       await page.waitForTimeout(300)
       await expect(page.locator('text=BIM Element Classification')).toBeVisible()
     })
 
     test('should switch to Cost Calculation tab', async ({ page }) => {
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
       await expect(page.locator('[data-slot="card-title"]:has-text("Cost Calculation")')).toBeVisible()
     })
 
     test('should switch to History tab', async ({ page }) => {
-      await page.getByRole('button', { name: /History/i }).click()
+      await page.getByRole('tab', { name: /History/i }).click()
       await page.waitForTimeout(300)
       await expect(page.locator('text=Recent Estimates')).toBeVisible()
     })
 
     test('should switch between tabs multiple times', async ({ page }) => {
-      await page.getByRole('button', { name: /AI Classification/i }).click()
+      await page.getByRole('tab', { name: /AI Classification/i }).click()
       await page.waitForTimeout(200)
       await expect(page.locator('text=BIM Element Classification')).toBeVisible()
 
-      await page.getByRole('button', { name: /Semantic Search/i }).click()
+      await page.getByRole('tab', { name: /Semantic Search/i }).click()
       await page.waitForTimeout(200)
       await expect(page.locator('input[placeholder*="Search work items"]')).toBeVisible()
 
-      await page.getByRole('button', { name: /History/i }).click()
+      await page.getByRole('tab', { name: /History/i }).click()
       await page.waitForTimeout(200)
       await expect(page.locator('text=Recent Estimates')).toBeVisible()
 
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(200)
       await expect(page.locator('[data-slot="card-title"]:has-text("Cost Calculation")')).toBeVisible()
     })
@@ -199,7 +199,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
   test.describe('AI Classification Tab', () => {
     test.beforeEach(async ({ page }) => {
-      await page.getByRole('button', { name: /AI Classification/i }).click()
+      await page.getByRole('tab', { name: /AI Classification/i }).click()
       await page.waitForTimeout(300)
     })
 
@@ -261,7 +261,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
   test.describe('Cost Calculation Tab', () => {
     test.beforeEach(async ({ page }) => {
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
     })
 
@@ -284,7 +284,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
     test('should display cost table when items exist', async ({ page }) => {
       // First add items via search
-      await page.getByRole('button', { name: /Semantic Search/i }).click()
+      await page.getByRole('tab', { name: /Semantic Search/i }).click()
       await page.waitForTimeout(300)
 
       const searchInput = page.locator('input[placeholder*="Search work items"]')
@@ -298,7 +298,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.waitForTimeout(500)
 
       // Switch back to Cost Calculation
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       // Check for table headers
@@ -312,7 +312,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
     test('should display Grand Total when items exist', async ({ page }) => {
       // Add items first
-      await page.getByRole('button', { name: /Semantic Search/i }).click()
+      await page.getByRole('tab', { name: /Semantic Search/i }).click()
       await page.waitForTimeout(300)
 
       const searchInput = page.locator('input[placeholder*="Search work items"]')
@@ -323,7 +323,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.getByRole('button', { name: /Add/i }).first().click()
       await page.waitForTimeout(500)
 
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=Grand Total')).toBeVisible()
@@ -331,7 +331,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
     test('should display quantity controls for items', async ({ page }) => {
       // Add items first
-      await page.getByRole('button', { name: /Semantic Search/i }).click()
+      await page.getByRole('tab', { name: /Semantic Search/i }).click()
       await page.waitForTimeout(300)
 
       const searchInput = page.locator('input[placeholder*="Search work items"]')
@@ -342,7 +342,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.getByRole('button', { name: /Add/i }).first().click()
       await page.waitForTimeout(500)
 
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       // Check for plus/minus buttons
@@ -352,7 +352,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
     test('should display delete button for items', async ({ page }) => {
       // Add items first
-      await page.getByRole('button', { name: /Semantic Search/i }).click()
+      await page.getByRole('tab', { name: /Semantic Search/i }).click()
       await page.waitForTimeout(300)
 
       const searchInput = page.locator('input[placeholder*="Search work items"]')
@@ -363,7 +363,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.getByRole('button', { name: /Add/i }).first().click()
       await page.waitForTimeout(500)
 
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       // Check for trash icon button (delete)
@@ -386,7 +386,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
   test.describe('History Tab', () => {
     test.beforeEach(async ({ page }) => {
-      await page.getByRole('button', { name: /History/i }).click()
+      await page.getByRole('tab', { name: /History/i }).click()
       await page.waitForTimeout(300)
     })
 
@@ -441,7 +441,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.waitForTimeout(500)
 
       // Step 3: Switch to Cost Calculation tab
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       // Step 4: Verify item appears in cost table
@@ -451,7 +451,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
 
     test('should complete classification workflow', async ({ page }) => {
       // Step 1: Go to AI Classification tab
-      await page.getByRole('button', { name: /AI Classification/i }).click()
+      await page.getByRole('tab', { name: /AI Classification/i }).click()
       await page.waitForTimeout(300)
 
       // Step 2: Start classification
@@ -466,7 +466,7 @@ test.describe('Module 3: CWICR Cost Estimation', () => {
       await page.waitForTimeout(500)
 
       // Step 5: Switch to Cost Calculation
-      await page.getByRole('button', { name: /Cost Calculation/i }).click()
+      await page.getByRole('tab', { name: /Cost Calculation/i }).click()
       await page.waitForTimeout(300)
 
       // Step 6: Verify items in cost table

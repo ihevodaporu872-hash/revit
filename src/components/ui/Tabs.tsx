@@ -26,10 +26,13 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-1 border-b border-border relative">
+      <div role="tablist" className="flex items-center gap-1 border-b border-border relative">
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            role="tab"
+            data-state={activeTab === tab.id ? 'active' : 'inactive'}
+            aria-selected={activeTab === tab.id}
             onClick={() => handleChange(tab.id)}
             className={cn(
               'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px',

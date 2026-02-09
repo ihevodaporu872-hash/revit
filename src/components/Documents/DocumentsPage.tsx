@@ -306,8 +306,9 @@ function RFITab() {
             <Card title="Create New RFI" hover>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-1">Subject</label>
+                  <label htmlFor="rfi-subject" className="block text-sm font-medium text-foreground mb-1">Subject</label>
                   <input
+                    id="rfi-subject"
                     type="text"
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
@@ -316,8 +317,9 @@ function RFITab() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Priority</label>
+                  <label htmlFor="rfi-priority" className="block text-sm font-medium text-foreground mb-1">Priority</label>
                   <select
+                    id="rfi-priority"
                     value={form.priority}
                     onChange={(e) => setForm({ ...form, priority: e.target.value as RFI['priority'] })}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -329,8 +331,9 @@ function RFITab() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Assigned To</label>
+                  <label htmlFor="rfi-assigned" className="block text-sm font-medium text-foreground mb-1">Assigned To</label>
                   <input
+                    id="rfi-assigned"
                     type="text"
                     value={form.assignedTo}
                     onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
@@ -339,8 +342,9 @@ function RFITab() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Due Date</label>
+                  <label htmlFor="rfi-duedate" className="block text-sm font-medium text-foreground mb-1">Due Date</label>
                   <input
+                    id="rfi-duedate"
                     type="date"
                     value={form.dueDate}
                     onChange={(e) => setForm({ ...form, dueDate: e.target.value })}

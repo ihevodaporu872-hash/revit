@@ -30,12 +30,12 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
   test.describe('Tabs', () => {
     test('should display both tabs', async ({ page }) => {
-      await expect(page.getByRole('button', { name: /New Conversion/i })).toBeVisible()
-      await expect(page.getByRole('button', { name: /Conversion History/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /New Conversion/i })).toBeVisible()
+      await expect(page.getByRole('tab', { name: /Conversion History/i })).toBeVisible()
     })
 
     test('should have New Conversion tab active by default', async ({ page }) => {
-      const newConversionTab = page.getByRole('button', { name: /New Conversion/i })
+      const newConversionTab = page.getByRole('tab', { name: /New Conversion/i })
       await expect(newConversionTab).toBeVisible()
 
       // Check for upload content which is only in New Conversion tab
@@ -43,7 +43,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should switch to Conversion History tab', async ({ page }) => {
-      const historyTab = page.getByRole('button', { name: /Conversion History/i })
+      const historyTab = page.getByRole('tab', { name: /Conversion History/i })
       await historyTab.click()
       await page.waitForTimeout(300)
 
@@ -53,7 +53,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display history data after switching tabs', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       // Check for history entries
@@ -64,11 +64,11 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
     test('should switch back to New Conversion tab', async ({ page }) => {
       // Switch to history
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       // Switch back to new conversion
-      await page.getByRole('button', { name: /New Conversion/i }).click()
+      await page.getByRole('tab', { name: /New Conversion/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=Upload Files')).toBeVisible()
@@ -175,7 +175,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
   test.describe('Status Badges', () => {
     test('should display status badges in history tab', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       // Check for various status badges
@@ -187,7 +187,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display input format badges in history', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=RVT').first()).toBeVisible()
@@ -197,7 +197,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display output format badges in history', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=EXCEL').first()).toBeVisible()
@@ -209,14 +209,14 @@ test.describe('Module 1: CAD/BIM Converter', () => {
   test.describe('Action Buttons', () => {
     test('should display Refresh button when queue section is not visible', async ({ page }) => {
       // Queue is not visible initially, so Refresh button in history tab
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('button:has-text("Export Log")')).toBeVisible()
     })
 
     test('should display history action button', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       const exportButton = page.locator('button:has-text("Export Log")')
@@ -233,7 +233,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
   test.describe('History Table', () => {
     test('should display history table headers', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=File Name')).toBeVisible()
@@ -246,7 +246,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display file sizes in history', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=45.2 MB')).toBeVisible()
@@ -255,7 +255,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display durations in history', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=2m 14s')).toBeVisible()
@@ -264,7 +264,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display history count subtitle', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('text=6 conversions in the last 7 days')).toBeVisible()
@@ -299,8 +299,8 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display tab icons', async ({ page }) => {
-      const newConversionTab = page.getByRole('button', { name: /New Conversion/i })
-      const historyTab = page.getByRole('button', { name: /Conversion History/i })
+      const newConversionTab = page.getByRole('tab', { name: /New Conversion/i })
+      const historyTab = page.getByRole('tab', { name: /Conversion History/i })
 
       await expect(newConversionTab).toBeVisible()
       await expect(historyTab).toBeVisible()
@@ -319,7 +319,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
     })
 
     test('should display history card in history tab', async ({ page }) => {
-      await page.getByRole('button', { name: /Conversion History/i }).click()
+      await page.getByRole('tab', { name: /Conversion History/i }).click()
       await page.waitForTimeout(300)
 
       await expect(page.locator('[data-slot="card-title"]').filter({ hasText: 'Conversion History' })).toBeVisible()
