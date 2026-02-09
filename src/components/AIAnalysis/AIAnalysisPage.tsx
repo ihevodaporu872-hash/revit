@@ -278,7 +278,7 @@ print(df.describe())`,
 
 // ---- Typing dots animation ----
 
-const typingDotVariants = {
+const typingDotVariants: import('framer-motion').Variants = {
   hidden: { opacity: 0.3, y: 0 },
   visible: (i: number) => ({
     opacity: [0.3, 1, 0.3],
@@ -286,7 +286,7 @@ const typingDotVariants = {
     transition: {
       duration: 0.8,
       repeat: Infinity,
-      ease: 'easeInOut',
+      ease: 'easeInOut' as const,
       delay: i * 0.15,
     },
   }),
@@ -294,13 +294,13 @@ const typingDotVariants = {
 
 // ---- Code block entrance ----
 
-const codeBlockVariants = {
+const codeBlockVariants: import('framer-motion').Variants = {
   hidden: { opacity: 0, y: 8, scaleY: 0.96 },
   visible: {
     opacity: 1,
     y: 0,
     scaleY: 1,
-    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] },
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as const },
   },
 }
 
