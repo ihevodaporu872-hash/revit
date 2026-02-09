@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAppStore } from '../../store/appStore'
+import { ThemeToggle } from '../ThemeToggle'
 import {
   ArrowLeftRight, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
@@ -23,15 +25,24 @@ export default function Sidebar() {
   const { sidebarOpen, toggleSidebar } = useAppStore()
 
   return (
-    <aside className={`h-full bg-sidebar text-white flex flex-col transition-all duration-300 shrink-0 ${sidebarOpen ? 'w-64' : 'w-16'}`}>
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+    <motion.aside
+      animate={{ width: sidebarOpen ? 256 : 64 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      className="h-full bg-sidebar text-sidebar-foreground flex flex-col shrink-0 overflow-hidden"
+    >
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         {sidebarOpen && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-lg">J</div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="flex items-center gap-2"
+          >
+            <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center font-bold text-lg text-sidebar-primary-foreground">J</div>
             <span className="font-bold text-lg">Jens</span>
-          </div>
+          </motion.div>
         )}
-        <button onClick={toggleSidebar} className="p-1.5 rounded-lg hover:bg-sidebar-hover transition-colors">
+        <button onClick={toggleSidebar} className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors">
           {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </button>
       </div>
@@ -45,24 +56,41 @@ export default function Sidebar() {
               key={mod.id}
               onClick={() => navigate(mod.path)}
               className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
-                active ? 'bg-sidebar-active text-white' : 'text-white/70 hover:bg-sidebar-hover hover:text-white'
+                active
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
               }`}
               title={mod.label}
             >
               <Icon size={20} className="shrink-0" />
-              {sidebarOpen && <span className="text-sm font-medium">{mod.label}</span>}
+              {sidebarOpen && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-sm font-medium whitespace-nowrap"
+                >
+                  {mod.label}
+                </motion.span>
+              )}
             </button>
           )
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
-        {sidebarOpen && (
-          <div className="text-xs text-white/40">
-            Jens Platform v1.0
-          </div>
-        )}
+      <div className="p-4 border-t border-sidebar-border">
+        <div className="flex items-center justify-between">
+          <ThemeToggle />
+          {sidebarOpen && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs text-sidebar-foreground/40"
+            >
+              Jens v1.0
+            </motion.span>
+          )}
+        </div>
       </div>
-    </aside>
+    </motion.aside>
   )
 }
