@@ -24,6 +24,7 @@ import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
 import { staggerContainer, fadeInUp, scaleIn, cardHover, listItem } from '../../lib/animations'
+import { saveValidationResult } from '../../services/supabase-api'
 
 // ---- Types ----
 
@@ -255,6 +256,14 @@ export default function ValidationPage() {
           setReport(data)
           setModelsValidated((prev) => prev + 1)
           addNotification('success', `Validation completed. Score: ${data.overallScore}%`)
+          // Persist to Supabase
+          saveValidationResult({
+            fileName: files[0].name,
+            overallScore: data.overallScore || data.score || 0,
+            summary: data.summary || {},
+            ruleResults: data.ruleResults || data.results || [],
+            issues: data.issues || [],
+          }).catch(() => {})
           return
         }
       } catch {
@@ -267,6 +276,14 @@ export default function ValidationPage() {
       setReport(mockReport)
       setModelsValidated((prev) => prev + 1)
       addNotification('success', `Validation completed. Score: ${mockReport.overallScore}%`)
+      // Persist to Supabase
+      saveValidationResult({
+        fileName: files[0].name,
+        overallScore: mockReport.overallScore,
+        summary: mockReport.ruleResults.reduce((acc, r) => ({ ...acc, [r.ruleId]: r.status }), {}),
+        ruleResults: mockReport.ruleResults,
+        issues: mockReport.issues,
+      }).catch(() => {})
     } catch (err) {
       addNotification('error', `Validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {

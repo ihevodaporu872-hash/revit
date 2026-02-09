@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileOutput,
@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react'
+import { fetchConversionHistory, saveConversionRecord } from '../../services/supabase-api'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -109,7 +110,13 @@ export default function ConverterPage() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('excel')
   const [jobs, setJobs] = useState<ConversionJob[]>([])
   const [isConverting, setIsConverting] = useState(false)
-  const [history] = useState<ConversionHistoryEntry[]>(MOCK_HISTORY)
+  const [history, setHistory] = useState<ConversionHistoryEntry[]>(MOCK_HISTORY)
+
+  useEffect(() => {
+    fetchConversionHistory()
+      .then((rows) => { if (rows.length > 0) setHistory(rows as ConversionHistoryEntry[]) })
+      .catch(() => {})
+  }, [])
 
   // ── Stats (derived from mock + active jobs) ────────────
 
@@ -179,6 +186,18 @@ export default function ConverterPage() {
 
     setIsConverting(false)
     addNotification('success', `Batch conversion of ${selectedFiles.length} file(s) complete.`)
+
+    // Persist completed conversions to Supabase
+    for (const job of newJobs) {
+      saveConversionRecord({
+        fileName: job.fileName,
+        inputFormat: job.inputFormat,
+        outputFormat: job.outputFormat,
+        status: 'completed',
+        fileSize: job.fileSize,
+        duration: job.duration || '',
+      }).catch(() => {})
+    }
 
     // In real implementation:
     // const formData = new FormData()
