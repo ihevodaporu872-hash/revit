@@ -170,7 +170,7 @@ export default function ViewerPage() {
 
     // Scene
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xf0f2f5)
+    scene.background = new THREE.Color(0x1a1a2e)
     sceneRef.current = scene
 
     // Camera
@@ -201,7 +201,7 @@ export default function ViewerPage() {
     controlsRef.current = controls
 
     // Grid
-    const gridHelper = new THREE.GridHelper(100, 100, 0xcccccc, 0xe5e5e5)
+    const gridHelper = new THREE.GridHelper(100, 100, 0x333355, 0x222244)
     scene.add(gridHelper)
 
     // Ambient light
@@ -223,7 +223,7 @@ export default function ViewerPage() {
     scene.add(dirLight)
 
     // Hemisphere light for softer fills
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x0f0e0d, 0.3)
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x1a1a2e, 0.3)
     scene.add(hemiLight)
 
     // Animate
