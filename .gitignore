@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.env
 uploads/
 *.log
 .DS_Store
@@ -19,3 +18,5 @@ cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto/
 CAD-BIM-to-Code-Automation-Pipeline-DDC-Workflow-with-LLM-ChatGPT/
 OpenConstructionEstimate-DDC-CWICR/
 Project-management-n8n-with-task-management-and-photo-reports/
+
+.vercel
