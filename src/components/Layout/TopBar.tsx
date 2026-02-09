@@ -14,6 +14,7 @@ const pageTitles: Record<string, { title: string; parent?: string }> = {
   '/project': { title: 'Project Management', parent: 'Modules' },
   '/documents': { title: 'Document Control', parent: 'Modules' },
   '/qto': { title: 'QTO Reports', parent: 'Modules' },
+  '/n8n': { title: 'n8n Workflows', parent: 'Modules' },
 }
 
 export default function TopBar() {

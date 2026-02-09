@@ -9,6 +9,7 @@ import ProjectMgmtPage from './components/ProjectMgmt/ProjectMgmtPage'
 import DocumentsPage from './components/Documents/DocumentsPage'
 import QTOReportsPage from './components/QTOReports/QTOReportsPage'
 import CadViewerPage from './components/CadViewer/CadViewerPage'
+import N8nStatusPanel from './components/N8nPanel/N8nStatusPanel'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/project" element={<ProjectMgmtPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
         <Route path="/qto" element={<QTOReportsPage />} />
+        <Route path="/n8n" element={<N8nStatusPanel />} />
       </Route>
     </Routes>
   )

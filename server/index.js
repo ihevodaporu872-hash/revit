@@ -1798,6 +1798,67 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
 })
 
 // ---------------------------------------------------------------------------
+// 21. n8n Integration Endpoints
+// ---------------------------------------------------------------------------
+
+import n8nBridge from './n8n-bridge.js'
+
+// GET /api/n8n/health — Check if n8n is reachable
+app.get('/api/n8n/health', async (_req, res) => {
+  try {
+    const health = await n8nBridge.checkHealth()
+    res.json(health)
+  } catch (err) {
+    res.json({ online: false, url: process.env.N8N_URL || 'http://localhost:5678', error: err.message })
+  }
+})
+
+// GET /api/n8n/workflows — List all n8n workflows
+app.get('/api/n8n/workflows', async (_req, res) => {
+  try {
+    const workflows = await n8nBridge.listWorkflows()
+    res.json(workflows)
+  } catch (err) {
+    console.error('[n8n] Failed to list workflows:', err.message)
+    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+  }
+})
+
+// GET /api/n8n/executions — Recent executions
+app.get('/api/n8n/executions', async (req, res) => {
+  try {
+    const { workflowId, limit } = req.query
+    const executions = await n8nBridge.getExecutions(workflowId, limit ? parseInt(limit, 10) : 20)
+    res.json(executions)
+  } catch (err) {
+    console.error('[n8n] Failed to get executions:', err.message)
+    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+  }
+})
+
+// GET /api/n8n/status/:executionId — Get execution status
+app.get('/api/n8n/status/:executionId', async (req, res) => {
+  try {
+    const execution = await n8nBridge.getWorkflowStatus(req.params.executionId)
+    res.json(execution)
+  } catch (err) {
+    console.error('[n8n] Failed to get execution status:', err.message)
+    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+  }
+})
+
+// POST /api/n8n/trigger/:webhookPath — Trigger a workflow via webhook
+app.post('/api/n8n/trigger/:webhookPath', async (req, res) => {
+  try {
+    const result = await n8nBridge.triggerWorkflow(req.params.webhookPath, req.body)
+    res.status(result.status).json(result.data)
+  } catch (err) {
+    console.error('[n8n] Failed to trigger workflow:', err.message)
+    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Static file serving for uploaded outputs
 // ---------------------------------------------------------------------------
 app.use('/uploads', express.static(UPLOADS_DIR))
@@ -1831,6 +1892,11 @@ app.use((_req, res) => {
       'POST   /api/revit/process-model',
       'GET    /api/revit/properties/:globalId',
       'POST   /api/revit/properties/bulk',
+      'GET    /api/n8n/health',
+      'GET    /api/n8n/workflows',
+      'GET    /api/n8n/executions',
+      'GET    /api/n8n/status/:executionId',
+      'POST   /api/n8n/trigger/:webhookPath',
     ],
   })
 })

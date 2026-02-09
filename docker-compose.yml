@@ -1,0 +1,58 @@
+# ============================================================================
+# Jens Platform — n8n + Qdrant Local Development Stack
+# ============================================================================
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose logs -f n8n    # View n8n logs
+#   docker-compose down           # Stop all services
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # n8n — Workflow Automation Engine
+  # --------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: jens-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=jens2024
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Berlin
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - jens-network
+
+  # --------------------------------------------------------------------------
+  # Qdrant — Vector Database for CWICR Semantic Search
+  # --------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: jens-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - jens-network
+
+volumes:
+  n8n_data:
+    driver: local
+  qdrant_data:
+    driver: local
+
+networks:
+  jens-network:
+    driver: bridge

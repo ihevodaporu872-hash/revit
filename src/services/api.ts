@@ -396,3 +396,55 @@ export async function askGemini(prompt: string, context?: string): Promise<strin
   const data = await handleResponse<{ response: string }>(response)
   return data.response
 }
+
+// ─── n8n Integration ─────────────────────────────────────────────────────────
+
+export interface N8nWorkflow {
+  id: string
+  name: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+  tags: string[]
+}
+
+export interface N8nExecution {
+  id: string
+  workflowId: string
+  workflowName: string | null
+  status: string
+  startedAt: string
+  stoppedAt: string | null
+  mode: string
+}
+
+export async function getN8nHealth(): Promise<{ online: boolean; url: string }> {
+  const response = await fetch(`${API_BASE}/n8n/health`)
+  return handleResponse<{ online: boolean; url: string }>(response)
+}
+
+export async function getN8nWorkflows(): Promise<N8nWorkflow[]> {
+  const response = await fetch(`${API_BASE}/n8n/workflows`)
+  return handleResponse<N8nWorkflow[]>(response)
+}
+
+export async function getN8nExecutions(workflowId?: string, limit = 20): Promise<N8nExecution[]> {
+  let url = `${API_BASE}/n8n/executions?limit=${limit}`
+  if (workflowId) url += `&workflowId=${workflowId}`
+  const response = await fetch(url)
+  return handleResponse<N8nExecution[]>(response)
+}
+
+export async function getN8nExecutionStatus(executionId: string): Promise<N8nExecution> {
+  const response = await fetch(`${API_BASE}/n8n/status/${encodeURIComponent(executionId)}`)
+  return handleResponse<N8nExecution>(response)
+}
+
+export async function triggerN8nWorkflow(webhookPath: string, data: Record<string, unknown> = {}): Promise<unknown> {
+  const response = await fetch(`${API_BASE}/n8n/trigger/${encodeURIComponent(webhookPath)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return handleResponse<unknown>(response)
+}

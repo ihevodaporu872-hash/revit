@@ -15,7 +15,7 @@ test.describe('Layout & Navigation', () => {
   })
 
   test.describe('Sidebar - Navigation Links', () => {
-    test('should show all 9 module navigation links', async ({ page }) => {
+    test('should show all 10 module navigation links', async ({ page }) => {
       await page.goto('/')
       const modules = [
         'CAD Converter',
@@ -27,6 +27,7 @@ test.describe('Layout & Navigation', () => {
         'Project Mgmt',
         'Documents',
         'QTO Reports',
+        'n8n Workflows',
       ]
       for (const mod of modules) {
         await expect(page.getByText(mod, { exact: true })).toBeVisible()
@@ -274,7 +275,7 @@ test.describe('Layout & Navigation', () => {
   })
 
   test.describe('Navigation Flow', () => {
-    test('should navigate through all 9 modules sequentially and verify page titles', async ({ page }) => {
+    test('should navigate through all 10 modules sequentially and verify page titles', async ({ page }) => {
       await page.goto('/converter')
       await expect(page.locator('header h1')).toHaveText('CAD/BIM Converter')
 
@@ -309,6 +310,10 @@ test.describe('Layout & Navigation', () => {
       await page.getByText('QTO Reports', { exact: true }).click()
       await page.waitForURL(/\/qto/)
       await expect(page.locator('header h1')).toHaveText('QTO Reports')
+
+      await page.getByText('n8n Workflows', { exact: true }).click()
+      await page.waitForURL(/\/n8n/)
+      await expect(page.locator('header h1')).toHaveText('n8n Workflows')
     })
 
     test('should redirect root path to /converter', async ({ page }) => {

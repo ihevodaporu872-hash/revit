@@ -5,7 +5,7 @@ import { ThemeToggle } from '../ThemeToggle'
 import {
   ArrowLeftRight, FileType, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Workflow
 } from 'lucide-react'
 
 const modules = [
@@ -18,6 +18,7 @@ const modules = [
   { id: 'project', path: '/project', label: 'Project Mgmt', icon: FolderKanban },
   { id: 'documents', path: '/documents', label: 'Documents', icon: FileText },
   { id: 'qto', path: '/qto', label: 'QTO Reports', icon: BarChart3 },
+  { id: 'n8n', path: '/n8n', label: 'n8n Workflows', icon: Workflow },
 ] as const
 
 export default function Sidebar() {
