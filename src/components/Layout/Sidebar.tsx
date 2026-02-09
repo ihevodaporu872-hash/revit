@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/appStore'
 import { ThemeToggle } from '../ThemeToggle'
 import {
-  ArrowLeftRight, Box, DollarSign, ShieldCheck,
+  ArrowLeftRight, FileType, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 const modules = [
   { id: 'converter', path: '/converter', label: 'CAD Converter', icon: ArrowLeftRight },
+  { id: 'cad-viewer', path: '/cad-viewer', label: 'CAD Viewer', icon: FileType },
   { id: 'viewer', path: '/viewer', label: '3D Viewer', icon: Box },
   { id: 'cost', path: '/cost', label: 'Cost Estimate', icon: DollarSign },
   { id: 'validation', path: '/validation', label: 'BIM Validation', icon: ShieldCheck },

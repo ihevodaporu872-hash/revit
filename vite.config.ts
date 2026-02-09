@@ -21,6 +21,6 @@ export default defineConfig({
   },
   assetsInclude: ['**/*.wasm'],
   optimizeDeps: {
-    exclude: ['web-ifc'],
+    exclude: ['web-ifc', '@mlightcad/cad-simple-viewer'],
   },
 })

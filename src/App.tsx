@@ -8,6 +8,7 @@ import AIAnalysisPage from './components/AIAnalysis/AIAnalysisPage'
 import ProjectMgmtPage from './components/ProjectMgmt/ProjectMgmtPage'
 import DocumentsPage from './components/Documents/DocumentsPage'
 import QTOReportsPage from './components/QTOReports/QTOReportsPage'
+import CadViewerPage from './components/CadViewer/CadViewerPage'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/converter" replace />} />
         <Route path="/converter" element={<ConverterPage />} />
+        <Route path="/cad-viewer" element={<CadViewerPage />} />
         <Route path="/viewer" element={<ViewerPage />} />
         <Route path="/cost" element={<CostEstimatePage />} />
         <Route path="/validation" element={<ValidationPage />} />

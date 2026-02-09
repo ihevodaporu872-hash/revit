@@ -6,6 +6,7 @@ import { ThemeToggle } from '../ThemeToggle'
 
 const pageTitles: Record<string, { title: string; parent?: string }> = {
   '/converter': { title: 'CAD/BIM Converter', parent: 'Modules' },
+  '/cad-viewer': { title: 'CAD Drawing Viewer', parent: 'Modules' },
   '/viewer': { title: '3D Model Viewer', parent: 'Modules' },
   '/cost': { title: 'CWICR Cost Estimation', parent: 'Modules' },
   '/validation': { title: 'BIM Validation', parent: 'Modules' },

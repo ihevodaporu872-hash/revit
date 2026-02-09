@@ -15,10 +15,11 @@ test.describe('Layout & Navigation', () => {
   })
 
   test.describe('Sidebar - Navigation Links', () => {
-    test('should show all 8 module navigation links', async ({ page }) => {
+    test('should show all 9 module navigation links', async ({ page }) => {
       await page.goto('/')
       const modules = [
         'CAD Converter',
+        'CAD Viewer',
         '3D Viewer',
         'Cost Estimate',
         'BIM Validation',
@@ -36,6 +37,12 @@ test.describe('Layout & Navigation', () => {
       await page.goto('/')
       await page.getByText('CAD Converter', { exact: true }).click()
       await expect(page).toHaveURL(/\/converter/)
+    })
+
+    test('should navigate to /cad-viewer when clicking CAD Viewer', async ({ page }) => {
+      await page.goto('/')
+      await page.getByText('CAD Viewer', { exact: true }).click()
+      await expect(page).toHaveURL(/\/cad-viewer/)
     })
 
     test('should navigate to /viewer when clicking 3D Viewer', async ({ page }) => {
@@ -179,6 +186,12 @@ test.describe('Layout & Navigation', () => {
       await expect(page.locator('header h1')).toHaveText('CAD/BIM Converter')
     })
 
+    test('should show "Modules > CAD Drawing Viewer" on cad-viewer page', async ({ page }) => {
+      await page.goto('/cad-viewer')
+      await expect(page.locator('header').getByText('Modules')).toBeVisible()
+      await expect(page.locator('header h1')).toHaveText('CAD Drawing Viewer')
+    })
+
     test('should show "Modules > 3D Model Viewer" on viewer page', async ({ page }) => {
       await page.goto('/viewer')
       await expect(page.locator('header').getByText('Modules')).toBeVisible()
@@ -261,9 +274,13 @@ test.describe('Layout & Navigation', () => {
   })
 
   test.describe('Navigation Flow', () => {
-    test('should navigate through all 8 modules sequentially and verify page titles', async ({ page }) => {
+    test('should navigate through all 9 modules sequentially and verify page titles', async ({ page }) => {
       await page.goto('/converter')
       await expect(page.locator('header h1')).toHaveText('CAD/BIM Converter')
+
+      await page.getByText('CAD Viewer', { exact: true }).click()
+      await page.waitForURL(/\/cad-viewer/)
+      await expect(page.locator('header h1')).toHaveText('CAD Drawing Viewer')
 
       await page.getByText('3D Viewer', { exact: true }).click()
       await page.waitForURL(/\/viewer/)
