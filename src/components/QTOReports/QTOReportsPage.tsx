@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3, Layers, Building2, GitBranch, List,
@@ -16,6 +16,7 @@ import { staggerContainer, fadeInUp, scaleIn, listItem } from '../../lib/animati
 import type { QTOReport, QTOOptions, QTOReportRecord } from '../../services/api'
 import { generateQTO } from '../../services/api'
 import { MotionPage } from '../MotionPage'
+import { fetchQTOHistory, saveQTOReport } from '../../services/supabase-api'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -208,9 +209,26 @@ function GenerateTab() {
       const options: QTOOptions = { groupBy, includeQuantities: true, includeCost: true }
       const result = await generateQTO(formData, options)
       setReport(result)
+      // Persist to Supabase
+      saveQTOReport({
+        fileName: result.fileName,
+        groupBy: result.groupBy,
+        categories: result.categories,
+        summary: result.summary,
+        totalElements: result.summary.totalElements,
+      }).catch(() => {})
     } catch {
       // Fallback: use mock data
-      setReport({ ...MOCK_QTO_REPORT, groupBy, fileName: files[0]?.name || 'Uploaded File' })
+      const fallbackReport = { ...MOCK_QTO_REPORT, groupBy, fileName: files[0]?.name || 'Uploaded File' }
+      setReport(fallbackReport)
+      // Persist to Supabase
+      saveQTOReport({
+        fileName: fallbackReport.fileName,
+        groupBy: fallbackReport.groupBy,
+        categories: fallbackReport.categories,
+        summary: fallbackReport.summary,
+        totalElements: fallbackReport.summary.totalElements,
+      }).catch(() => {})
     } finally {
       setGenerating(false)
       setExpandedCategories(new Set())
@@ -433,7 +451,13 @@ function GenerateTab() {
 }
 
 function HistoryTab() {
-  const [history] = useState(MOCK_HISTORY)
+  const [history, setHistory] = useState(MOCK_HISTORY)
+
+  useEffect(() => {
+    fetchQTOHistory()
+      .then((rows) => { if (rows.length > 0) setHistory(rows as typeof history) })
+      .catch(() => {})
+  }, [])
 
   const columns = [
     {
