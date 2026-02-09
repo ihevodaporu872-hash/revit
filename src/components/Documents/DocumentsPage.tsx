@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Plus, Send, ClipboardList, FileCheck2,
@@ -21,6 +21,7 @@ import {
   getSubmittals,
   generateMeetingMinutes,
 } from '../../services/api'
+import { fetchDocuments as sbFetchDocs, fetchRFIs as sbFetchRFIs, fetchSubmittals as sbFetchSubmittals, createRFI as sbCreateRFI } from '../../services/supabase-api'
 import { MotionPage } from '../MotionPage'
 import {
   staggerContainer,
@@ -115,6 +116,12 @@ function DocumentsTab() {
   const [showUpload, setShowUpload] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    sbFetchDocs()
+      .then((rows) => { if (rows.length > 0) setDocuments(rows as typeof documents) })
+      .catch(() => {})
+  }, [])
 
   const filtered = documents.filter((d) =>
     d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -240,6 +247,12 @@ function RFITab() {
     dueDate: '',
   })
 
+  useEffect(() => {
+    sbFetchRFIs()
+      .then((rows) => { if (rows.length > 0) setRfis(rows as typeof rfis) })
+      .catch(() => {})
+  }, [])
+
   const handleCreate = useCallback(async () => {
     if (!form.subject.trim() || !form.assignedTo.trim()) return
     setSubmitting(true)
@@ -266,6 +279,12 @@ function RFITab() {
         createdAt: new Date().toISOString().split('T')[0],
       }
       setRfis([newRFI, ...rfis])
+      sbCreateRFI({
+        subject: form.subject,
+        priority: form.priority,
+        assignedTo: form.assignedTo,
+        dueDate: form.dueDate,
+      }).catch(() => {})
     } finally {
       setSubmitting(false)
       setShowForm(false)
@@ -370,7 +389,13 @@ function RFITab() {
 }
 
 function SubmittalsTab() {
-  const [submittals] = useState(MOCK_SUBMITTALS)
+  const [submittals, setSubmittals] = useState(MOCK_SUBMITTALS)
+
+  useEffect(() => {
+    sbFetchSubmittals()
+      .then((rows) => { if (rows.length > 0) setSubmittals(rows as typeof submittals) })
+      .catch(() => {})
+  }, [])
 
   const columns = [
     { key: 'number', header: 'Number', render: (s: typeof submittals[0]) => (
