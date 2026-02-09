@@ -58,7 +58,7 @@ test.describe('Layout & Navigation', () => {
 
   test('should toggle sidebar', async ({ page }) => {
     await page.goto('/')
-    const sidebarText = page.locator('text=Jens Platform v1.0')
+    const sidebarText = page.locator('text=Jens v1.0')
     await expect(sidebarText).toBeVisible()
 
     // Click collapse button (ChevronLeft)
