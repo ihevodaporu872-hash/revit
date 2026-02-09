@@ -17,6 +17,7 @@ import fs from 'fs/promises'
 import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
+import { createClient } from '@supabase/supabase-js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -31,6 +32,18 @@ dotenv.config({ path: path.join(PROJECT_ROOT, '.env') })
 const app = express()
 const PORT = process.env.PORT || 3001
 const execAsync = promisify(exec)
+
+// ---------------------------------------------------------------------------
+// Supabase Server Client
+// ---------------------------------------------------------------------------
+
+let supabaseServer = null
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+  supabaseServer = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+  console.log('[Jens] Supabase server client initialized')
+} else {
+  console.warn('[Jens] WARNING: Supabase credentials not set — persistence disabled')
+}
 
 // ---------------------------------------------------------------------------
 // Gemini AI Initialization
@@ -492,6 +505,20 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
       }
 
       conversionHistory.unshift(record)
+
+      // Persist to Supabase
+      if (supabaseServer) {
+        supabaseServer.from('conversion_history').insert({
+          file_name: req.file.originalname,
+          input_format: inputExt,
+          output_format: outputFormat || 'xlsx',
+          status: 'completed',
+          file_size: `${(req.file.size / (1024 * 1024)).toFixed(1)} MB`,
+          duration: `${Math.floor(duration / 60000)}m ${Math.floor((duration % 60000) / 1000)}s`,
+        }).then(() => console.log('[Supabase] Conversion record saved'))
+          .catch(e => console.error('[Supabase] Conversion save error:', e.message))
+      }
+
       res.json(record)
     } catch (execErr) {
       const duration = Date.now() - startTime
@@ -508,6 +535,19 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
         duration,
       }
       conversionHistory.unshift(record)
+
+      // Persist failed conversion to Supabase
+      if (supabaseServer) {
+        supabaseServer.from('conversion_history').insert({
+          file_name: req.file.originalname,
+          input_format: inputExt,
+          output_format: outputFormat || 'xlsx',
+          status: 'failed',
+          file_size: `${(req.file.size / (1024 * 1024)).toFixed(1)} MB`,
+          duration: '—',
+        }).catch(e => console.error('[Supabase] Conversion save error:', e.message))
+      }
+
       res.status(500).json(record)
     }
   } catch (err) {
@@ -821,7 +861,7 @@ app.post('/api/validation/run', async (req, res) => {
       ? (failCount === 0 && warnCount === 0 ? 'pass' : 'fail')
       : (failCount === 0 ? 'pass' : 'fail')
 
-    res.json({
+    const validationResponse = {
       status: overallStatus,
       score,
       summary: {
@@ -835,7 +875,21 @@ app.post('/api/validation/run', async (req, res) => {
       results,
       rulesApplied: validationRules.length,
       validatedAt: new Date().toISOString(),
-    })
+    }
+
+    // Persist to Supabase
+    if (supabaseServer) {
+      supabaseServer.from('validation_results').insert({
+        file_name: req.body.fileName || 'uploaded_file',
+        overall_score: score,
+        summary: validationResponse.summary,
+        rule_results: results,
+        issues: results.flatMap(r => r.checks.filter(c => !c.passed)),
+      }).then(() => console.log('[Supabase] Validation result saved'))
+        .catch(e => console.error('[Supabase] Validation save error:', e.message))
+    }
+
+    res.json(validationResponse)
   } catch (err) {
     console.error('[Validation] Error:', err)
     res.status(500).json({ error: 'Validation failed', message: err.message })
@@ -1226,7 +1280,7 @@ Create a complete, self-contained HTML page with inline CSS styling. Include a h
       }
     }
 
-    res.json({
+    const qtoResponse = {
       report: {
         title: `QTO Report - ${req.file.originalname}`,
         generatedAt: new Date().toISOString(),
@@ -1237,7 +1291,26 @@ Create a complete, self-contained HTML page with inline CSS styling. Include a h
       },
       summary,
       htmlReport,
-    })
+    }
+
+    // Persist to Supabase
+    if (supabaseServer) {
+      supabaseServer.from('qto_reports').insert({
+        file_name: req.file.originalname,
+        group_by: groupBy,
+        categories: summary,
+        summary: {
+          totalElements: elements.length,
+          totalCategories: summary.length,
+          estimatedCost: 0,
+          currency: 'USD',
+        },
+        total_elements: elements.length,
+      }).then(() => console.log('[Supabase] QTO report saved'))
+        .catch(e => console.error('[Supabase] QTO save error:', e.message))
+    }
+
+    res.json(qtoResponse)
   } catch (err) {
     console.error('[QTO] Error:', err)
     res.status(500).json({ error: 'QTO generation failed', message: err.message })
