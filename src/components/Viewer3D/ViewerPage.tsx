@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ZoomIn,
   ZoomOut,
@@ -28,6 +29,16 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
+import {
+  fadeInUp,
+  fadeInLeft,
+  fadeInRight,
+  scaleIn,
+  staggerContainer,
+  modalOverlay,
+  modalContent,
+  shimmer,
+} from '../../lib/animations'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -479,7 +490,12 @@ export default function ViewerPage() {
     <MotionPage>
       <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <motion.div
+          variants={fadeInUp}
+          initial="hidden"
+          animate="visible"
+          className="flex items-center justify-between"
+        >
           <div>
             <h1 className="text-2xl font-bold text-foreground">3D IFC Viewer</h1>
             <p className="text-muted-foreground mt-0.5">
@@ -507,208 +523,278 @@ export default function ViewerPage() {
             </Button>
           </label>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main viewer area */}
       <div className="flex-1 flex gap-4 min-h-0">
         {/* Selection Tree Panel */}
-        {showTree && (
-          <div className="w-72 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground">Selection Tree</h3>
-              <button onClick={() => setShowTree(false)} className="p-1 hover:bg-muted rounded">
-                <X size={14} className="text-muted-foreground" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto py-2">
-              {treeData.map((node) => renderTreeNode(node))}
-            </div>
-            {/* Model stats at bottom */}
-            <div className="border-t border-border p-3 space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Model Info</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <span className="text-muted-foreground">Elements</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.totalElements.toLocaleString()}</span>
-                <span className="text-muted-foreground">Types</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.types}</span>
-                <span className="text-muted-foreground">Stories</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.stories}</span>
-                <span className="text-muted-foreground">Materials</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.materials}</span>
-                <span className="text-muted-foreground">IFC Version</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.ifcVersion}</span>
-                <span className="text-muted-foreground">File Size</span>
-                <span className="text-foreground font-medium">{MODEL_STATS.fileSize}</span>
+        <AnimatePresence mode="wait">
+          {showTree && (
+            <motion.div
+              key="selection-tree"
+              variants={fadeInLeft}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              className="w-72 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <h3 className="text-sm font-semibold text-foreground">Selection Tree</h3>
+                <button onClick={() => setShowTree(false)} className="p-1 hover:bg-muted rounded">
+                  <X size={14} className="text-muted-foreground" />
+                </button>
               </div>
-            </div>
-          </div>
-        )}
+              <div className="flex-1 overflow-y-auto py-2">
+                {treeData.map((node) => renderTreeNode(node))}
+              </div>
+              {/* Model stats at bottom */}
+              <div className="border-t border-border p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Model Info</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">Elements</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.totalElements.toLocaleString()}</span>
+                  <span className="text-muted-foreground">Types</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.types}</span>
+                  <span className="text-muted-foreground">Stories</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.stories}</span>
+                  <span className="text-muted-foreground">Materials</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.materials}</span>
+                  <span className="text-muted-foreground">IFC Version</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.ifcVersion}</span>
+                  <span className="text-muted-foreground">File Size</span>
+                  <span className="text-foreground font-medium">{MODEL_STATS.fileSize}</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Viewport */}
         <div className="flex-1 relative rounded-xl border border-border overflow-hidden bg-card">
-          {/* Toolbar */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-card/90 backdrop-blur-sm rounded-lg border border-border shadow-sm p-1">
+          {/* Toolbar - Glass panel */}
+          <motion.div
+            variants={scaleIn}
+            initial="hidden"
+            animate="visible"
+            className="absolute top-3 left-3 z-10 flex items-center gap-1 backdrop-blur-md bg-card/80 ring-1 ring-border rounded-lg shadow-lg p-1"
+          >
             {tools.map((tool) => (
-              <button
+              <motion.button
                 key={tool.id}
                 title={tool.label}
                 onClick={() => handleToolClick(tool.id)}
+                whileTap={{ scale: 0.95 }}
                 className={`p-2 rounded-md transition-colors ${
                   activeTool === tool.id
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-white ring-1 ring-primary/50'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 {tool.icon}
-              </button>
+              </motion.button>
             ))}
             <div className="w-px h-6 bg-border mx-1" />
-            <button
+            <motion.button
               title="Fit to View"
               onClick={fitToView}
+              whileTap={{ scale: 0.95 }}
               className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <Maximize size={18} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               title="Zoom In"
               onClick={() => {
                 const cam = cameraRef.current
                 if (cam) { cam.position.multiplyScalar(0.85); controlsRef.current?.update() }
               }}
+              whileTap={{ scale: 0.95 }}
               className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ZoomIn size={18} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               title="Zoom Out"
               onClick={() => {
                 const cam = cameraRef.current
                 if (cam) { cam.position.multiplyScalar(1.15); controlsRef.current?.update() }
               }}
+              whileTap={{ scale: 0.95 }}
               className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ZoomOut size={18} />
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
 
           {/* Side buttons */}
-          <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
-            <button
+          <motion.div
+            variants={scaleIn}
+            initial="hidden"
+            animate="visible"
+            className="absolute top-3 right-3 z-10 flex flex-col gap-1"
+          >
+            <motion.button
               title={showTree ? 'Hide Tree' : 'Show Tree'}
               onClick={() => setShowTree(!showTree)}
-              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+              whileTap={{ scale: 0.95 }}
+              className="p-2 rounded-lg backdrop-blur-md bg-card/80 ring-1 ring-border shadow-lg text-muted-foreground hover:text-foreground transition-colors"
             >
               {showTree ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               title="Model Info"
               onClick={() => addNotification('info', `Model: ${MODEL_STATS.totalElements} elements, ${MODEL_STATS.types} types, ${MODEL_STATS.stories} stories`)}
-              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+              whileTap={{ scale: 0.95 }}
+              className="p-2 rounded-lg backdrop-blur-md bg-card/80 ring-1 ring-border shadow-lg text-muted-foreground hover:text-foreground transition-colors"
             >
               <Info size={18} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               title="Toggle Visibility"
               onClick={() => addNotification('info', 'Toggle element visibility')}
-              className="p-2 rounded-lg bg-card/90 backdrop-blur-sm border border-border shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+              whileTap={{ scale: 0.95 }}
+              className="p-2 rounded-lg backdrop-blur-md bg-card/80 ring-1 ring-border shadow-lg text-muted-foreground hover:text-foreground transition-colors"
             >
               {isModelLoaded ? <Eye size={18} /> : <EyeOff size={18} />}
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
 
           {/* Mock select button (temporary - click to simulate element selection) */}
           {isModelLoaded && (
-            <button
+            <motion.button
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
               onClick={handleMockSelect}
-              className="absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs bg-card/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+              whileTap={{ scale: 0.95 }}
+              className="absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs backdrop-blur-md bg-card/80 ring-1 ring-border rounded-lg shadow-lg text-muted-foreground hover:text-foreground transition-colors"
             >
               Click to simulate element selection
-            </button>
+            </motion.button>
           )}
 
-          {/* Upload overlay when no model */}
-          {!isModelLoaded && (
-            <div className="absolute inset-0 z-5 flex items-center justify-center pointer-events-none">
-              <div className="text-center pointer-events-auto">
-                <Box size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground text-sm">No model loaded</p>
-                <p className="text-muted-foreground/60 text-xs mt-1">Upload an IFC file or load the demo model</p>
-              </div>
-            </div>
-          )}
+          {/* Loading skeleton placeholder when model is not loaded */}
+          <AnimatePresence>
+            {!isModelLoaded && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none"
+              >
+                <div className="text-center pointer-events-auto">
+                  {/* Shimmer skeleton blocks */}
+                  <div className="flex flex-col items-center gap-3 mb-4">
+                    <motion.div
+                      variants={shimmer}
+                      initial="hidden"
+                      animate="visible"
+                      className="w-32 h-24 rounded-lg bg-muted/40"
+                    />
+                    <div className="flex gap-2">
+                      <motion.div
+                        variants={shimmer}
+                        initial="hidden"
+                        animate="visible"
+                        className="w-16 h-3 rounded bg-muted/30"
+                      />
+                      <motion.div
+                        variants={shimmer}
+                        initial="hidden"
+                        animate="visible"
+                        className="w-24 h-3 rounded bg-muted/30"
+                      />
+                    </div>
+                  </div>
+                  <Box size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">No model loaded</p>
+                  <p className="text-muted-foreground/60 text-xs mt-1">Upload an IFC file or load the demo model</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Three.js container */}
           <div ref={containerRef} className="w-full h-full" />
         </div>
 
         {/* Properties Panel */}
-        {showProperties && selectedElement && (
-          <div className="w-80 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Element Properties</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{selectedElement.type}</p>
+        <AnimatePresence mode="wait">
+          {showProperties && selectedElement && (
+            <motion.div
+              key="properties-panel"
+              variants={fadeInRight}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              className="w-80 flex flex-col border border-border rounded-xl bg-card overflow-hidden shrink-0"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Element Properties</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{selectedElement.type}</p>
+                </div>
+                <button onClick={() => { setShowProperties(false); setSelectedElement(null) }} className="p-1 hover:bg-muted rounded">
+                  <X size={14} className="text-muted-foreground" />
+                </button>
               </div>
-              <button onClick={() => { setShowProperties(false); setSelectedElement(null) }} className="p-1 hover:bg-muted rounded">
-                <X size={14} className="text-muted-foreground" />
-              </button>
-            </div>
 
-            <div className="flex-1 overflow-y-auto">
-              {/* Element summary */}
-              <div className="px-4 py-3 border-b border-border bg-muted/50">
-                <p className="text-sm font-medium text-foreground">{selectedElement.name}</p>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-card rounded-lg p-2 border border-border">
-                    <p className="text-muted-foreground">Express ID</p>
-                    <p className="font-medium text-foreground">{selectedElement.id}</p>
-                  </div>
-                  <div className="bg-card rounded-lg p-2 border border-border">
-                    <p className="text-muted-foreground">Type</p>
-                    <p className="font-medium text-foreground">{selectedElement.type}</p>
-                  </div>
-                  {selectedElement.volume && (
+              <div className="flex-1 overflow-y-auto">
+                {/* Element summary */}
+                <div className="px-4 py-3 border-b border-border bg-muted/50">
+                  <p className="text-sm font-medium text-foreground">{selectedElement.name}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-card rounded-lg p-2 border border-border">
-                      <p className="text-muted-foreground">Volume</p>
-                      <p className="font-medium text-foreground">{selectedElement.volume}</p>
+                      <p className="text-muted-foreground">Express ID</p>
+                      <p className="font-medium text-foreground">{selectedElement.id}</p>
                     </div>
-                  )}
-                  {selectedElement.area && (
                     <div className="bg-card rounded-lg p-2 border border-border">
-                      <p className="text-muted-foreground">Area</p>
-                      <p className="font-medium text-foreground">{selectedElement.area}</p>
+                      <p className="text-muted-foreground">Type</p>
+                      <p className="font-medium text-foreground">{selectedElement.type}</p>
+                    </div>
+                    {selectedElement.volume && (
+                      <div className="bg-card rounded-lg p-2 border border-border">
+                        <p className="text-muted-foreground">Volume</p>
+                        <p className="font-medium text-foreground">{selectedElement.volume}</p>
+                      </div>
+                    )}
+                    {selectedElement.area && (
+                      <div className="bg-card rounded-lg p-2 border border-border">
+                        <p className="text-muted-foreground">Area</p>
+                        <p className="font-medium text-foreground">{selectedElement.area}</p>
+                      </div>
+                    )}
+                  </div>
+                  {selectedElement.material && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-muted-foreground">Material: </span>
+                      <span className="text-foreground font-medium">{selectedElement.material}</span>
                     </div>
                   )}
                 </div>
-                {selectedElement.material && (
-                  <div className="mt-2 text-xs">
-                    <span className="text-muted-foreground">Material: </span>
-                    <span className="text-foreground font-medium">{selectedElement.material}</span>
-                  </div>
-                )}
-              </div>
 
-              {/* Property table */}
-              <div className="px-4 py-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">All Properties</p>
-                <div className="space-y-0">
-                  {selectedElement.properties.map((prop, i) => (
-                    <div
-                      key={i}
-                      className={`flex justify-between items-start py-2 text-xs ${
-                        i < selectedElement.properties.length - 1 ? 'border-b border-border/50' : ''
-                      }`}
-                    >
-                      <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
-                      <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
-                    </div>
-                  ))}
+                {/* Property table */}
+                <div className="px-4 py-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">All Properties</p>
+                  <div className="space-y-0">
+                    {selectedElement.properties.map((prop, i) => (
+                      <div
+                        key={i}
+                        className={`flex justify-between items-start py-2 px-2 rounded text-xs ${
+                          i % 2 === 0 ? 'bg-muted/30' : ''
+                        } ${
+                          i < selectedElement.properties.length - 1 ? 'border-b border-border/50' : ''
+                        }`}
+                      >
+                        <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
+                        <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       </div>
     </MotionPage>
