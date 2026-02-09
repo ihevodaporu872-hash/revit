@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { fetchCostEstimates, saveCostEstimate } from '../../services/supabase-api'
 import {
   Search,
   Globe,
@@ -142,7 +143,13 @@ export default function CostEstimatePage() {
   const [isClassifying, setIsClassifying] = useState(false)
 
   // Recent estimates
-  const [recentEstimates] = useState<RecentEstimate[]>(MOCK_RECENT_ESTIMATES)
+  const [recentEstimates, setRecentEstimates] = useState<RecentEstimate[]>(MOCK_RECENT_ESTIMATES)
+
+  useEffect(() => {
+    fetchCostEstimates()
+      .then((rows) => { if (rows.length > 0) setRecentEstimates(rows as RecentEstimate[]) })
+      .catch(() => {})
+  }, [])
 
   // ── Computed values ────────────────────────────────────
 
