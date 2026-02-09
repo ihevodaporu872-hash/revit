@@ -152,7 +152,7 @@ test.describe('Module 1: CAD/BIM Converter', () => {
 
     test('should show "Convert" text when no files selected', async ({ page }) => {
       const convertBtn = page.locator('button').filter({ hasText: /^Convert/ }).last()
-      await expect(convertBtn).toHaveText(/^Convert$/)
+      await expect(convertBtn).toHaveText(/^Convert\s*$/)
     })
 
     test('should have convert button disabled when no files selected', async ({ page }) => {
