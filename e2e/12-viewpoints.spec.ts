@@ -13,7 +13,9 @@ test.describe('Viewer - Drawing Mode & Viewpoints', () => {
   test('should toggle drawing mode on click', async ({ page }) => {
     const btn = page.locator('button[title="Drawing Mode"]')
     await btn.click()
-    await expect(btn).toHaveClass(/bg-primary/)
+    // After click, title changes to "Exit Drawing Mode"
+    const exitBtn = page.locator('button[title="Exit Drawing Mode"]')
+    await expect(exitBtn).toHaveClass(/bg-primary/)
   })
 
   test('should show drawing toolbar when drawing mode active', async ({ page }) => {

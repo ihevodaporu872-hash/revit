@@ -18,7 +18,7 @@ test.describe('Module 2: 3D Viewer - Page Load', () => {
   })
 
   test('should have canvas element for Three.js rendering', async ({ page }) => {
-    const canvas = page.locator('canvas')
+    const canvas = page.locator('canvas').first()
     await expect(canvas).toBeVisible()
   })
 
@@ -173,9 +173,9 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     const panelBtn = page.locator('button[title="Show Panel"]')
     await panelBtn.click()
 
-    // Panel should appear with Tree and Search Sets tabs
+    // Panel should appear with Tree and Sets tabs
     await expect(page.getByRole('button', { name: 'Tree' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Search Sets/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sets' })).toBeVisible()
   })
 
   test('panel should have Tree tab', async ({ page }) => {
@@ -186,11 +186,11 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     await expect(treeTab).toBeVisible()
   })
 
-  test('panel should have Search Sets tab', async ({ page }) => {
+  test('panel should have Sets tab', async ({ page }) => {
     const panelBtn = page.locator('button[title="Show Panel"]')
     await panelBtn.click()
 
-    const setsTab = page.locator('button').filter({ hasText: 'Search Sets' }).first()
+    const setsTab = page.locator('button').filter({ hasText: 'Sets' }).first()
     await expect(setsTab).toBeVisible()
   })
 
@@ -201,12 +201,12 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     await expect(page.getByText('Load an IFC file to see the spatial tree')).toBeVisible()
   })
 
-  test('Search Sets tab should show Selection Sets section', async ({ page }) => {
+  test('Sets tab should show Selection Sets section', async ({ page }) => {
     const panelBtn = page.locator('button[title="Show Panel"]')
     await panelBtn.click()
 
-    // Click Search Sets tab
-    const setsTab = page.locator('button').filter({ hasText: 'Search Sets' }).first()
+    // Click Sets tab
+    const setsTab = page.locator('button').filter({ hasText: 'Sets' }).first()
     await setsTab.click()
 
     // Should show Selection Sets section
@@ -236,8 +236,8 @@ test.describe('Module 2: 3D Viewer - Panel Toggle', () => {
     await treeTab.click()
     await expect(page.getByText('Load an IFC file to see the spatial tree')).toBeVisible()
 
-    // Click Search Sets tab
-    const setsTab = page.locator('button').filter({ hasText: 'Search Sets' }).first()
+    // Click Sets tab
+    const setsTab = page.locator('button').filter({ hasText: 'Sets' }).first()
     await setsTab.click()
     await expect(page.getByText('Selection Sets')).toBeVisible()
   })
@@ -307,7 +307,7 @@ test.describe('Module 2: 3D Viewer - IFC Loading', () => {
     await fileChooser.setFiles(samplePath)
 
     // Progress bar should appear
-    await expect(page.locator('[class*="bg-primary"][class*="rounded-full"]')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('[class*="bg-primary"][class*="rounded-full"]').first()).toBeVisible({ timeout: 5000 })
   })
 
   test('should show loading message', async ({ page }) => {
@@ -358,8 +358,8 @@ test.describe('Module 2: 3D Viewer - IFC Loading', () => {
     await expect(page.locator('.animate-spin').first()).toBeHidden({ timeout: 60000 })
 
     // Left panel should be visible
-    await expect(page.getByText('Tree')).toBeVisible()
-    await expect(page.getByText('Search Sets')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Tree' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sets' })).toBeVisible()
   })
 
   test('should show model stats after loading', async ({ page }) => {

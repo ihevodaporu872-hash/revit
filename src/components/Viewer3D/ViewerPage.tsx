@@ -25,6 +25,11 @@ import {
   Search,
   Bookmark,
   Loader2,
+  Camera,
+  Pencil,
+  Focus,
+  Palette,
+  Download,
 } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -33,10 +38,25 @@ import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
 import { MotionPage } from '../MotionPage'
 import { IFCService } from './ifc/ifcService'
-import type { IFCSpatialNode, IFCModelStats, LoadingProgress } from './ifc/types'
+import type { IFCSpatialNode, IFCModelStats, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode } from './ifc/types'
 import { useViewerHighlight } from './useViewerHighlight'
 import { useSearchSets } from './useSearchSets'
 import { SearchSetsPanel } from './SearchSetsPanel'
+import { useZoomToSelected } from './useZoomToSelected'
+import { useAnnotations } from './useAnnotations'
+import { AnnotationCanvas } from './AnnotationCanvas'
+import { DrawingToolbar } from './DrawingToolbar'
+import { ViewpointsPanel } from './ViewpointsPanel'
+import { SaveViewpointDialog } from './SaveViewpointDialog'
+import { useSectionPlanes } from './useSectionPlanes'
+import { SectionPanel } from './SectionPanel'
+import { useMeasureTool } from './useMeasureTool'
+import { MeasurePanel } from './MeasurePanel'
+import { useAppearanceProfiler } from './useAppearanceProfiler'
+import { AppearanceProfilerPanel } from './AppearanceProfilerPanel'
+import { useExcelExport } from './useExcelExport'
+import { ExportDialog } from './ExportDialog'
+import { useBoxSelect } from './useBoxSelect'
 import {
   fadeInUp,
   fadeInLeft,
@@ -67,13 +87,16 @@ interface TreeNode {
 }
 
 type ToolMode = 'select' | 'pan' | 'rotate' | 'zoom' | 'measure' | 'section'
-type LeftTab = 'tree' | 'sets'
+type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler'
 
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function ViewerPage() {
   const { addNotification } = useAppStore()
-  const { savedSets, activeDisplay, selectedElementIds, setSelectedElementIds, setActiveDisplay } = useViewerStore()
+  const {
+    savedSets, activeDisplay, selectedElementIds, setSelectedElementIds,
+    setActiveDisplay, addToSelection, addViewpoint, activeProfile, setActiveProfile,
+  } = useViewerStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -85,6 +108,7 @@ export default function ViewerPage() {
   const modelGroupRef = useRef<THREE.Group | null>(null)
   const selectedMeshRef = useRef<THREE.Mesh | null>(null)
   const originalMaterialRef = useRef<THREE.Material | THREE.Material[] | null>(null)
+  const annotationCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const [isModelLoaded, setIsModelLoaded] = useState(false)
   const [activeTool, setActiveTool] = useState<ToolMode>('select')
@@ -97,8 +121,75 @@ export default function ViewerPage() {
   const [modelStats, setModelStats] = useState<IFCModelStats | null>(null)
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress | null>(null)
 
+  // Drawing / Annotations state
+  const [isDrawingMode, setIsDrawingMode] = useState(false)
+  const [drawingSettings, setDrawingSettings] = useState<DrawingSettings>({
+    tool: 'pen', color: '#ef4444', lineWidth: 4, fontSize: 16,
+  })
+  const [saveViewpointOpen, setSaveViewpointOpen] = useState(false)
+
+  // Export state
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+
+  // Profiler state
+  const [isProfilerProcessing, setIsProfilerProcessing] = useState(false)
+
   const { applyDisplay, reset: resetHighlight } = useViewerHighlight()
   const { evaluateSearchSet } = useSearchSets()
+
+  // ── Hooks ─────────────────────────────────────────────────
+
+  const { zoomToSelected } = useZoomToSelected({
+    cameraRef, controlsRef, ifcServiceRef, selectedElementIds,
+  })
+
+  const annotations = useAnnotations({
+    canvasRef: annotationCanvasRef,
+    active: isDrawingMode,
+    tool: drawingSettings.tool,
+    color: drawingSettings.color,
+    lineWidth: drawingSettings.lineWidth,
+    fontSize: drawingSettings.fontSize,
+  })
+
+  const sectionPlanes = useSectionPlanes({
+    rendererRef, sceneRef,
+  })
+
+  const measureTool = useMeasureTool({
+    sceneRef, cameraRef, modelGroupRef, containerRef,
+  })
+
+  const { buildProfile, clearProfile } = useAppearanceProfiler()
+
+  const { exportToExcel } = useExcelExport()
+
+  const handleBoxSelect = useCallback((ids: number[], additive: boolean) => {
+    if (additive) {
+      addToSelection(ids)
+    } else {
+      setSelectedElementIds(ids)
+    }
+    if (ids.length > 0) {
+      setShowProperties(true)
+      setSelectedElement({
+        id: ids[0],
+        type: `${ids.length} elements selected`,
+        name: `Multi-selection (${ids.length})`,
+        properties: [],
+      })
+    }
+  }, [addToSelection, setSelectedElementIds])
+
+  useBoxSelect({
+    containerRef,
+    cameraRef,
+    modelGroupRef,
+    enabled: activeTool === 'select' && !isDrawingMode && isModelLoaded,
+    onSelect: handleBoxSelect,
+  })
 
   // ── Three.js Initialization ─────────────────────────────
 
@@ -125,6 +216,7 @@ export default function ViewerPage() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
+    renderer.localClippingEnabled = true
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
@@ -193,14 +285,18 @@ export default function ViewerPage() {
     return () => {
       cleanup?.()
       ifcServiceRef.current?.dispose()
+      sectionPlanes.dispose()
+      measureTool.clearAllMeasurements()
     }
-  }, [initScene])
+  }, [initScene]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Apply Search Set display ─────────────────────────────
 
   useEffect(() => {
     const group = modelGroupRef.current
     if (!group || !isModelLoaded) return
+    // Skip if profiler is active
+    if (activeProfile) return
 
     if (!activeDisplay) {
       resetHighlight(group)
@@ -221,20 +317,51 @@ export default function ViewerPage() {
       applyDisplay(group, new Set(ids), activeDisplay, set.color)
     }
     applyIds()
-  }, [activeDisplay, savedSets, isModelLoaded, applyDisplay, resetHighlight, evaluateSearchSet])
+  }, [activeDisplay, savedSets, isModelLoaded, applyDisplay, resetHighlight, evaluateSearchSet, activeProfile])
+
+  // ── Drawing mode keyboard shortcuts ─────────────────────
+
+  useEffect(() => {
+    if (!isDrawingMode) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return
+      const keyMap: Record<string, () => void> = {
+        p: () => setDrawingSettings((s) => ({ ...s, tool: 'pen' })),
+        l: () => setDrawingSettings((s) => ({ ...s, tool: 'line' })),
+        r: () => setDrawingSettings((s) => ({ ...s, tool: 'rectangle' })),
+        c: () => setDrawingSettings((s) => ({ ...s, tool: 'circle' })),
+        a: () => setDrawingSettings((s) => ({ ...s, tool: 'arrow' })),
+        t: () => setDrawingSettings((s) => ({ ...s, tool: 'text' })),
+        e: () => setDrawingSettings((s) => ({ ...s, tool: 'eraser' })),
+        Escape: () => setIsDrawingMode(false),
+        Delete: () => annotations.clearAll(),
+      }
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault()
+        annotations.undo()
+        return
+      }
+      const action = keyMap[e.key]
+      if (action) action()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isDrawingMode, annotations])
+
+  // Toggle OrbitControls when drawing mode changes
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (controls) controls.enabled = !isDrawingMode
+  }, [isDrawingMode])
 
   // ── Convert spatial tree ─────────────────────────────────
 
   const convertToTreeNodes = (node: IFCSpatialNode, depth = 0): TreeNode => {
     const typeMap: Record<string, TreeNode['type']> = {
-      IfcProject: 'project',
-      IFCPROJECT: 'project',
-      IfcSite: 'site',
-      IFCSITE: 'site',
-      IfcBuilding: 'building',
-      IFCBUILDING: 'building',
-      IfcBuildingStorey: 'storey',
-      IFCBUILDINGSTOREY: 'storey',
+      IfcProject: 'project', IFCPROJECT: 'project',
+      IfcSite: 'site', IFCSITE: 'site',
+      IfcBuilding: 'building', IFCBUILDING: 'building',
+      IfcBuildingStorey: 'storey', IFCBUILDINGSTOREY: 'storey',
     }
     const nodeType = typeMap[node.type] || 'element'
 
@@ -312,6 +439,14 @@ export default function ViewerPage() {
 
   const handleCanvasClick = useCallback(
     (event: MouseEvent) => {
+      if (isDrawingMode) return
+
+      // Measure tool click
+      if (activeTool === 'measure') {
+        measureTool.handleMeasureClick(event)
+        return
+      }
+
       if (activeTool !== 'select') return
       const container = containerRef.current
       const camera = cameraRef.current
@@ -345,7 +480,7 @@ export default function ViewerPage() {
         setShowProperties(false)
       }
     },
-    [activeTool, selectElement],
+    [activeTool, selectElement, isDrawingMode, measureTool],
   )
 
   useEffect(() => {
@@ -393,6 +528,7 @@ export default function ViewerPage() {
         modelGroupRef.current = result.group
 
         fitToModel(result.group)
+        sectionPlanes.initBounds(result.group)
 
         const treeNodes = convertToTreeNodes(result.tree)
         setTreeData([treeNodes])
@@ -409,12 +545,17 @@ export default function ViewerPage() {
         addNotification('error', `Failed to load IFC: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     },
-    [addNotification, fitToModel],
+    [addNotification, fitToModel, sectionPlanes],
   )
 
   // ── Tool handlers ───────────────────────────────────────
 
   const handleToolClick = (tool: ToolMode) => {
+    // Cancel pending states when switching tools
+    if (activeTool === 'measure' && tool !== 'measure') {
+      measureTool.cancelPending()
+    }
+
     setActiveTool(tool)
     const controls = controlsRef.current
     if (!controls) return
@@ -434,9 +575,6 @@ export default function ViewerPage() {
         controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE as number, MIDDLE: THREE.MOUSE.DOLLY as number, RIGHT: THREE.MOUSE.PAN as number }
         break
     }
-
-    if (tool === 'measure') addNotification('info', 'Click two points to measure distance')
-    if (tool === 'section') addNotification('info', 'Click to place section plane')
   }
 
   const fitToView = () => {
@@ -454,6 +592,128 @@ export default function ViewerPage() {
     }
     addNotification('info', 'View reset to fit model')
   }
+
+  // ── Viewpoint handlers ──────────────────────────────────
+
+  const handleSaveViewpoint = (name: string) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    const renderer = rendererRef.current
+    if (!camera || !controls || !renderer) return
+
+    const annotationDataURL = annotations.getCanvasDataURL()
+
+    // Create composite thumbnail
+    let thumbnail = ''
+    try {
+      const threeCanvas = renderer.domElement
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = 320
+      tempCanvas.height = 180
+      const ctx = tempCanvas.getContext('2d')!
+      ctx.drawImage(threeCanvas, 0, 0, 320, 180)
+      // Overlay annotations if any
+      if (annotationCanvasRef.current) {
+        ctx.drawImage(annotationCanvasRef.current, 0, 0, 320, 180)
+      }
+      thumbnail = tempCanvas.toDataURL('image/jpeg', 0.7)
+    } catch {
+      // thumbnail generation may fail in some contexts
+    }
+
+    const viewpoint: SavedViewpoint = {
+      id: Date.now().toString(),
+      name,
+      thumbnail,
+      cameraState: {
+        position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+        target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
+        zoom: camera.zoom,
+        fov: camera.fov,
+      },
+      annotationDataURL,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+
+    addViewpoint(viewpoint)
+    addNotification('success', `Viewpoint "${name}" saved`)
+  }
+
+  const handleRestoreViewpoint = (vp: SavedViewpoint) => {
+    const camera = cameraRef.current
+    const controls = controlsRef.current
+    if (!camera || !controls) return
+
+    camera.position.set(vp.cameraState.position.x, vp.cameraState.position.y, vp.cameraState.position.z)
+    controls.target.set(vp.cameraState.target.x, vp.cameraState.target.y, vp.cameraState.target.z)
+    camera.zoom = vp.cameraState.zoom
+    camera.fov = vp.cameraState.fov
+    camera.updateProjectionMatrix()
+    controls.update()
+
+    // Restore annotations
+    if (vp.annotationDataURL) {
+      annotations.restoreFromDataURL(vp.annotationDataURL)
+    } else {
+      annotations.clearAll()
+    }
+  }
+
+  // ── Profiler handlers ───────────────────────────────────
+
+  const handleApplyProfile = async (field: string) => {
+    const service = ifcServiceRef.current
+    const group = modelGroupRef.current
+    if (!service || !group) return
+
+    setIsProfilerProcessing(true)
+    try {
+      const legend = await buildProfile(service, field as 'type' | 'name' | 'material' | 'objectType', group)
+      setActiveProfile({ field, legend })
+    } finally {
+      setIsProfilerProcessing(false)
+    }
+  }
+
+  const handleClearProfile = () => {
+    const group = modelGroupRef.current
+    if (group) clearProfile(group)
+    setActiveProfile(null)
+  }
+
+  // ── Export handlers ─────────────────────────────────────
+
+  const handleExport = async (scope: 'all' | 'selected' | 'set', setId?: string) => {
+    const service = ifcServiceRef.current
+    if (!service) return
+
+    setIsExporting(true)
+    setExportProgress(0)
+
+    try {
+      const set = setId ? savedSets.find((s) => s.id === setId) : undefined
+      await exportToExcel(service, modelFile || 'model', {
+        scope,
+        selectedIds: selectedElementIds,
+        set,
+        evaluateSearchSet,
+      }, setExportProgress)
+      addNotification('success', 'Excel export complete')
+      setShowExportDialog(false)
+    } catch (err) {
+      addNotification('error', `Export failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+    } finally {
+      setIsExporting(false)
+      setExportProgress(0)
+    }
+  }
+
+  // ── Section update handler ──────────────────────────────
+
+  const handleSectionUpdate = useCallback((mode: SectionMode, planes: ClipPlaneState[], box: ClipBoxState) => {
+    sectionPlanes.updateClipping(mode, planes, box)
+  }, [sectionPlanes])
 
   // ── Tree toggle & click ─────────────────────────────────
 
@@ -522,6 +782,15 @@ export default function ViewerPage() {
     { id: 'section', icon: <Scissors size={18} />, label: 'Section' },
   ]
 
+  // ── Left panel tabs config ──────────────────────────────
+
+  const leftTabs: { id: LeftTab; icon: React.ReactNode; label: string }[] = [
+    { id: 'tree', icon: <Layers size={14} />, label: 'Tree' },
+    { id: 'sets', icon: <Bookmark size={14} />, label: 'Sets' },
+    { id: 'viewpoints', icon: <Camera size={14} />, label: 'Views' },
+    { id: 'profiler', icon: <Palette size={14} />, label: 'Profiler' },
+  ]
+
   // ── Render ──────────────────────────────────────────────
 
   return (
@@ -560,7 +829,7 @@ export default function ViewerPage() {
 
         {/* Main viewer area */}
         <div className="flex-1 flex gap-4 min-h-0">
-          {/* Left Panel (Tree + Search Sets) */}
+          {/* Left Panel (Tree + Search Sets + Viewpoints + Profiler) */}
           <AnimatePresence mode="wait">
             {showLeftPanel && (
               <motion.div
@@ -573,28 +842,20 @@ export default function ViewerPage() {
               >
                 {/* Tabs */}
                 <div className="flex items-center border-b border-border">
-                  <button
-                    onClick={() => setLeftTab('tree')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                      leftTab === 'tree'
-                        ? 'text-foreground border-b-2 border-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Layers size={14} />
-                    Tree
-                  </button>
-                  <button
-                    onClick={() => setLeftTab('sets')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                      leftTab === 'sets'
-                        ? 'text-foreground border-b-2 border-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Bookmark size={14} />
-                    Search Sets
-                  </button>
+                  {leftTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setLeftTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2.5 text-[11px] font-medium transition-colors ${
+                        leftTab === tab.id
+                          ? 'text-foreground border-b-2 border-primary'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Tab content */}
@@ -630,8 +891,17 @@ export default function ViewerPage() {
                       </div>
                     )}
                   </>
-                ) : (
+                ) : leftTab === 'sets' ? (
                   <SearchSetsPanel selectedIds={selectedElementIds} />
+                ) : leftTab === 'viewpoints' ? (
+                  <ViewpointsPanel onRestore={handleRestoreViewpoint} />
+                ) : (
+                  <AppearanceProfilerPanel
+                    activeProfile={activeProfile}
+                    onApply={handleApplyProfile}
+                    onClear={handleClearProfile}
+                    isProcessing={isProfilerProcessing}
+                  />
                 )}
               </motion.div>
             )}
@@ -669,6 +939,19 @@ export default function ViewerPage() {
                 className="p-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <Maximize size={18} />
+              </motion.button>
+              <motion.button
+                title="Zoom to Selected"
+                onClick={zoomToSelected}
+                whileTap={{ scale: 0.95 }}
+                disabled={selectedElementIds.length === 0}
+                className={`p-2 rounded-md transition-colors ${
+                  selectedElementIds.length === 0
+                    ? 'text-muted-foreground/30 cursor-not-allowed'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <Focus size={18} />
               </motion.button>
               <motion.button
                 title="Zoom In"
@@ -731,7 +1014,67 @@ export default function ViewerPage() {
               >
                 {isModelLoaded ? <Eye size={18} /> : <EyeOff size={18} />}
               </motion.button>
+              <motion.button
+                title={isDrawingMode ? 'Exit Drawing Mode' : 'Drawing Mode'}
+                onClick={() => setIsDrawingMode(!isDrawingMode)}
+                whileTap={{ scale: 0.95 }}
+                className={`p-2 rounded-lg backdrop-blur-md ring-1 shadow-lg transition-colors ${
+                  isDrawingMode
+                    ? 'bg-primary text-white ring-primary/50'
+                    : 'bg-card/80 ring-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Pencil size={18} />
+              </motion.button>
+              <motion.button
+                title="Export to Excel"
+                onClick={() => setShowExportDialog(true)}
+                whileTap={{ scale: 0.95 }}
+                disabled={!isModelLoaded}
+                className={`p-2 rounded-lg backdrop-blur-md bg-card/80 ring-1 ring-border shadow-lg transition-colors ${
+                  isModelLoaded
+                    ? 'text-muted-foreground hover:text-foreground'
+                    : 'text-muted-foreground/30 cursor-not-allowed'
+                }`}
+              >
+                <Download size={18} />
+              </motion.button>
             </motion.div>
+
+            {/* Annotation canvas overlay */}
+            <AnnotationCanvas
+              canvasRef={annotationCanvasRef}
+              active={isDrawingMode}
+              containerRef={containerRef}
+            />
+
+            {/* Drawing toolbar (bottom center when drawing mode active) */}
+            <AnimatePresence>
+              {isDrawingMode && (
+                <DrawingToolbar
+                  settings={drawingSettings}
+                  onSettingsChange={(s) => setDrawingSettings((prev) => ({ ...prev, ...s }))}
+                  onUndo={annotations.undo}
+                  onClear={annotations.clearAll}
+                  onSaveViewpoint={() => setSaveViewpointOpen(true)}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Measure panel */}
+            {activeTool === 'measure' && (
+              <MeasurePanel
+                getMeasurements={measureTool.getMeasurements}
+                hasPendingPoint={measureTool.hasPendingPoint}
+                onDelete={measureTool.deleteMeasurement}
+                onClearAll={measureTool.clearAllMeasurements}
+              />
+            )}
+
+            {/* Section panel */}
+            {activeTool === 'section' && (
+              <SectionPanel onUpdate={handleSectionUpdate} />
+            )}
 
             {/* Loading overlay */}
             <AnimatePresence>
@@ -879,6 +1222,22 @@ export default function ViewerPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <SaveViewpointDialog
+        open={saveViewpointOpen}
+        onClose={() => setSaveViewpointOpen(false)}
+        onSave={handleSaveViewpoint}
+      />
+      <ExportDialog
+        open={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        onExport={handleExport}
+        selectedCount={selectedElementIds.length}
+        savedSets={savedSets}
+        isExporting={isExporting}
+        exportProgress={exportProgress}
+      />
     </MotionPage>
   )
 }

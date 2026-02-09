@@ -19,7 +19,7 @@ test.describe('Viewer - Measure Tool', () => {
   test('should show measure panel when tool is active', async ({ page }) => {
     const btn = page.locator('button[title="Measure"]')
     await btn.click()
-    await expect(page.getByText('Measurements')).toBeVisible()
+    await expect(page.getByText('Measurements', { exact: true })).toBeVisible()
   })
 
   test('should show status text in measure panel', async ({ page }) => {
@@ -37,10 +37,10 @@ test.describe('Viewer - Measure Tool', () => {
   test('should hide measure panel when switching tool', async ({ page }) => {
     const measureBtn = page.locator('button[title="Measure"]')
     await measureBtn.click()
-    await expect(page.getByText('Measurements')).toBeVisible()
+    await expect(page.getByText('Measurements', { exact: true })).toBeVisible()
 
     const selectBtn = page.locator('button[title="Select"]')
     await selectBtn.click()
-    await expect(page.getByText('Measurements')).toBeHidden()
+    await expect(page.getByText('Measurements', { exact: true })).toBeHidden()
   })
 })

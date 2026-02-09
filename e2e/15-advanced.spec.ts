@@ -18,10 +18,10 @@ test.describe('Viewer - Advanced Features', () => {
   test('should have 4 left panel tabs when panel open', async ({ page }) => {
     const panelBtn = page.locator('button[title="Show Panel"]')
     await panelBtn.click()
-    await expect(page.getByText('Tree')).toBeVisible()
-    await expect(page.getByText('Sets')).toBeVisible()
-    await expect(page.getByText('Views')).toBeVisible()
-    await expect(page.getByText('Profiler')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Tree' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sets' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Views' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Profiler' })).toBeVisible()
   })
 
   test('all 4 tabs should be switchable', async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe('Viewer - Advanced Features', () => {
     await expect(page.getByText('Color By')).toBeVisible()
 
     // Switch back to Tree
-    await page.getByText('Tree').click()
+    await page.getByRole('button', { name: 'Tree' }).click()
     await expect(page.getByText('Load an IFC file to see the spatial tree')).toBeVisible()
   })
 

@@ -64,3 +64,73 @@ export interface ActiveSetDisplay {
   setId: string
   mode: 'highlight' | 'isolate' | 'transparent'
 }
+
+// ── Drawing / Annotations ────────────────────────────────────────────
+
+export type DrawingToolType = 'pen' | 'line' | 'rectangle' | 'circle' | 'arrow' | 'text' | 'eraser'
+
+export interface DrawingSettings {
+  tool: DrawingToolType
+  color: string
+  lineWidth: number
+  fontSize: number
+}
+
+export interface CameraState {
+  position: { x: number; y: number; z: number }
+  target: { x: number; y: number; z: number }
+  zoom: number
+  fov: number
+}
+
+export interface SavedViewpoint {
+  id: string
+  name: string
+  thumbnail: string
+  cameraState: CameraState
+  annotationDataURL: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+// ── Section Planes ───────────────────────────────────────────────────
+
+export type ClipAxis = 'x' | 'y' | 'z'
+export type SectionMode = 'planes' | 'box' | 'off'
+
+export interface ClipPlaneState {
+  axis: ClipAxis
+  enabled: boolean
+  position: number
+  flipped: boolean
+}
+
+export interface ClipBoxState {
+  enabled: boolean
+  xMin: number; xMax: number
+  yMin: number; yMax: number
+  zMin: number; zMax: number
+}
+
+// ── Measure Tool ─────────────────────────────────────────────────────
+
+export interface MeasurePoint {
+  position: import('three').Vector3
+  expressID: number | null
+}
+
+export interface Measurement {
+  id: string
+  pointA: MeasurePoint
+  pointB: MeasurePoint
+  distance: number
+  visualGroup: import('three').Group
+}
+
+// ── Appearance Profiler ──────────────────────────────────────────────
+
+export interface ProfileLegendEntry {
+  value: string
+  color: string
+  count: number
+}
