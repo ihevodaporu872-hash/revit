@@ -8,7 +8,7 @@ test.describe('CAD Viewer', () => {
 
   test('should show upload button', async ({ page }) => {
     await page.goto('/cad-viewer')
-    await expect(page.getByText('Upload DWG/DXF')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Upload DWG/DXF' })).toBeVisible()
   })
 
   test('should have file input that accepts .dwg and .dxf', async ({ page }) => {
