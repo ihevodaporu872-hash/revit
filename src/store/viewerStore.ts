@@ -17,6 +17,10 @@ interface ViewerState {
   // Custom colors
   customColors: Record<string, string>
 
+  // Summary highlight
+  highlightedSummaryGroup: string | null
+  setHighlightedSummaryGroup: (key: string | null) => void
+
   addSet: (set: SavedSet) => void
   updateSet: (id: string, updates: Partial<SavedSet>) => void
   deleteSet: (id: string) => void
@@ -51,6 +55,8 @@ export const useViewerStore = create<ViewerState>()(
       activeViewpointId: null,
       activeProfile: null,
       customColors: {},
+      highlightedSummaryGroup: null,
+      setHighlightedSummaryGroup: (key) => set({ highlightedSummaryGroup: key }),
 
       addSet: (newSet) =>
         set((state) => ({ savedSets: [...state.savedSets, newSet] })),

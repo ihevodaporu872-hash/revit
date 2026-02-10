@@ -205,6 +205,38 @@ export interface RevitProcessingJob {
   error: string | null
 }
 
+// ── Properties Summary ───────────────────────────────────────────────
+
+export type SummaryGroupBy = 'type' | 'name' | 'material'
+
+export interface SummaryElementData {
+  expressID: number
+  type: string
+  name: string
+  material: string
+  length: number
+  area: number
+  volume: number
+}
+
+export interface SummaryGroup {
+  key: string
+  count: number
+  expressIDs: number[]
+  totalLength: number
+  totalArea: number
+  totalVolume: number
+  elements: SummaryElementData[]
+}
+
+export interface SummaryData {
+  groupBy: SummaryGroupBy
+  groups: SummaryGroup[]
+  totalElements: number
+  scanProgress: number
+  isScanning: boolean
+}
+
 // ── Appearance Profiler ──────────────────────────────────────────────
 
 export interface ProfileLegendEntry {
