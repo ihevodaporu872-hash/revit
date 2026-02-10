@@ -71,8 +71,12 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
   const inputRef = useRef<HTMLInputElement>(null)
   const acceptedExtensions = parseAcceptedExtensions(accept)
 
+  const openFilePicker = useCallback(() => {
+    inputRef.current?.click()
+  }, [])
+
   const handleFiles = useCallback((newFiles: FileList | null) => {
-    if (!newFiles) return
+    if (!newFiles || newFiles.length === 0) return
     const arr = Array.from(newFiles).filter((f) => {
       if (f.size > maxSize) return false
       if (acceptedExtensions.length > 0) {
@@ -81,9 +85,36 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
       }
       return true
     })
-    setFiles(arr)
-    onFilesSelected(arr)
+    if (arr.length > 0) {
+      setFiles(arr)
+      onFilesSelected(arr)
+    }
   }, [maxSize, onFilesSelected, acceptedExtensions])
+
+  const onInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFiles(e.target.files)
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+  }, [handleFiles])
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    handleFiles(e.dataTransfer.files)
+  }, [handleFiles])
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }, [])
+
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }, [])
 
   const removeFile = (index: number) => {
     const updated = files.filter((_, i) => i !== index)
@@ -93,6 +124,17 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
 
   return (
     <div className={cn('space-y-3', className)}>
+      {/* Hidden file input — positioned offscreen, not display:none */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={onInputChange}
+        tabIndex={-1}
+        style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
+      />
+
       <motion.div
         variants={interactiveScaleSubtle}
         initial="rest"
@@ -100,21 +142,21 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
         whileTap="tap"
         animate={dragOver ? { borderColor: 'var(--primary)' } : {}}
         className={cn(
-          'file-upload-dropzone',
+          'file-upload-dropzone cursor-pointer',
           'relative overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-colors',
           dragOver
             ? 'border-primary bg-primary/8'
             : 'border-border/70 bg-card/45 hover:border-primary/50 hover:bg-muted/45',
           dropzoneClassName,
         )}
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
+        onClick={openFilePicker}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       >
         {dragOver && (
           <motion.div
-            className="absolute inset-0 bg-primary/5"
+            className="pointer-events-none absolute inset-0 bg-primary/5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -153,19 +195,12 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
         <div className="mt-6">
           <button
             type="button"
+            onClick={(e) => { e.stopPropagation(); openFilePicker() }}
             className="primary-glow-btn converter-upload-cta rounded-2xl px-8 py-3 text-[15px] font-bold text-primary-foreground shadow-[var(--shadow-glow)]"
           >
             Загрузить файлы
           </button>
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          multiple={multiple}
-          onChange={(e) => handleFiles(e.target.files)}
-          className="hidden"
-        />
       </motion.div>
 
       <AnimatePresence>
