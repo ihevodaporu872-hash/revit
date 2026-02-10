@@ -334,7 +334,7 @@ export default function AIAnalysisPage() {
     const saved = localStorage.getItem('jens_ai_charts_generated')
     return saved ? parseInt(saved, 10) : 0
   })
-  const [trackedFileNames, setTrackedFileNames] = useState<Set<string>>(() => {
+  const [, setTrackedFileNames] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('jens_ai_tracked_files')
     return saved ? new Set(JSON.parse(saved)) : new Set()
   })
@@ -399,7 +399,6 @@ export default function AIAnalysisPage() {
 
     try {
       // Real API call
-      let usedMock = false
       let aiMsg: ChatMessage | null = null
 
       try {
@@ -428,7 +427,6 @@ export default function AIAnalysisPage() {
 
       // Fallback: mock response with [Demo] indication
       if (!aiMsg) {
-        usedMock = true
         await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000))
         const mock = generateMockResponse(text, files[0].name)
         aiMsg = {
@@ -509,16 +507,16 @@ export default function AIAnalysisPage() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           <motion.div variants={fadeInUp}>
-            <StatCard label="Запусков анализа" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'за неделю' }} />
+            <StatCard label="Запусков анализа" value={analysesRun} icon={Zap} color="primary" />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Средний ответ" value={avgResponse} icon={Clock} color="success" />
+            <StatCard label="Средний ответ" value={avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(1)}s` : '—'} icon={Clock} color="success" />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Обработано файлов" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'за месяц' }} />
+            <StatCard label="Обработано файлов" value={filesProcessed} icon={FileSpreadsheet} color="warning" />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Построено графиков" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'за неделю' }} />
+            <StatCard label="Построено графиков" value={chartsGenerated} icon={PieChart} color="primary" />
           </motion.div>
         </motion.div>
 
