@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCostEstimates, saveCostEstimate } from '../../services/supabase-api'
+import { fetchCostEstimates } from '../../services/supabase-api'
 import { classifyVOR } from '../../services/api'
 import {
   Search,
@@ -36,7 +36,6 @@ import {
   fadeInUp,
   scaleIn,
   listItem,
-  modalOverlay,
   modalContent,
   springTransition,
 } from '../../lib/animations'

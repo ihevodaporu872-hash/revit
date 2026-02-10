@@ -112,7 +112,7 @@ export default function VORCompare() {
                     >
                       <Plus size={14} className="text-green-500 shrink-0" />
                       <span className="flex-1 text-sm text-foreground truncate">{item.name}</span>
-                      <Badge variant="default">{item.unit}</Badge>
+                      {item.unit && <Badge variant="default">{item.unit}</Badge>}
                       <span className="text-sm font-medium text-foreground tabular-nums">{item.quantity}</span>
                     </motion.div>
                   ))}
@@ -132,7 +132,7 @@ export default function VORCompare() {
                     >
                       <Minus size={14} className="text-red-500 shrink-0" />
                       <span className="flex-1 text-sm text-foreground truncate">{item.name}</span>
-                      <Badge variant="default">{item.unit}</Badge>
+                      {item.unit && <Badge variant="default">{item.unit}</Badge>}
                       <span className="text-sm font-medium text-foreground tabular-nums">{item.quantity}</span>
                     </motion.div>
                   ))}
@@ -152,7 +152,7 @@ export default function VORCompare() {
                     >
                       <ArrowRightLeft size={14} className="text-yellow-500 shrink-0" />
                       <span className="flex-1 text-sm text-foreground truncate">{item.name}</span>
-                      <Badge variant="default">{item.unit}</Badge>
+                      {item.unit && <Badge variant="default">{item.unit}</Badge>}
                       <div className="flex items-center gap-2 text-sm tabular-nums">
                         <span className="text-muted-foreground">{item.oldQuantity}</span>
                         <span className="text-muted-foreground">→</span>

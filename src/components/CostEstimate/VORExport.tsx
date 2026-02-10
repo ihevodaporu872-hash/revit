@@ -29,6 +29,15 @@ interface CostLineItem {
 
 // ── Utilities ──────────────────────────────────────────────────────────
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function downloadBlob(content: string | ArrayBuffer, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -106,7 +115,7 @@ export function VORExportButtons({ results }: VORExportButtonsProps) {
   const exportClassificationPdf = () => {
     const total = results.reduce((s, r) => s + r.quantity * r.unitPrice, 0)
     const rows = results.map((r, i) =>
-      `<tr><td>${i + 1}</td><td>${r.elementName}</td><td class="mono">${r.matchedCode}</td><td>${r.matchedDescription}</td><td>${Math.round(r.confidence * 100)}%</td><td>${r.unit}</td><td class="num">${formatCurrency(r.unitPrice)}</td><td class="num">${r.quantity}</td><td class="num">${formatCurrency(r.quantity * r.unitPrice)}</td></tr>`
+      `<tr><td>${i + 1}</td><td>${escapeHtml(r.elementName)}</td><td class="mono">${escapeHtml(r.matchedCode)}</td><td>${escapeHtml(r.matchedDescription)}</td><td>${Math.round(r.confidence * 100)}%</td><td>${escapeHtml(r.unit)}</td><td class="num">${formatCurrency(r.unitPrice)}</td><td class="num">${r.quantity}</td><td class="num">${formatCurrency(r.quantity * r.unitPrice)}</td></tr>`
     ).join('\n')
 
     const html = `<!DOCTYPE html><html><head><title>Классификация ВОР — Jens</title>
@@ -181,7 +190,7 @@ export function EstimateExportButtons({ costItems, grandTotal }: EstimateExportB
 
   const exportEstimatePdf = () => {
     const rows = costItems.map((item, i) =>
-      `<tr><td>${i + 1}</td><td class="mono">${item.workItem.code}</td><td>${item.workItem.description}</td><td>${item.workItem.unit}</td><td class="num">${formatCurrency(item.workItem.unitPrice)}</td><td class="num">${item.quantity}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
+      `<tr><td>${i + 1}</td><td class="mono">${escapeHtml(item.workItem.code)}</td><td>${escapeHtml(item.workItem.description)}</td><td>${escapeHtml(item.workItem.unit)}</td><td class="num">${formatCurrency(item.workItem.unitPrice)}</td><td class="num">${item.quantity}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
     ).join('\n')
 
     const html = `<!DOCTYPE html><html><head><title>Смета — Jens</title>

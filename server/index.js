@@ -3258,6 +3258,8 @@ app.post('/api/cost/validate-vor', upload.single('file'), async (req, res) => {
     console.log(`[VOR Validate] Parsed ${vorRows.length} rows from ${req.file.originalname}`)
 
     // 4. Send to Gemini for validation
+    const rowsToValidate = vorRows.slice(0, 100)
+    const truncated = vorRows.length > 100
     const langLabel = language === 'ru' ? 'Russian' : language === 'de' ? 'German' : 'English'
     const prompt = `You are a construction cost estimating QA expert. Analyze this Bill of Quantities (ВОР / BOQ) for issues.
 
@@ -3277,8 +3279,8 @@ For each issue, provide a JSON object:
 - itemName: the item name if applicable
 - details: additional context
 
-Items to validate (${vorRows.length} rows):
-${JSON.stringify(vorRows.slice(0, 100), null, 2)}
+Items to validate (${rowsToValidate.length} rows${truncated ? `, showing first 100 of ${vorRows.length}` : ''}):
+${JSON.stringify(rowsToValidate, null, 2)}
 
 Respond ONLY with a JSON array of issue objects, no markdown, no explanation. If no issues found, return [].`
 
@@ -3287,7 +3289,32 @@ Respond ONLY with a JSON array of issue objects, no markdown, no explanation. If
     const jsonMatch = responseText.match(/\[[\s\S]*\]/)
     let issues = []
     if (jsonMatch) {
-      issues = JSON.parse(jsonMatch[0])
+      try {
+        const parsed = JSON.parse(jsonMatch[0])
+        // Validate each issue has required fields
+        issues = parsed
+          .filter(i => i && typeof i.message === 'string' && ['error', 'warning', 'info'].includes(i.type))
+          .map(i => ({
+            type: i.type,
+            message: i.message,
+            rowIndex: typeof i.rowIndex === 'number' ? i.rowIndex : undefined,
+            itemName: typeof i.itemName === 'string' ? i.itemName : undefined,
+            details: typeof i.details === 'string' ? i.details : undefined,
+          }))
+      } catch (parseErr) {
+        console.error('[VOR Validate] Failed to parse Gemini response:', parseErr.message)
+      }
+    }
+
+    // Add info issue if rows were truncated
+    if (truncated) {
+      issues.unshift({
+        type: 'info',
+        message: `Проверено ${rowsToValidate.length} из ${vorRows.length} строк. Загрузите файл с меньшим числом строк для полной проверки.`,
+        rowIndex: undefined,
+        itemName: undefined,
+        details: undefined,
+      })
     }
 
     // Cleanup
@@ -3348,6 +3375,11 @@ app.post('/api/cost/compare-vor', upload.array('files', 2), async (req, res) => 
 
     const rows1 = parseFile(req.files[0].path)
     const rows2 = parseFile(req.files[1].path)
+
+    if (rows1.length === 0 && rows2.length === 0) {
+      for (const f of req.files) { try { await fs.unlink(f.path) } catch { /* ignore */ } }
+      return res.status(400).json({ error: 'Both files are empty or have unrecognizable columns' })
+    }
 
     console.log(`[VOR Compare] File1: ${rows1.length} rows, File2: ${rows2.length} rows`)
 

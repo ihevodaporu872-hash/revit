@@ -103,8 +103,6 @@ export default function VORAnalytics({ results }: VORAnalyticsProps) {
                   outerRadius={100}
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
                 >
                   {analytics.pieData.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
