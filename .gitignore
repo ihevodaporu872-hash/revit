@@ -2,6 +2,10 @@ node_modules/
 dist/
 nul
 .mcp.json
+.env
+.env.local
+.env.*.local
+test-results/
 
 # DDC source repositories (separate git repos)
 123/
