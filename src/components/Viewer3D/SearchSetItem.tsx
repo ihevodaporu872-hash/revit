@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreVertical, Eye, Layers, Pencil, Trash2, Crosshair, Plus, Minus } from 'lucide-react'
+import { MoreVertical, Eye, Layers, Pencil, Trash2, Crosshair, Plus, Minus, Grid3x3 } from 'lucide-react'
 import type { SavedSet, ActiveSetDisplay } from './ifc/types'
 
 interface SearchSetItemProps {
@@ -58,6 +58,7 @@ export function SearchSetItem({ set, isActive, activeMode, onDisplay, onClearDis
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             title="Highlight"
+            data-testid={`set-${set.id}-highlight`}
             onClick={() => isActive && activeMode === 'highlight' ? onClearDisplay() : onDisplay('highlight')}
             className={`p-1 rounded text-xs transition-colors ${activeMode === 'highlight' && isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           >
@@ -65,6 +66,7 @@ export function SearchSetItem({ set, isActive, activeMode, onDisplay, onClearDis
           </button>
           <button
             title="Isolate"
+            data-testid={`set-${set.id}-isolate`}
             onClick={() => isActive && activeMode === 'isolate' ? onClearDisplay() : onDisplay('isolate')}
             className={`p-1 rounded text-xs transition-colors ${activeMode === 'isolate' && isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           >
@@ -72,10 +74,19 @@ export function SearchSetItem({ set, isActive, activeMode, onDisplay, onClearDis
           </button>
           <button
             title="Transparent"
+            data-testid={`set-${set.id}-transparent`}
             onClick={() => isActive && activeMode === 'transparent' ? onClearDisplay() : onDisplay('transparent')}
             className={`p-1 rounded text-xs transition-colors ${activeMode === 'transparent' && isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           >
             <Layers size={12} />
+          </button>
+          <button
+            title="Wireframe"
+            data-testid={`set-${set.id}-wireframe`}
+            onClick={() => isActive && activeMode === 'wireframe' ? onClearDisplay() : onDisplay('wireframe')}
+            className={`p-1 rounded text-xs transition-colors ${activeMode === 'wireframe' && isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <Grid3x3 size={12} />
           </button>
         </div>
 

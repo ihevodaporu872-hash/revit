@@ -350,10 +350,10 @@ export default function CostEstimatePage() {
   // ── Tabs ──────────────────────────────────────────────
 
   const tabs = [
-    { id: 'search', label: 'Semantic Search', icon: <Search size={16} /> },
-    { id: 'classify', label: 'AI Classification', icon: <Sparkles size={16} /> },
-    { id: 'estimate', label: 'Cost Calculation', icon: <Calculator size={16} /> },
-    { id: 'history', label: 'History', icon: <Clock size={16} /> },
+    { id: 'search', label: 'Семантический поиск', icon: <Search size={16} /> },
+    { id: 'classify', label: 'Классификация ИИ', icon: <Sparkles size={16} /> },
+    { id: 'estimate', label: 'Расчёт сметы', icon: <Calculator size={16} /> },
+    { id: 'history', label: 'История', icon: <Clock size={16} /> },
   ]
 
   // ── Render ──────────────────────────────────────────────
@@ -363,9 +363,9 @@ export default function CostEstimatePage() {
       <div className="space-y-6">
         {/* Header */}
         <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-          <h1 className="text-2xl font-bold text-foreground">CWICR Cost Estimation</h1>
+          <h1 className="text-2xl font-bold text-foreground">Смета стоимости CWICR</h1>
           <p className="text-muted-foreground mt-1">
-            Search 55,719 construction work items across 9 languages with AI-powered BIM classification
+            Поиск по 55 719 строительным позициям на 9 языках с BIM-классификацией на базе ИИ
           </p>
         </motion.div>
 
@@ -377,16 +377,16 @@ export default function CostEstimatePage() {
         animate="visible"
       >
         <motion.div variants={fadeInUp}>
-          <StatCard label="Total Items" value="55,719" icon={Database} color="primary" />
+          <StatCard label="Всего позиций" value="55,719" icon={Database} color="primary" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Languages" value={LANGUAGES.length} icon={Globe} color="success" />
+          <StatCard label="Языки" value={LANGUAGES.length} icon={Globe} color="success" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Avg Response Time" value="0.3s" icon={Clock} color="warning" />
+          <StatCard label="Среднее время ответа" value="0.3s" icon={Clock} color="warning" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Estimates Today" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: 'vs yesterday' }} />
+          <StatCard label="Смет сегодня" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: 'к вчера' }} />
         </motion.div>
       </motion.div>
 
@@ -449,13 +449,13 @@ export default function CostEstimatePage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        placeholder="Search work items... e.g. 'concrete wall', 'steel beam', '03.31'"
+                        placeholder="Поиск позиций... например: 'бетонная стена', 'балка', '03.31'"
                         className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
                       />
                     </div>
 
                     <Button onClick={handleSearch} loading={isSearching} icon={<Search size={16} />}>
-                      Search
+                      Найти
                     </Button>
                   </div>
                 </Card>
@@ -470,8 +470,8 @@ export default function CostEstimatePage() {
                       exit="exit"
                     >
                       <Card
-                        title="Search Results"
-                        subtitle={`${searchResults.length} items found for "${searchQuery}" in ${currentLang.name}`}
+                        title="Результаты поиска"
+                        subtitle={`${searchResults.length} найдено по запросу "${searchQuery}" на языке ${currentLang.name}`}
                         hover
                       >
                         <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -479,7 +479,7 @@ export default function CostEstimatePage() {
                             columns={searchColumns as any}
                             data={searchResults as any}
                             keyField="id"
-                            emptyMessage="No results found. Try a different query."
+                            emptyMessage="Ничего не найдено. Попробуйте другой запрос."
                           />
                         </motion.div>
                       </Card>
@@ -493,9 +493,9 @@ export default function CostEstimatePage() {
                     <Card>
                       <div className="text-center py-16">
                         <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">Search for construction work items</p>
+                        <p className="text-muted-foreground">Выполните поиск строительных позиций</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
-                          Try "concrete", "steel beam", "insulation", or a work item code
+                          Пример: "бетон", "балка", "утепление" или код позиции
                         </p>
                       </div>
                     </Card>
@@ -510,8 +510,8 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 <Card
-                  title="BIM Element Classification"
-                  subtitle="Upload an Excel file with BIM elements to auto-classify using Gemini AI"
+                  title="Классификация BIM-элементов"
+                  subtitle="Загрузите Excel-файл с BIM-элементами для авто-классификации через Gemini"
                   hover
                 >
                   <div className="flex items-center gap-4">
@@ -523,15 +523,15 @@ export default function CostEstimatePage() {
                         onClick={() => handleClassifyUpload()}
                       >
                         <Upload size={32} className="mx-auto text-muted-foreground mb-3" />
-                        <p className="font-medium text-foreground">Drop Excel file with BIM elements</p>
+                        <p className="font-medium text-foreground">Перетащите Excel-файл с BIM-элементами</p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Supports .xlsx with columns: Element Name, Type, Quantity
+                          Поддержка .xlsx с колонками: имя элемента, тип, количество
                         </p>
                       </motion.div>
                     </div>
                     <div className="text-center px-6">
                       <Sparkles size={24} className="mx-auto text-primary mb-2" />
-                      <p className="text-xs text-muted-foreground">Powered by</p>
+                      <p className="text-xs text-muted-foreground">Работает на</p>
                       <p className="text-sm font-semibold text-foreground">Gemini AI</p>
                     </div>
                   </div>
@@ -542,7 +542,7 @@ export default function CostEstimatePage() {
                       loading={isClassifying}
                       icon={<Sparkles size={16} />}
                     >
-                      {isClassifying ? 'Classifying with AI...' : 'Classify Elements'}
+                      {isClassifying ? 'Классификация ИИ...' : 'Классифицировать элементы'}
                     </Button>
                   </div>
                 </Card>
@@ -557,12 +557,12 @@ export default function CostEstimatePage() {
                       exit="exit"
                     >
                       <Card
-                        title="Classification Results"
-                        subtitle={`${classificationResults.length} elements classified`}
+                        title="Результаты классификации"
+                        subtitle={`Классифицировано элементов: ${classificationResults.length}`}
                         hover
                         actions={
                           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
-                            Add All to Estimate
+                            Добавить всё в смету
                           </Button>
                         }
                       >
@@ -571,12 +571,12 @@ export default function CostEstimatePage() {
                             columns={classifyColumns as any}
                             data={classificationResults as any}
                             keyField="elementName"
-                            emptyMessage="No classification results yet"
+                            emptyMessage="Пока нет результатов классификации"
                           />
                         </motion.div>
                         <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                           <p className="text-sm text-muted-foreground">
-                            Total estimated cost from classification:
+                            Общая стоимость по классификации:
                           </p>
                           <motion.p
                             key={classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0)}
@@ -603,16 +603,16 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 <Card
-                  title="Cost Calculation"
-                  subtitle={`${costItems.length} line items`}
+                  title="Расчёт сметы"
+                  subtitle={`Позиции в расчёте: ${costItems.length}`}
                   hover
                   actions={
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" icon={<FileSpreadsheet size={14} />} onClick={exportToExcel}>
-                        Export Excel
+                        Экспорт Excel
                       </Button>
                       <Button variant="outline" size="sm" icon={<FileText size={14} />} onClick={exportToPdf}>
-                        Export PDF
+                        Экспорт PDF
                       </Button>
                     </div>
                   }
@@ -621,9 +621,9 @@ export default function CostEstimatePage() {
                     <motion.div variants={scaleIn} initial="hidden" animate="visible">
                       <div className="text-center py-16">
                         <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">No items added yet</p>
+                        <p className="text-muted-foreground">Позиции пока не добавлены</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
-                          Search for work items or classify BIM elements to add items
+                          Найдите позиции или классифицируйте BIM-элементы, чтобы добавить их
                         </p>
                       </div>
                     </motion.div>
@@ -634,12 +634,12 @@ export default function CostEstimatePage() {
                         <table className="w-full">
                           <thead>
                             <tr className="border-b border-border">
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Code</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Description</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit Price</th>
-                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Quantity</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Total</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Код</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Описание</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Ед.</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Цена за ед.</th>
+                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Кол-во</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Итого</th>
                               <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-16"></th>
                             </tr>
                           </thead>
@@ -710,7 +710,7 @@ export default function CostEstimatePage() {
                             <p className="text-sm text-muted-foreground">{costItems.length} line items</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Grand Total</p>
+                            <p className="text-sm text-muted-foreground">Общий итог</p>
                             <motion.p
                               key={grandTotal}
                               initial={{ opacity: 0, scale: 0.85, y: 4 }}
@@ -734,12 +734,12 @@ export default function CostEstimatePage() {
           if (activeTab === 'history') {
             return (
               <Card
-                title="Recent Estimates"
-                subtitle={`${recentEstimates.length} estimates in the last 7 days`}
+                title="Последние сметы"
+                subtitle={`Смет за последние 7 дней: ${recentEstimates.length}`}
                 hover
                 actions={
                   <Button variant="outline" size="sm" icon={<Download size={14} />}>
-                    Export All
+                    Экспорт всего
                   </Button>
                 }
               >
@@ -748,7 +748,7 @@ export default function CostEstimatePage() {
                     columns={historyColumns as any}
                     data={recentEstimates as any}
                     keyField="id"
-                    emptyMessage="No recent estimates"
+                    emptyMessage="История смет пока пуста"
                   />
                 </motion.div>
               </Card>

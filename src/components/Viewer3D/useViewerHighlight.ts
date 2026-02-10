@@ -76,6 +76,22 @@ export function useViewerHighlight() {
             }
             break
           }
+          case 'wireframe': {
+            const mat = (obj.material as THREE.MeshPhysicalMaterial).clone()
+            if (isMatch) {
+              mat.wireframe = false
+              mat.transparent = false
+              mat.opacity = 1
+              mat.depthWrite = true
+            } else {
+              mat.wireframe = true
+              mat.transparent = true
+              mat.opacity = 0.14
+              mat.depthWrite = false
+            }
+            obj.material = mat
+            break
+          }
         }
       })
     },

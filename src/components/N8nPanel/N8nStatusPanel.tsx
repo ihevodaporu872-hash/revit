@@ -78,8 +78,8 @@ export default function N8nStatusPanel() {
   const errorCount = executions.filter((e) => e.status === 'error').length
 
   const tabs = [
-    { id: 'workflows', label: 'Workflows', icon: <Workflow size={16} /> },
-    { id: 'executions', label: 'Executions', icon: <Activity size={16} /> },
+    { id: 'workflows', label: 'Воркфлоу', icon: <Workflow size={16} /> },
+    { id: 'executions', label: 'Запуски', icon: <Activity size={16} /> },
   ]
 
   function getWorkflowWebhookPath(workflowId: string): string | null {
@@ -101,9 +101,9 @@ export default function N8nStatusPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">n8n Workflows</h1>
+          <h1 className="text-2xl font-bold text-foreground">Рабочие процессы n8n</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage and monitor n8n workflow automation
+            Управление и мониторинг автоматизаций n8n
           </p>
         </div>
         <Button
@@ -113,7 +113,7 @@ export default function N8nStatusPanel() {
           onClick={refresh}
           loading={loading}
         >
-          Refresh
+          Обновить
         </Button>
       </div>
 
@@ -125,25 +125,25 @@ export default function N8nStatusPanel() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         <StatCard
-          label="n8n Status"
-          value={online ? 'Online' : 'Offline'}
+          label="Статус n8n"
+          value={online ? 'Онлайн' : 'Офлайн'}
           icon={Server}
           color={online ? 'success' : 'danger'}
         />
         <StatCard
-          label="Total Workflows"
+          label="Всего воркфлоу"
           value={workflows.length}
           icon={Workflow}
           color="primary"
         />
         <StatCard
-          label="Active Workflows"
+          label="Активные воркфлоу"
           value={activeCount}
           icon={Zap}
           color="success"
         />
         <StatCard
-          label="Recent Errors"
+          label="Ошибки в последних запусках"
           value={errorCount}
           icon={AlertTriangle}
           color={errorCount > 0 ? 'warning' : 'success'}
@@ -157,10 +157,10 @@ export default function N8nStatusPanel() {
             <div className="flex items-start gap-3">
               <XCircle size={20} className="text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-foreground">n8n is not reachable</p>
+                <p className="text-sm font-medium text-foreground">Нет соединения с n8n</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Make sure n8n is running at <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{n8nUrl || 'http://localhost:5678'}</code>.
-                  Start it with <code className="text-xs bg-muted px-1.5 py-0.5 rounded">n8n start</code> or Docker.
+                  Проверьте, что n8n запущен по адресу <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{n8nUrl || 'http://localhost:5678'}</code>.
+                  Запуск: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">n8n start</code> или Docker.
                 </p>
               </div>
             </div>
@@ -182,7 +182,7 @@ export default function N8nStatusPanel() {
                 >
                   {workflows.length === 0 && !loading && (
                     <p className="text-sm text-muted-foreground py-8 text-center">
-                      No workflows found. {!online && 'n8n is offline.'}
+                      Воркфлоу не найдены. {!online && 'n8n офлайн.'}
                     </p>
                   )}
                   {workflows.map((wf) => {
@@ -199,14 +199,14 @@ export default function N8nStatusPanel() {
                             <p className="text-sm font-medium text-foreground truncate">{wf.name}</p>
                             <p className="text-xs text-muted-foreground">
                               ID: {wf.id}
-                              {wf.updatedAt && ` · Updated: ${new Date(wf.updatedAt).toLocaleDateString()}`}
-                              {webhookPath && ` · Trigger: ${webhookPath}`}
+                              {wf.updatedAt && ` · Обновлено: ${new Date(wf.updatedAt).toLocaleDateString()}`}
+                              {webhookPath && ` · Триггер: ${webhookPath}`}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <Badge variant={wf.active ? 'success' : 'default'}>
-                            {wf.active ? 'Active' : 'Inactive'}
+                            {wf.active ? 'Активен' : 'Неактивен'}
                           </Badge>
                           {webhookPath && online && (
                             <Button
@@ -218,7 +218,7 @@ export default function N8nStatusPanel() {
                               onClick={() => handleTrigger(webhookPath)}
                               disabled={!!triggeringId}
                             >
-                              Trigger
+                              Запустить
                             </Button>
                           )}
                         </div>
@@ -237,7 +237,7 @@ export default function N8nStatusPanel() {
                 >
                   {executions.length === 0 && !loading && (
                     <p className="text-sm text-muted-foreground py-8 text-center">
-                      No recent executions found. {!online && 'n8n is offline.'}
+                      Последние запуски не найдены. {!online && 'n8n офлайн.'}
                     </p>
                   )}
                   {executions.map((ex) => (
@@ -256,10 +256,10 @@ export default function N8nStatusPanel() {
                         )}
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">
-                            {ex.workflowName || `Workflow ${ex.workflowId}`}
+                            {ex.workflowName || `Воркфлоу ${ex.workflowId}`}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {ex.startedAt ? new Date(ex.startedAt).toLocaleString() : 'Unknown'}
+                            {ex.startedAt ? new Date(ex.startedAt).toLocaleString() : 'Неизвестно'}
                             {ex.mode && ` · ${ex.mode}`}
                           </p>
                         </div>
@@ -283,30 +283,30 @@ export default function N8nStatusPanel() {
       </Card>
 
       {/* Known Issues / Info */}
-      <Card title="Integration Notes" subtitle="Known issues and requirements">
+      <Card title="Интеграционные заметки" subtitle="Известные ограничения и требования">
         <div className="space-y-3 text-sm">
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">Qdrant not deployed</strong> — CWICR semantic search is disabled. Deploy Qdrant via Docker to enable.
+              <strong className="text-foreground">Qdrant не развернут</strong> — семантический поиск CWICR отключён. Разверните Qdrant через Docker.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">Cloudflare tunnel URL is temporary</strong> — Webhook URLs will change when tunnel restarts.
+              <strong className="text-foreground">Cloudflare tunnel временный</strong> — URL вебхуков изменится при перезапуске туннеля.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <XCircle size={14} className="text-destructive shrink-0 mt-0.5" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">CAD workflows (n8n_1-9)</strong> — Require local RvtExporter.exe with Revit installed.
+              <strong className="text-foreground">CAD-воркфлоу (n8n_1-9)</strong> — нужен локальный `RvtExporter.exe` и установленный Revit.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 size={14} className="text-success shrink-0 mt-0.5" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">Photo Cost Estimate Pro v2.0</strong> — Form trigger, should work when n8n is online.
+              <strong className="text-foreground">Photo Cost Estimate Pro v2.0</strong> — form-trigger должен работать при онлайн n8n.
             </span>
           </div>
         </div>

@@ -65,11 +65,11 @@ interface ValidationReport {
 // ---- Mock Data ----
 
 const INITIAL_RULES: ValidationRule[] = [
-  { id: 'naming', label: 'Naming Convention', description: 'Check element names follow ISO 19650 / company standards', checked: true },
-  { id: 'properties', label: 'Property Completeness', description: 'Verify all required IFC properties are populated', checked: true },
-  { id: 'geometry', label: 'Geometry Valid', description: 'Detect invalid geometry, zero-area faces, duplicate vertices', checked: true },
-  { id: 'classification', label: 'Classification', description: 'Validate Uniclass / OmniClass classification codes', checked: false },
-  { id: 'spatial', label: 'Spatial Structure', description: 'Ensure correct IfcSite > IfcBuilding > IfcStorey hierarchy', checked: false },
+  { id: 'naming', label: 'Именование', description: 'Проверка соответствия названий элементов стандарту ISO 19650 и правилам компании', checked: true },
+  { id: 'properties', label: 'Полнота свойств', description: 'Проверка заполнения обязательных IFC-свойств', checked: true },
+  { id: 'geometry', label: 'Геометрия', description: 'Поиск дефектов геометрии, нулевых граней и дублирующихся вершин', checked: true },
+  { id: 'classification', label: 'Классификация', description: 'Проверка кодов Uniclass / OmniClass', checked: false },
+  { id: 'spatial', label: 'Пространственная структура', description: 'Проверка иерархии IfcSite > IfcBuilding > IfcStorey', checked: false },
 ]
 
 function generateMockReport(fileName: string, rules: ValidationRule[]): ValidationReport {
@@ -202,7 +202,12 @@ function scoreBgColor(score: number): string {
 
 function severityBadge(severity: ValidationIssue['severity']) {
   const map: Record<string, 'danger' | 'warning' | 'info'> = { error: 'danger', warning: 'warning', info: 'info' }
-  return <Badge variant={map[severity]}>{severity.toUpperCase()}</Badge>
+  const labelMap: Record<ValidationIssue['severity'], string> = {
+    error: 'Ошибка',
+    warning: 'Предупреждение',
+    info: 'Инфо',
+  }
+  return <Badge variant={map[severity]}>{labelMap[severity]}</Badge>
 }
 
 function statusIcon(status: RuleResult['status']) {
@@ -231,12 +236,12 @@ export default function ValidationPage() {
 
   const runValidation = useCallback(async () => {
     if (files.length === 0) {
-      addNotification('warning', 'Please upload at least one file to validate.')
+      addNotification('warning', 'Загрузите минимум один файл для валидации.')
       return
     }
     const selectedRules = rules.filter((r) => r.checked)
     if (selectedRules.length === 0) {
-      addNotification('warning', 'Please select at least one validation rule.')
+      addNotification('warning', 'Выберите хотя бы одно правило валидации.')
       return
     }
 
@@ -255,7 +260,7 @@ export default function ValidationPage() {
           const data = await res.json()
           setReport(data)
           setModelsValidated((prev) => prev + 1)
-          addNotification('success', `Validation completed. Score: ${data.overallScore}%`)
+          addNotification('success', `Валидация завершена. Оценка: ${data.overallScore}%`)
           // Persist to Supabase
           saveValidationResult({
             fileName: files[0].name,
@@ -275,7 +280,7 @@ export default function ValidationPage() {
       const mockReport = generateMockReport(files[0].name, rules)
       setReport(mockReport)
       setModelsValidated((prev) => prev + 1)
-      addNotification('success', `Validation completed. Score: ${mockReport.overallScore}%`)
+      addNotification('success', `Валидация завершена. Оценка: ${mockReport.overallScore}%`)
       // Persist to Supabase
       saveValidationResult({
         fileName: files[0].name,
@@ -285,7 +290,7 @@ export default function ValidationPage() {
         issues: mockReport.issues,
       }).catch(() => {})
     } catch (err) {
-      addNotification('error', `Validation failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      addNotification('error', `Ошибка валидации: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`)
     } finally {
       setRunning(false)
     }
@@ -330,24 +335,24 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
       a.download = `validation-report-${Date.now()}.html`
       a.click()
       URL.revokeObjectURL(url)
-      addNotification('success', 'HTML report downloaded.')
+      addNotification('success', 'HTML-отчёт загружен.')
     } else {
       // PDF export - would call backend in production
-      addNotification('info', 'PDF export requires backend. Use HTML export for now.')
+      addNotification('info', 'Экспорт PDF требует backend. Пока используйте HTML.')
     }
   }, [report, addNotification])
 
   const issueColumns = [
     {
       key: 'severity',
-      header: 'Severity',
+      header: 'Критичность',
       render: (item: ValidationIssue) => severityBadge(item.severity),
       className: 'w-28',
     },
-    { key: 'element', header: 'Element', className: 'font-mono text-xs' },
-    { key: 'rule', header: 'Rule' },
-    { key: 'description', header: 'Description' },
-    { key: 'suggestion', header: 'Suggestion', className: 'text-muted-foreground' },
+    { key: 'element', header: 'Элемент', className: 'font-mono text-xs' },
+    { key: 'rule', header: 'Правило' },
+    { key: 'description', header: 'Описание' },
+    { key: 'suggestion', header: 'Рекомендация', className: 'text-muted-foreground' },
   ]
 
   return (
@@ -358,19 +363,19 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
               <ShieldCheck size={28} className="text-primary" />
-              BIM Validation
+              Валидация BIM
             </h1>
             <p className="text-muted-foreground mt-1">
-              Validate IFC models against industry standards and custom rules
+              Проверка IFC-моделей на соответствие отраслевым и проектным стандартам
             </p>
           </div>
         {report && (
           <div className="flex gap-2">
             <Button variant="outline" icon={<Download size={16} />} onClick={() => exportReport('html')}>
-              Export HTML
+              Экспорт HTML
             </Button>
             <Button variant="outline" icon={<Download size={16} />} onClick={() => exportReport('pdf')}>
-              Export PDF
+              Экспорт PDF
             </Button>
           </div>
         )}
@@ -384,16 +389,16 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
         animate="visible"
       >
         <motion.div variants={fadeInUp}>
-          <StatCard label="Models Validated" value={modelsValidated} icon={FileCheck2} color="primary" trend={{ value: 12, label: 'this month' }} />
+          <StatCard label="Проверено моделей" value={modelsValidated} icon={FileCheck2} color="primary" trend={{ value: 12, label: 'за месяц' }} />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Average Score" value={`${avgScore}%`} icon={Target} color="success" trend={{ value: 5, label: 'vs last month' }} />
+          <StatCard label="Средняя оценка" value={`${avgScore}%`} icon={Target} color="success" trend={{ value: 5, label: 'к прошлому месяцу' }} />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Issues Found" value={issuesFound} icon={AlertTriangle} color="warning" trend={{ value: -8, label: 'vs last month' }} />
+          <StatCard label="Найдено замечаний" value={issuesFound} icon={AlertTriangle} color="warning" trend={{ value: -8, label: 'к прошлому месяцу' }} />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Pass Rate" value={`${passRate}%`} icon={TrendingUp} color="success" trend={{ value: 3, label: 'improvement' }} />
+          <StatCard label="Процент прохождения" value={`${passRate}%`} icon={TrendingUp} color="success" trend={{ value: 3, label: 'улучшение' }} />
         </motion.div>
       </motion.div>
 
@@ -401,20 +406,20 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* File Upload */}
         <div className="lg:col-span-2">
-          <Card title="Upload Model" subtitle="IFC or Excel files for validation">
+          <Card title="Загрузка модели" subtitle="IFC или Excel-файлы для проверки">
             <FileUpload
               accept=".ifc,.xlsx,.xls"
               multiple
               onFilesSelected={setFiles}
-              label="Drop IFC or Excel files here"
-              description="Supports .ifc, .xlsx, .xls up to 500 MB"
+              label="Перетащите IFC или Excel-файлы сюда"
+              description="Поддержка .ifc, .xlsx, .xls до 500 МБ"
             />
           </Card>
         </div>
 
         {/* Validation Rules */}
-        <Card title="Validation Rules" subtitle="Select rules to check" actions={
-          <span className="text-xs text-muted-foreground">{rules.filter((r) => r.checked).length}/{rules.length} selected</span>
+        <Card title="Правила валидации" subtitle="Выберите правила для проверки" actions={
+          <span className="text-xs text-muted-foreground">Выбрано: {rules.filter((r) => r.checked).length}/{rules.length}</span>
         }>
           <motion.div className="space-y-3" variants={staggerContainer} initial="hidden" animate="visible">
             {rules.map((rule) => (
@@ -444,7 +449,7 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
             onClick={runValidation}
             disabled={files.length === 0}
           >
-            {running ? 'Validating...' : 'Run Validation'}
+            {running ? 'Идёт проверка...' : 'Запустить проверку'}
           </Button>
         </Card>
       </div>
@@ -486,29 +491,29 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
               {/* Score Summary */}
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-foreground">Overall Validation Score</h3>
+                <h3 className="text-lg font-semibold text-foreground">Итоговая оценка валидации</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  File: <span className="font-medium text-foreground">{report.fileName}</span> |
-                  Validated: {new Date(report.timestamp).toLocaleString()} |
-                  Rules checked: {report.ruleResults.length}
+                  Файл: <span className="font-medium text-foreground">{report.fileName}</span> |
+                  Проверено: {new Date(report.timestamp).toLocaleString()} |
+                  Правил: {report.ruleResults.length}
                 </p>
                 <div className="flex gap-4 mt-3">
                   <div className="flex items-center gap-1.5 text-sm">
                     <CheckCircle2 size={14} className="text-success" />
                     <span className="text-muted-foreground">
-                      {report.ruleResults.filter((r) => r.status === 'pass').length} Passed
+                      Прошло: {report.ruleResults.filter((r) => r.status === 'pass').length}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm">
                     <AlertTriangle size={14} className="text-warning" />
                     <span className="text-muted-foreground">
-                      {report.ruleResults.filter((r) => r.status === 'warning').length} Warnings
+                      Предупреждения: {report.ruleResults.filter((r) => r.status === 'warning').length}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm">
                     <XCircle size={14} className="text-destructive" />
                     <span className="text-muted-foreground">
-                      {report.ruleResults.filter((r) => r.status === 'fail').length} Failed
+                      Ошибки: {report.ruleResults.filter((r) => r.status === 'fail').length}
                     </span>
                   </div>
                 </div>
@@ -580,19 +585,19 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                       >
                         <div className="mt-4 pt-4 border-t border-border space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total Elements</span>
+                            <span className="text-muted-foreground">Всего элементов</span>
                             <span className="font-medium text-foreground">{result.total}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Passed</span>
+                            <span className="text-muted-foreground">Пройдено</span>
                             <span className="font-medium text-success">{result.passed}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Failed</span>
+                            <span className="text-muted-foreground">Ошибок</span>
                             <span className="font-medium text-destructive">{result.total - result.passed}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Related Issues</span>
+                            <span className="text-muted-foreground">Связанные замечания</span>
                             <span className="font-medium text-foreground">
                               {report.issues.filter((i) => i.rule === result.ruleName).length}
                             </span>
@@ -608,13 +613,13 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
 
           {/* Issues Table */}
           <Card
-            title="Issues"
-            subtitle={`${report.issues.length} issues found`}
+            title="Замечания"
+            subtitle={`Найдено: ${report.issues.length}`}
             actions={
               <div className="flex items-center gap-2">
-                <Badge variant="danger">{report.issues.filter((i) => i.severity === 'error').length} Errors</Badge>
-                <Badge variant="warning">{report.issues.filter((i) => i.severity === 'warning').length} Warnings</Badge>
-                <Badge variant="info">{report.issues.filter((i) => i.severity === 'info').length} Info</Badge>
+                <Badge variant="danger">Ошибки: {report.issues.filter((i) => i.severity === 'error').length}</Badge>
+                <Badge variant="warning">Предупреждения: {report.issues.filter((i) => i.severity === 'warning').length}</Badge>
+                <Badge variant="info">Инфо: {report.issues.filter((i) => i.severity === 'info').length}</Badge>
               </div>
             }
           >
@@ -627,8 +632,8 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
             ) : (
               <div className="flex flex-col items-center py-12 text-muted-foreground">
                 <CheckCircle2 size={48} className="text-success mb-3" />
-                <p className="font-medium text-foreground">No issues found</p>
-                <p className="text-sm">All validation rules passed successfully.</p>
+                <p className="font-medium text-foreground">Замечаний не найдено</p>
+                <p className="text-sm">Все выбранные правила пройдены успешно.</p>
               </div>
             )}
           </Card>
@@ -637,19 +642,19 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
           <div className="flex items-center gap-6 text-xs text-muted-foreground px-1">
             <div className="flex items-center gap-1.5">
               <Info size={12} />
-              <span>Score colors: </span>
+              <span>Шкала оценки:</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-success" />
-              <span>90-100% Pass</span>
+              <span>90-100% Норма</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-warning" />
-              <span>70-89% Warning</span>
+              <span>70-89% Предупреждение</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-destructive" />
-              <span>0-69% Fail</span>
+              <span>0-69% Критично</span>
             </div>
           </div>
         </motion.div>
@@ -669,9 +674,9 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
           <Card>
             <div className="flex flex-col items-center py-16 text-muted-foreground">
               <ListChecks size={48} className="mb-4 text-primary/30" />
-              <h3 className="text-lg font-semibold text-foreground">No Validation Results Yet</h3>
+              <h3 className="text-lg font-semibold text-foreground">Результатов валидации пока нет</h3>
               <p className="text-sm mt-1 max-w-md text-center">
-                Upload an IFC or Excel file, select your validation rules, and click "Run Validation" to check your BIM model against industry standards.
+                Загрузите IFC или Excel-файл, выберите правила и запустите проверку модели BIM.
               </p>
             </div>
           </Card>
@@ -696,9 +701,9 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                 <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <BarChart3 size={28} className="absolute inset-0 m-auto text-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Validating Model...</h3>
+              <h3 className="text-lg font-semibold text-foreground">Проверка модели...</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Checking {rules.filter((r) => r.checked).length} rules against {files.length} file(s)
+                Проверяю правил: {rules.filter((r) => r.checked).length}, файлов: {files.length}
               </p>
             </div>
           </Card>

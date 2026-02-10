@@ -27,7 +27,7 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
 
   return (
     <div className={className}>
-      <div role="tablist" className="flex items-center gap-1 border-b border-border relative">
+      <div role="tablist" className="relative mb-1 flex items-center gap-1 border-b border-border/70">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -36,10 +36,10 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
             aria-selected={activeTab === tab.id}
             onClick={() => handleChange(tab.id)}
             className={cn(
-              'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px',
+              'relative -mb-px flex items-center gap-2 rounded-t-lg px-3.5 py-2 text-[14px] font-semibold transition-colors',
               activeTab === tab.id
-                ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground',
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
             )}
           >
             {tab.icon}
@@ -47,7 +47,7 @@ export function Tabs({ tabs, defaultTab, onChange, children, className }: TabsPr
             {activeTab === tab.id && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary"
                 transition={layoutIndicator}
               />
             )}

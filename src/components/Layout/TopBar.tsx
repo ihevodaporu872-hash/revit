@@ -6,71 +6,66 @@ import { ThemeToggle } from '../ThemeToggle'
 import { fastTransition } from '../../lib/animations'
 
 const pageTitles: Record<string, { title: string; parent?: string }> = {
-  '/converter': { title: 'CAD/BIM Converter', parent: 'Modules' },
-  '/cad-viewer': { title: 'CAD Drawing Viewer', parent: 'Modules' },
-  '/viewer': { title: '3D Model Viewer', parent: 'Modules' },
-  '/cost': { title: 'CWICR Cost Estimation', parent: 'Modules' },
-  '/validation': { title: 'BIM Validation', parent: 'Modules' },
-  '/ai-analysis': { title: 'AI Data Analysis', parent: 'Modules' },
-  '/project': { title: 'Project Management', parent: 'Modules' },
-  '/documents': { title: 'Document Control', parent: 'Modules' },
-  '/qto': { title: 'QTO Reports', parent: 'Modules' },
-  '/n8n': { title: 'n8n Workflows', parent: 'Modules' },
+  '/converter': { title: 'Преобразователь CAD/BIM', parent: 'Модули' },
+  '/cad-viewer': { title: 'Просмотр CAD-чертежей', parent: 'Модули' },
+  '/viewer': { title: '3D-просмотрщик модели', parent: 'Модули' },
+  '/cost': { title: 'Смета стоимости CWICR', parent: 'Модули' },
+  '/validation': { title: 'Валидация BIM', parent: 'Модули' },
+  '/ai-analysis': { title: 'Анализ данных ИИ', parent: 'Модули' },
+  '/project': { title: 'Управление проектом', parent: 'Модули' },
+  '/documents': { title: 'Контроль документов', parent: 'Модули' },
+  '/qto': { title: 'Отчёты QTO', parent: 'Модули' },
+  '/n8n': { title: 'Рабочие процессы n8n', parent: 'Модули' },
 }
 
 export default function TopBar() {
   const location = useLocation()
-  const page = pageTitles[location.pathname] || { title: 'Jens Platform' }
+  const page = pageTitles[location.pathname] || { title: 'Платформа Йенс' }
   const [searchQuery, setSearchQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
 
   return (
-    <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 shrink-0">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5">
-        {page.parent && (
-          <>
-            <span className="text-sm text-muted-foreground">{page.parent}</span>
-            <ChevronRight size={14} className="text-muted-foreground/50" />
-          </>
-        )}
-        <h1 className="text-sm font-semibold text-foreground">{page.title}</h1>
-      </div>
+    <header className="sticky top-0 z-20 border-b border-border/70 bg-card/70 backdrop-blur-xl">
+      <div className="mx-auto flex h-[60px] w-full max-w-[1560px] items-center justify-between gap-4 px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {page.parent && (
+            <>
+              <span className="text-[13px] text-muted-foreground">{page.parent}</span>
+              <ChevronRight size={15} className="text-muted-foreground/70" />
+            </>
+          )}
+          <h1 className="truncate text-[19px] font-semibold leading-none tracking-tight text-foreground">{page.title}</h1>
+        </div>
 
-      <div className="flex items-center gap-2">
-        {/* Animated Search */}
-        <motion.div
-          className="relative"
-          animate={{ width: searchFocused ? 280 : 200 }}
-          transition={fastTransition}
-        >
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            className="w-full pl-9 pr-4 py-1.5 text-sm border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring"
-          />
-        </motion.div>
+        <div className="flex items-center gap-2.5">
+          <motion.div
+            className="relative"
+            animate={{ width: searchFocused ? 300 : 230 }}
+            transition={fastTransition}
+          >
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Поиск..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              className="h-9 w-full rounded-full border border-border bg-card/70 pl-10 pr-4 text-[12.5px] text-foreground placeholder:text-muted-foreground/80 focus:border-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/25"
+            />
+          </motion.div>
 
-        {/* Notifications with dot */}
-        <button className="relative p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
-        </button>
-
-        <button className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground">
-          <Settings size={18} />
-        </button>
-
-        <ThemeToggle />
-
-        {/* User Avatar */}
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center ml-1">
-          <User size={16} className="text-primary" />
+          <button className="relative rounded-full border border-border bg-card/50 p-2 text-muted-foreground transition-colors hover:text-foreground">
+            <Bell size={16} />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+          </button>
+          <button className="rounded-full border border-border bg-card/50 p-2 text-muted-foreground transition-colors hover:text-foreground">
+            <Settings size={16} />
+          </button>
+          <ThemeToggle />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/45 bg-primary/18">
+            <User size={16} className="text-primary" />
+          </div>
         </div>
       </div>
     </header>

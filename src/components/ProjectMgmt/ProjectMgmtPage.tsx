@@ -74,16 +74,16 @@ interface GanttItem {
 // ---- Constants ----
 
 const STATUS_COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'todo', label: 'To Do', color: 'bg-muted-foreground' },
-  { id: 'in_progress', label: 'In Progress', color: 'bg-primary' },
-  { id: 'review', label: 'Review', color: 'bg-warning' },
-  { id: 'done', label: 'Done', color: 'bg-success' },
+  { id: 'todo', label: 'К выполнению', color: 'bg-muted-foreground' },
+  { id: 'in_progress', label: 'В работе', color: 'bg-primary' },
+  { id: 'review', label: 'Проверка', color: 'bg-warning' },
+  { id: 'done', label: 'Готово', color: 'bg-success' },
 ]
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; variant: 'danger' | 'warning' | 'info' }> = {
-  high: { label: 'High', variant: 'danger' },
-  medium: { label: 'Medium', variant: 'warning' },
-  low: { label: 'Low', variant: 'info' },
+  high: { label: 'Высокий', variant: 'danger' },
+  medium: { label: 'Средний', variant: 'warning' },
+  low: { label: 'Низкий', variant: 'info' },
 }
 
 const TEAM_MEMBERS = ['Alexei Petrov', 'Maria Chen', 'David Kim', 'Sarah Johnson', 'Oleg Novak', 'Lena Vogt']
@@ -249,7 +249,7 @@ export default function ProjectMgmtPage() {
 
   const addTask = useCallback(() => {
     if (!newTitle.trim()) {
-      addNotification('warning', 'Please enter a task title.')
+      addNotification('warning', 'Введите название задачи.')
       return
     }
     const task: Task = {
@@ -282,7 +282,7 @@ export default function ProjectMgmtPage() {
     setNewPriority('medium')
     setNewDueDate('')
     setNewTags([])
-    addNotification('success', `Task "${task.title}" created.`)
+    addNotification('success', `Задача "${task.title}" создана.`)
   }, [newTitle, newDescription, newAssignee, newPriority, newDueDate, newTags, addNotification])
 
   const addComment = useCallback(() => {
@@ -327,10 +327,10 @@ export default function ProjectMgmtPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
               <LayoutDashboard size={28} className="text-primary" />
-              Project Management
+              Управление проектом
             </h1>
             <p className="text-muted-foreground mt-1">
-              Track tasks, coordinate team, and manage project timeline
+              Контролируйте задачи, команду и сроки проекта
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -338,7 +338,7 @@ export default function ProjectMgmtPage() {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border">
               <BotMessageSquare size={16} className={telegramConnected ? 'text-success' : 'text-muted-foreground'} />
               <span className="text-xs font-medium text-muted-foreground">
-                Telegram Bot: {telegramConnected ? 'Connected' : 'Disconnected'}
+                Telegram Bot: {telegramConnected ? 'Подключен' : 'Отключен'}
               </span>
               <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-success' : 'bg-muted-foreground'}`} />
             </div>
@@ -347,10 +347,10 @@ export default function ProjectMgmtPage() {
               icon={<Filter size={16} />}
               onClick={() => setShowFilters(!showFilters)}
             >
-              Filters
+              Фильтры
             </Button>
             <Button icon={<Plus size={16} />} onClick={() => setShowAddDialog(true)}>
-              Add Task
+              Добавить задачу
             </Button>
           </div>
         </div>
@@ -363,16 +363,16 @@ export default function ProjectMgmtPage() {
           animate="visible"
         >
           <motion.div variants={fadeInUp}>
-            <StatCard label="Total Tasks" value={totalTasks} icon={ListTodo} color="primary" />
+            <StatCard label="Всего задач" value={totalTasks} icon={ListTodo} color="primary" />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Completed" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'completion rate' }} />
+            <StatCard label="Выполнено" value={completedTasks} icon={CheckCircle2} color="success" trend={{ value: Math.round((completedTasks / totalTasks) * 100), label: 'доля выполнения' }} />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Overdue" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
+            <StatCard label="Просрочено" value={overdueTasks} icon={AlertCircle} color={overdueTasks > 0 ? 'danger' : 'success'} />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Team Members" value={teamMembers} icon={Users} color="primary" />
+            <StatCard label="Участники команды" value={teamMembers} icon={Users} color="primary" />
           </motion.div>
         </motion.div>
 
@@ -381,29 +381,29 @@ export default function ProjectMgmtPage() {
           <Card>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-muted-foreground">Assignee:</label>
+                <label className="text-sm font-medium text-muted-foreground">Исполнитель:</label>
                 <select
                   value={filterAssignee}
                   onChange={(e) => setFilterAssignee(e.target.value)}
                   className="px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
-                  <option value="">All</option>
+                  <option value="">Все</option>
                   {TEAM_MEMBERS.map((m) => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-muted-foreground">Priority:</label>
+                <label className="text-sm font-medium text-muted-foreground">Приоритет:</label>
                 <select
                   value={filterPriority}
                   onChange={(e) => setFilterPriority(e.target.value as TaskPriority | '')}
                   className="px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
-                  <option value="">All</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
+                  <option value="">Все</option>
+                  <option value="high">Высокий</option>
+                  <option value="medium">Средний</option>
+                  <option value="low">Низкий</option>
                 </select>
               </div>
               {(filterAssignee || filterPriority) && (
@@ -412,7 +412,7 @@ export default function ProjectMgmtPage() {
                   size="sm"
                   onClick={() => { setFilterAssignee(''); setFilterPriority('') }}
                 >
-                  Clear Filters
+                  Сбросить фильтры
                 </Button>
               )}
             </div>
@@ -514,7 +514,7 @@ export default function ProjectMgmtPage() {
 
                   {columnTasks.length === 0 && (
                     <div className="flex items-center justify-center h-32 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm">
-                      No tasks
+                      Задач нет
                     </div>
                   )}
                 </motion.div>
@@ -524,7 +524,7 @@ export default function ProjectMgmtPage() {
         </div>
 
         {/* Timeline / Gantt */}
-        <Card title="Project Timeline" subtitle="Simplified Gantt view of active tasks">
+        <Card title="Таймлайн проекта" subtitle="Упрощённый Gantt по активным задачам">
           <div className="space-y-2">
             {/* Time axis */}
             <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-3">
@@ -567,7 +567,7 @@ export default function ProjectMgmtPage() {
                   {/* Today marker */}
                   <div className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10" style={{ left: '27%' }}>
                     <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-destructive font-bold whitespace-nowrap">
-                      Today
+                      Сегодня
                     </div>
                   </div>
                 </div>
@@ -596,7 +596,7 @@ export default function ProjectMgmtPage() {
                 exit="exit"
               >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                  <h3 className="text-lg font-semibold text-foreground">New Task</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Новая задача</h3>
                   <button onClick={() => setShowAddDialog(false)} className="p-1 hover:bg-muted rounded-lg transition-colors">
                     <X size={18} className="text-muted-foreground" />
                   </button>
@@ -605,23 +605,23 @@ export default function ProjectMgmtPage() {
                 <div className="p-6 space-y-4">
                   {/* Title */}
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Title *</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Название *</label>
                     <input
                       type="text"
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder="Enter task title..."
+                      placeholder="Введите название задачи..."
                       className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
 
                   {/* Description */}
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Описание</label>
                     <textarea
                       value={newDescription}
                       onChange={(e) => setNewDescription(e.target.value)}
-                      placeholder="Describe the task..."
+                      placeholder="Опишите задачу..."
                       rows={3}
                       className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
                     />
@@ -630,7 +630,7 @@ export default function ProjectMgmtPage() {
                   {/* Assignee + Priority */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Assignee</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Исполнитель</label>
                       <select
                         value={newAssignee}
                         onChange={(e) => setNewAssignee(e.target.value)}
@@ -640,22 +640,22 @@ export default function ProjectMgmtPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1.5">Priority</label>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Приоритет</label>
                       <select
                         value={newPriority}
                         onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
                         className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
+                        <option value="high">Высокий</option>
+                        <option value="medium">Средний</option>
+                        <option value="low">Низкий</option>
                       </select>
                     </div>
                   </div>
 
                   {/* Due Date */}
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Due Date</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Срок</label>
                     <input
                       type="date"
                       value={newDueDate}
@@ -666,7 +666,7 @@ export default function ProjectMgmtPage() {
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Tags</label>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Теги</label>
                     <div className="flex flex-wrap gap-2">
                       {Object.keys(TAG_COLORS).map((tag) => (
                         <motion.button
@@ -689,8 +689,8 @@ export default function ProjectMgmtPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
-                  <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-                  <Button onClick={addTask} icon={<Plus size={16} />}>Create Task</Button>
+                  <Button variant="outline" onClick={() => setShowAddDialog(false)}>Отмена</Button>
+                  <Button onClick={addTask} icon={<Plus size={16} />}>Создать задачу</Button>
                 </div>
               </motion.div>
             </motion.div>
@@ -741,28 +741,28 @@ export default function ProjectMgmtPage() {
                   {/* Details */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-muted rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">Assignee</p>
+                      <p className="text-xs text-muted-foreground">Исполнитель</p>
                       <div className="flex items-center gap-2 mt-1">
                         <User size={14} className="text-primary" />
                         <span className="text-sm font-medium text-foreground">{selectedTask.assignee}</span>
                       </div>
                     </div>
                     <div className="p-3 bg-muted rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">Due Date</p>
+                      <p className="text-xs text-muted-foreground">Срок</p>
                       <div className={`flex items-center gap-2 mt-1 ${isOverdue(selectedTask) ? 'text-destructive' : ''}`}>
                         <Calendar size={14} className={isOverdue(selectedTask) ? 'text-destructive' : 'text-primary'} />
                         <span className="text-sm font-medium">{new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                     </div>
                     <div className="p-3 bg-muted rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">Created</p>
+                      <p className="text-xs text-muted-foreground">Создано</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Clock size={14} className="text-primary" />
                         <span className="text-sm font-medium text-foreground">{new Date(selectedTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                       </div>
                     </div>
                     <div className="p-3 bg-muted rounded-lg border border-border">
-                      <p className="text-xs text-muted-foreground">Comments</p>
+                      <p className="text-xs text-muted-foreground">Комментарии</p>
                       <div className="flex items-center gap-2 mt-1">
                         <MessageSquare size={14} className="text-primary" />
                         <span className="text-sm font-medium text-foreground">{selectedTask.comments.length}</span>
@@ -773,7 +773,7 @@ export default function ProjectMgmtPage() {
                   {/* Tags */}
                   {selectedTask.tags.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Теги</p>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedTask.tags.map((tag) => (
                           <span key={tag} className={`text-xs px-2 py-1 rounded-md font-medium ${TAG_COLORS[tag] || 'bg-muted text-muted-foreground'}`}>
@@ -786,7 +786,7 @@ export default function ProjectMgmtPage() {
 
                   {/* Move Task */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Move To</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Переместить в</p>
                     <div className="flex gap-2">
                       {STATUS_COLUMNS.filter((c) => c.id !== selectedTask.status).map((col) => (
                         <Button
@@ -805,7 +805,7 @@ export default function ProjectMgmtPage() {
                   {/* Comments */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                      Comments ({selectedTask.comments.length})
+                      Комментарии ({selectedTask.comments.length})
                     </p>
 
                     {selectedTask.comments.length > 0 ? (
@@ -832,7 +832,7 @@ export default function ProjectMgmtPage() {
                         ))}
                       </motion.div>
                     ) : (
-                      <p className="text-sm text-muted-foreground italic">No comments yet.</p>
+                      <p className="text-sm text-muted-foreground italic">Комментариев пока нет.</p>
                     )}
 
                     {/* Add comment */}
@@ -842,7 +842,7 @@ export default function ProjectMgmtPage() {
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') addComment() }}
-                        placeholder="Add a comment..."
+                        placeholder="Добавить комментарий..."
                         className="flex-1 px-3 py-2 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                       <Button
@@ -851,7 +851,7 @@ export default function ProjectMgmtPage() {
                         onClick={addComment}
                         disabled={!commentText.trim()}
                       >
-                        Send
+                        Отправить
                       </Button>
                     </div>
                   </div>

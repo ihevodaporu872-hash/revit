@@ -21,11 +21,14 @@ interface Props {
 }
 
 export function MatchingReport({ result, onClose, onHighlightMatchStatus, onExportReport }: Props) {
-  const [showMissing, setShowMissing] = useState<'none' | 'ifc' | 'excel'>('none')
+  const [showMissing, setShowMissing] = useState<'none' | 'ifc' | 'excel' | 'ambiguous'>('none')
   const [showCategories, setShowCategories] = useState(true)
 
   const matchPercent = result.totalIfcElements > 0
     ? ((result.totalMatched / result.totalIfcElements) * 100).toFixed(1)
+    : '0'
+  const ambiguousPercent = result.totalIfcElements > 0
+    ? ((result.ambiguous.length / result.totalIfcElements) * 100).toFixed(1)
     : '0'
 
   // Sort categories by IFC count descending
@@ -42,6 +45,7 @@ export function MatchingReport({ result, onClose, onHighlightMatchStatus, onExpo
       onClick={onClose}
     >
       <div
+        data-testid="match-report-dialog"
         className="bg-card border border-border rounded-2xl shadow-2xl w-[560px] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -75,17 +79,29 @@ export function MatchingReport({ result, onClose, onHighlightMatchStatus, onExpo
             <div className="pl-6 space-y-1 text-xs text-muted-foreground">
               <p>By ElementId (Tag): <span className="font-medium text-foreground">{result.matchedByElementId.toLocaleString()}</span></p>
               <p>By GlobalId: <span className="font-medium text-foreground">{result.matchedByGlobalId.toLocaleString()}</span></p>
+              <p>By Type IfcGUID: <span className="font-medium text-foreground">{result.matchedByTypeIfcGuid.toLocaleString()}</span></p>
+              <p>Mixed: <span className="font-medium text-foreground">{result.matchedMixed.toLocaleString()}</span></p>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all"
                 style={{ width: `${matchPercent}%` }}
               />
+              <div
+                className="h-full bg-amber-500 transition-all"
+                style={{ width: `${ambiguousPercent}%` }}
+              />
             </div>
 
             <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle size={12} className="text-amber-500" />
+                <span className="text-muted-foreground">
+                  Ambiguous: <span className="font-medium text-foreground">{result.ambiguous.length.toLocaleString()}</span>
+                </span>
+              </div>
               <div className="flex items-center gap-1.5">
                 <XCircle size={12} className="text-red-500" />
                 <span className="text-muted-foreground">
@@ -155,6 +171,32 @@ export function MatchingReport({ result, onClose, onHighlightMatchStatus, onExpo
           </div>
 
           {/* Missing elements lists */}
+          {result.ambiguous.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowMissing(showMissing === 'ambiguous' ? 'none' : 'ambiguous')}
+                className="flex items-center gap-2 text-xs font-medium text-amber-500 mb-1"
+              >
+                {showMissing === 'ambiguous' ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                Ambiguous matches ({result.ambiguous.length})
+              </button>
+              {showMissing === 'ambiguous' && (
+                <div className="max-h-32 overflow-y-auto bg-muted/20 rounded-lg p-2 space-y-0.5">
+                  {result.ambiguous.slice(0, 50).map((item, i) => (
+                    <div key={`${item.expressID}-${i}`} className="text-[11px] text-muted-foreground px-2 py-0.5">
+                      <span className="font-mono text-foreground">#{item.expressID}</span>
+                      {item.globalId ? ` — ${item.globalId}` : ''}
+                      {item.candidates[0] ? ` (top=${(item.candidates[0].score * 100).toFixed(1)}%)` : ''}
+                    </div>
+                  ))}
+                  {result.ambiguous.length > 50 && (
+                    <p className="text-[10px] text-muted-foreground px-2">...and {result.ambiguous.length - 50} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {result.missingInExcel.length > 0 && (
             <div>
               <button
@@ -200,6 +242,28 @@ export function MatchingReport({ result, onClose, onHighlightMatchStatus, onExpo
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {result.diagnostics.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Top unmatched reasons</p>
+              <div className="rounded-lg border border-border p-2 text-[11px] text-muted-foreground space-y-0.5">
+                {Object.entries(
+                  result.diagnostics.reduce<Record<string, number>>((acc, d) => {
+                    acc[d.reason] = (acc[d.reason] || 0) + 1
+                    return acc
+                  }, {}),
+                )
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 6)
+                  .map(([reason, count]) => (
+                    <div key={reason} className="flex justify-between">
+                      <span>{reason}</span>
+                      <span className="font-medium text-foreground">{count}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
         </div>

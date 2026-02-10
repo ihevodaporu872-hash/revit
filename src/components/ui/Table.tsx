@@ -30,12 +30,12 @@ export function Table<T extends Record<string, unknown>>({ columns, data, keyFie
   }
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
+    <div className={cn('overflow-x-auto rounded-xl border border-border/65 bg-card/55', className)}>
       <table className="w-full">
-        <thead className="sticky top-0 z-10 bg-card">
-          <tr className="border-b border-border">
+        <thead className="sticky top-0 z-10 bg-card/88 backdrop-blur-md">
+          <tr className="border-b border-border/70">
             {columns.map((col) => (
-              <th key={col.key} className={cn('text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3', col.className)}>
+              <th key={col.key} className={cn('px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground', col.className)}>
                 {col.header}
               </th>
             ))}
@@ -48,14 +48,14 @@ export function Table<T extends Record<string, unknown>>({ columns, data, keyFie
               variants={tableRow}
               className={cn(
                 'border-b border-border/50 transition-colors',
-                i % 2 === 1 && 'bg-muted/30',
-                'hover:bg-muted/60',
+                i % 2 === 1 && 'bg-muted/24',
+                'hover:bg-muted/40',
                 onRowClick && 'cursor-pointer',
               )}
               onClick={() => onRowClick?.(item)}
             >
               {columns.map((col) => (
-                <td key={col.key} className={cn('px-4 py-3 text-sm text-foreground', col.className)}>
+                <td key={col.key} className={cn('px-4 py-2.5 text-sm text-foreground', col.className)}>
                   {col.render ? col.render(item) : String(item[col.key] ?? '')}
                 </td>
               ))}

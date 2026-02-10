@@ -1,5 +1,15 @@
 import { useState, useRef, useCallback } from 'react'
-import { Upload, X, File, CheckCircle2 } from 'lucide-react'
+import {
+  CloudUpload,
+  X,
+  File,
+  CheckCircle2,
+  Building2,
+  Cuboid,
+  PencilRuler,
+  Layers3,
+  type LucideIcon,
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn, formatFileSize } from '../../lib/utils'
 import { fadeInUp, listItem, staggerContainer, interactiveScaleSubtle } from '../../lib/animations'
@@ -12,6 +22,7 @@ interface FileUploadProps {
   label?: string
   description?: string
   className?: string
+  dropzoneClassName?: string
 }
 
 const FILE_ICONS: Record<string, string> = {
@@ -30,10 +41,35 @@ function getFileColor(name: string): string {
   return FILE_ICONS[ext] || 'text-primary'
 }
 
-export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFilesSelected, label, description, className }: FileUploadProps) {
+const SUPPORTED_TYPE_META: Record<string, { icon: LucideIcon; className: string; label: string }> = {
+  rvt: { icon: Building2, className: 'text-sky-300 border-sky-400/35 bg-sky-500/15', label: '.rvt' },
+  ifc: { icon: Cuboid, className: 'text-emerald-300 border-emerald-400/35 bg-emerald-500/15', label: 'ifc' },
+  dwg: { icon: PencilRuler, className: 'text-amber-300 border-amber-400/35 bg-amber-500/15', label: '.dwg' },
+  dgn: { icon: Layers3, className: 'text-violet-300 border-violet-400/35 bg-violet-500/15', label: '.dgn' },
+}
+
+function parseAcceptedExtensions(accept?: string): string[] {
+  if (!accept) return []
+  return accept
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.startsWith('.'))
+    .map((item) => item.slice(1).toLowerCase())
+}
+
+function getTypeMeta(ext: string): { icon: LucideIcon; className: string; label: string } {
+  return SUPPORTED_TYPE_META[ext] ?? {
+    icon: File,
+    className: 'text-primary border-primary/35 bg-primary/15',
+    label: `.${ext}`,
+  }
+}
+
+export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFilesSelected, label, description, className, dropzoneClassName }: FileUploadProps) {
   const [dragOver, setDragOver] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const acceptedExtensions = parseAcceptedExtensions(accept)
 
   const handleFiles = useCallback((newFiles: FileList | null) => {
     if (!newFiles) return
@@ -57,8 +93,12 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
         whileTap="tap"
         animate={dragOver ? { borderColor: 'var(--primary)' } : {}}
         className={cn(
-          'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors relative overflow-hidden',
-          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50',
+          'file-upload-dropzone',
+          'relative overflow-hidden rounded-2xl border-2 border-dashed p-6 text-center transition-colors',
+          dragOver
+            ? 'border-primary bg-primary/8'
+            : 'border-border/70 bg-card/45 hover:border-primary/50 hover:bg-muted/45',
+          dropzoneClassName,
         )}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
@@ -73,9 +113,44 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
             exit={{ opacity: 0 }}
           />
         )}
-        <Upload size={32} className={cn('mx-auto mb-3 transition-colors', dragOver ? 'text-primary' : 'text-muted-foreground')} />
-        <p className="font-medium text-foreground">{label || 'Drop files here or click to browse'}</p>
-        <p className="text-sm text-muted-foreground mt-1">{description || `Supports ${accept || 'all files'} up to ${formatFileSize(maxSize)}`}</p>
+
+        <div className="file-upload-main-icon mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-border/70 bg-card/70">
+          <CloudUpload size={42} className={cn('transition-colors', dragOver ? 'text-primary' : 'text-muted-foreground')} />
+        </div>
+        {acceptedExtensions.length > 0 && (
+          <div className="file-upload-supported-list mb-5 flex flex-wrap items-center justify-center gap-2">
+            {acceptedExtensions.map((ext) => {
+              const meta = getTypeMeta(ext)
+              const TypeIcon = meta.icon
+              return (
+                <span
+                  key={ext}
+                  className={cn(
+                    'file-upload-supported-item inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold tracking-wide',
+                    meta.className,
+                  )}
+                >
+                  <TypeIcon size={12} />
+                  {meta.label}
+                </span>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-[15px] font-semibold leading-tight text-foreground">
+          {label || 'Перетащите файлы сюда или нажмите для загрузки'}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {description || `Поддерживаются ${accept || 'все файлы'} до ${formatFileSize(maxSize)}`}
+        </p>
+        <div className="mt-6">
+          <button
+            type="button"
+            className="primary-glow-btn converter-upload-cta rounded-2xl px-8 py-3 text-[15px] font-bold text-primary-foreground shadow-[var(--shadow-glow)]"
+          >
+            Загрузить файлы
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -94,15 +169,18 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
                 key={file.name + i}
                 variants={listItem}
                 exit="exit"
-                className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border group"
+                className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card/70 p-3"
               >
                 <File size={18} className={cn('shrink-0', getFileColor(file.name))} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                  <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
                   <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                 </div>
                 <CheckCircle2 size={14} className="text-success shrink-0" />
-                <button onClick={(e) => { e.stopPropagation(); removeFile(i) }} className="p-1 hover:bg-card rounded transition-colors opacity-0 group-hover:opacity-100">
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeFile(i) }}
+                  className="rounded p-1 opacity-0 transition-colors group-hover:opacity-100 hover:bg-card"
+                >
                   <X size={14} className="text-muted-foreground" />
                 </button>
               </motion.div>

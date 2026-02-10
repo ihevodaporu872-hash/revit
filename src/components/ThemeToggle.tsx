@@ -13,7 +13,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={cycle}
-      className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+      className="rounded-full border border-border bg-card/50 p-2.5 text-muted-foreground transition-colors hover:text-foreground"
       title={`Theme: ${theme}`}
     >
       {theme === 'dark' && <Moon size={18} />}

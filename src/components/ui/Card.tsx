@@ -22,58 +22,72 @@ export function Card({ children, className, title, subtitle, actions, glass, hov
       whileHover={hover ? "hover" : undefined}
     >
       <ShadcnCard className={cn(
-        glass && 'backdrop-blur-sm bg-card/80',
-        hover && 'transition-shadow hover:shadow-md hover:border-primary/20',
+        'glow-card glass-panel overflow-hidden rounded-2xl border-border/80 shadow-[var(--card-glow)]',
+        glass && 'bg-card/85',
+        hover && 'transition-all hover:border-primary/35 hover:shadow-[var(--shadow-glow)]',
         className,
       )}>
         {(title || actions) && (
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-5 py-4">
-            <div>
-              {title && <CardTitle className="text-base">{title}</CardTitle>}
-              {subtitle && <CardDescription className="mt-0.5">{subtitle}</CardDescription>}
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/50 px-5 py-3.5">
+            <div className="min-w-0">
+              {title && <CardTitle className="truncate text-[15px] font-semibold leading-tight">{title}</CardTitle>}
+              {subtitle && <CardDescription className="mt-1 text-[13px]">{subtitle}</CardDescription>}
             </div>
             {actions && <div className="flex items-center gap-2">{actions}</div>}
           </CardHeader>
         )}
-        <CardContent className="px-5 pb-5">{children}</CardContent>
+        <CardContent className="px-5 pb-5 pt-4">{children}</CardContent>
       </ShadcnCard>
     </motion.div>
   )
 }
 
-export function StatCard({ label, value, icon: Icon, trend, color = 'primary' }: {
+export function StatCard({ label, value, icon: Icon, trend, color = 'primary', className }: {
   label: string
   value: string | number
   icon?: React.ComponentType<{ size?: number; className?: string }>
   trend?: { value: number; label: string }
   color?: 'primary' | 'success' | 'warning' | 'danger'
+  className?: string
 }) {
   const colorMap = {
-    primary: 'bg-primary/10 text-primary',
-    success: 'bg-success/10 text-success',
-    warning: 'bg-warning/10 text-warning',
-    danger: 'bg-destructive/10 text-destructive',
+    primary: 'text-primary',
+    success: 'text-success',
+    warning: 'text-warning',
+    danger: 'text-destructive',
   }
 
   return (
     <motion.div variants={scaleIn} initial="hidden" animate="visible">
-      <ShadcnCard className="p-5 transition-shadow hover:shadow-md hover:border-primary/20">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-            {trend && (
-              <p className={`text-xs mt-1 ${trend.value >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}
-              </p>
+      <ShadcnCard className={cn(
+        "glow-card glass-panel overflow-hidden rounded-2xl border-border/80 p-0 transition-all hover:border-primary/35 hover:shadow-[var(--shadow-glow)]",
+        className,
+      )}>
+        <div className="relative p-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="statcard-label truncate text-[11px] font-medium text-muted-foreground">{label}</p>
+              <p className="statcard-value mt-1.5 text-[28px] font-bold leading-[0.96] tracking-tight text-foreground">{value}</p>
+            </div>
+            {Icon && (
+              <div className={`statcard-icon-shell rounded-lg border border-border/60 bg-card/60 p-2 ${colorMap[color]}`}>
+                <Icon size={16} />
+              </div>
             )}
           </div>
-          {Icon && (
-            <div className={`p-2.5 rounded-lg ${colorMap[color]}`}>
-              <Icon size={20} />
-            </div>
+          <div className="pointer-events-none absolute inset-x-3.5 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
+          {trend && (
+            <p className={`statcard-trend mt-2 text-[11px] font-medium ${trend.value >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}
+            </p>
           )}
         </div>
+        {!trend && (
+          <div className="h-7 border-t border-border/55 bg-gradient-to-r from-primary/10 via-transparent to-primary/5" />
+        )}
+        {trend && (
+          <div className="h-2 border-t border-border/55 bg-gradient-to-r from-primary/20 via-transparent to-primary/10" />
+        )}
       </ShadcnCard>
     </motion.div>
   )

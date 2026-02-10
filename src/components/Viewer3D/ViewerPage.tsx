@@ -41,7 +41,7 @@ import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
 import { MotionPage } from '../MotionPage'
 import { IFCService } from './ifc/ifcService'
-import type { IFCSpatialNode, IFCModelStats, IFCElementInfo, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode } from './ifc/types'
+import type { IFCSpatialNode, IFCModelStats, IFCElementInfo, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode, CoverageSummary } from './ifc/types'
 import { useViewerHighlight } from './useViewerHighlight'
 import { useSearchSets } from './useSearchSets'
 import { SearchSetsPanel } from './SearchSetsPanel'
@@ -66,6 +66,7 @@ import { useElementMatcher } from './useElementMatcher'
 import { MatchingReport } from './MatchingReport'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
+import { uploadRevitXlsx } from '../../services/revit-api'
 import {
   fadeInUp,
   fadeInLeft,
@@ -189,11 +190,18 @@ export default function ViewerPage() {
   const wireframe = useWireframe()
   const revitEnrichment = useRevitEnrichment()
   const elementMatcher = useElementMatcher()
+  const setRevitScope = useCallback((projectId: string, modelVersion?: string) => {
+    const scope = { projectId, modelVersion }
+    setRevitScopeState(scope)
+    revitEnrichment.setScope(scope)
+  }, [revitEnrichment])
 
   // Matching state
   const [showMatchReport, setShowMatchReport] = useState(false)
   const [showMatchHighlight, setShowMatchHighlight] = useState(false)
   const matchOverlayRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map())
+  const [revitScope, setRevitScopeState] = useState<{ projectId: string; modelVersion?: string }>({ projectId: 'default' })
+  const [xlsxCoverage, setXlsxCoverage] = useState<CoverageSummary | null>(null)
 
   const clearAllSelections = useCallback(() => {
     selectedMeshesRef.current.forEach(({ mesh, originalMaterial }) => {
@@ -346,6 +354,10 @@ export default function ViewerPage() {
       measureTool.clearAllMeasurements()
     }
   }, [initScene]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    revitEnrichment.setScope(revitScope)
+  }, [revitEnrichment, revitScope])
 
   // ── Apply Search Set display ─────────────────────────────
 
@@ -646,8 +658,8 @@ export default function ViewerPage() {
           }
           // Run in background — don't block UI
           extractIds(result.tree).then(async () => {
-            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds)
-            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds)
+            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds, revitScope)
+            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds, revitScope)
             // Auto-run matching if we have Revit data
             const cachedProps = revitEnrichment.getAllCachedProps()
             if (cachedProps.length > 0 && allIfcElements.length > 0) {
@@ -661,7 +673,7 @@ export default function ViewerPage() {
         addNotification('error', `Failed to load IFC: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     },
-    [addNotification, fitToModel, sectionPlanes, revitEnrichment],
+    [addNotification, fitToModel, sectionPlanes, revitEnrichment, revitScope, elementMatcher],
   )
 
   // ── XLSX Upload handler ─────────────────────────────────
@@ -676,58 +688,64 @@ export default function ViewerPage() {
 
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('projectId', revitScope.projectId)
+      if (revitScope.modelVersion) formData.append('modelVersion', revitScope.modelVersion)
 
       try {
-        const resp = await fetch('http://localhost:3001/api/revit/upload-xlsx', {
-          method: 'POST',
-          body: formData,
-        })
-        const data = await resp.json()
-        if (resp.ok) {
-          addNotification('success', `Revit data imported: ${data.count} elements`)
-          // Invalidate cache and re-prefetch
-          revitEnrichment.invalidateCache()
-          const service = ifcServiceRef.current
-          if (service) {
-            const allGlobalIds: string[] = []
-            const allElementIds: number[] = []
-            const allIfcElements: IFCElementInfo[] = []
-            const tree = treeData
-            // Quick re-prefetch from loaded model
-            const extractIds = async (nodes: TreeNode[]) => {
-              for (const node of nodes) {
-                const info = await service.getElementProperties(node.expressID)
-                if (info) {
-                  allIfcElements.push(info)
-                  if (info.globalId) allGlobalIds.push(info.globalId)
-                  if (info.tag) {
-                    const tagNum = parseInt(info.tag, 10)
-                    if (!isNaN(tagNum)) allElementIds.push(tagNum)
-                  }
-                }
-                if (node.children) await extractIds(node.children)
-              }
-            }
-            extractIds(tree).then(async () => {
-              if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds)
-              if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds)
-              // Run matching
-              const cachedProps = revitEnrichment.getAllCachedProps()
-              if (cachedProps.length > 0 && allIfcElements.length > 0) {
-                const result = elementMatcher.runMatching(allIfcElements, cachedProps)
-                addNotification('info', `Matching complete: ${result.totalMatched}/${result.totalIfcElements} elements matched`)
-              }
-            })
-          }
+        const data = await uploadRevitXlsx(formData)
+        const nextProjectId = data.projectId || revitScope.projectId
+        const nextModelVersion = data.modelVersion || revitScope.modelVersion
+        setRevitScope(nextProjectId, nextModelVersion)
+        setXlsxCoverage(data.coverage || null)
+
+        if (data.status === 'partial_success') {
+          addNotification('warning', `Revit import partial: ${data.insertedCount}/${data.parsedRows} rows, errors: ${data.errorCount}`)
         } else {
-          addNotification('error', data.error || 'Failed to import Revit data')
+          addNotification('success', `Revit data imported: ${data.insertedCount} elements`)
+        }
+
+        revitEnrichment.invalidateCache()
+        const service = ifcServiceRef.current
+        if (service) {
+          const allGlobalIds: string[] = []
+          const allElementIds: number[] = []
+          const allIfcElements: IFCElementInfo[] = []
+          const tree = treeData
+
+          const extractIds = async (nodes: TreeNode[]) => {
+            for (const node of nodes) {
+              const info = await service.getElementProperties(node.expressID)
+              if (info) {
+                allIfcElements.push(info)
+                if (info.globalId) allGlobalIds.push(info.globalId)
+                if (info.tag) {
+                  const tagNum = parseInt(info.tag, 10)
+                  if (!isNaN(tagNum)) allElementIds.push(tagNum)
+                }
+              }
+              if (node.children) await extractIds(node.children)
+            }
+          }
+          extractIds(tree).then(async () => {
+            const scope = { projectId: nextProjectId, modelVersion: nextModelVersion }
+            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds, scope)
+            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds, scope)
+            const cachedProps = revitEnrichment.getAllCachedProps()
+            if (cachedProps.length > 0 && allIfcElements.length > 0) {
+              const result = elementMatcher.runMatching(allIfcElements, cachedProps)
+              addNotification(
+                'info',
+                `Matching complete: ${result.totalMatched}/${result.totalIfcElements} (${(result.matchRate * 100).toFixed(1)}%)`,
+              )
+            }
+          })
         }
       } catch (err) {
         addNotification('error', `Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     }
     input.click()
-  }, [addNotification, revitEnrichment, treeData, elementMatcher])
+  }, [addNotification, revitEnrichment, treeData, elementMatcher, revitScope, setRevitScope])
 
   // ── Match status highlighting ────────────────────────────
 
@@ -790,8 +808,12 @@ export default function ViewerPage() {
         ['Total IFC Elements', result.totalIfcElements],
         ['Total Revit Elements', result.totalExcelRows],
         ['Matched (Total)', result.totalMatched],
+        ['Match Rate', `${(result.matchRate * 100).toFixed(2)}%`],
         ['Matched by ElementId', result.matchedByElementId],
         ['Matched by GlobalId', result.matchedByGlobalId],
+        ['Matched by Type IfcGUID', result.matchedByTypeIfcGuid],
+        ['Matched Mixed', result.matchedMixed],
+        ['Ambiguous', result.ambiguous.length],
         ['Missing in IFC (Revit-only)', result.missingInIfc.length],
         ['Missing in Excel (IFC-only)', result.missingInExcel.length],
       ]
@@ -819,6 +841,28 @@ export default function ViewerPage() {
           GlobalId: el.globalId ?? '',
         }))
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingExcelData), 'Missing in Excel')
+      }
+
+      if (result.ambiguous.length > 0) {
+        const ambiguousData = result.ambiguous.map((item) => ({
+          ExpressID: item.expressID,
+          GlobalId: item.globalId || '',
+          Tag: item.tag || '',
+          TopScore: item.candidates[0] ? item.candidates[0].score : '',
+          TopCandidateGlobalId: item.candidates[0]?.globalId || '',
+          TopCandidateElementId: item.candidates[0]?.revitElementId || '',
+        }))
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ambiguousData), 'Ambiguous')
+      }
+
+      if (result.diagnostics.length > 0) {
+        const diagnosticsData = result.diagnostics.map((d) => ({
+          ExpressID: d.expressID,
+          Reason: d.reason,
+          CandidateCount: d.candidateCount,
+          TopScore: d.topScore,
+        }))
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(diagnosticsData), 'Diagnostics')
       }
 
       // Category breakdown
@@ -1100,7 +1144,7 @@ export default function ViewerPage() {
               {modelFile ? modelFile : 'Upload an IFC file to view and inspect 3D building models'}
             </p>
           </div>
-          <Button variant="primary" icon={<Upload size={16} />} onClick={() => {
+          <Button data-testid="upload-ifc-btn" variant="primary" icon={<Upload size={16} />} onClick={() => {
             const input = document.createElement('input')
             input.type = 'file'
             input.accept = '.ifc'
@@ -1112,12 +1156,26 @@ export default function ViewerPage() {
           }}>
             Upload IFC
           </Button>
-          <Button variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
+          <Button data-testid="upload-revit-xlsx-btn" variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
             Upload Revit (.xlsx)
           </Button>
+          {xlsxCoverage && (
+            <div
+              data-testid="coverage-panel"
+              className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium bg-muted border border-border rounded-lg"
+            >
+              <span className="text-muted-foreground">Rows:</span>
+              <span className="text-foreground">{xlsxCoverage.validRows}/{xlsxCoverage.parsedRows}</span>
+              <span className="text-muted-foreground">GlobalId:</span>
+              <span className="text-foreground">{xlsxCoverage.withGlobalId}</span>
+              <span className="text-muted-foreground">ElementId:</span>
+              <span className="text-foreground">{xlsxCoverage.withElementId}</span>
+            </div>
+          )}
           {elementMatcher.matchResult && (
             <>
               <button
+                data-testid="match-badge"
                 onClick={() => setShowMatchReport(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-colors"
               >
@@ -1125,6 +1183,7 @@ export default function ViewerPage() {
                 {elementMatcher.matchResult.totalMatched}/{elementMatcher.matchResult.totalIfcElements} matched
               </button>
               <button
+                data-testid="match-highlight-toggle"
                 onClick={toggleMatchHighlight}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                   showMatchHighlight
@@ -1378,17 +1437,18 @@ export default function ViewerPage() {
                 className="p-2 rounded-lg backdrop-blur-md bg-card/80 ring-1 ring-border shadow-lg text-muted-foreground hover:text-foreground transition-colors"
               >
                 {isModelLoaded ? <Eye size={18} /> : <EyeOff size={18} />}
-              </motion.button>
-              <motion.button
-                title={isWireframe ? 'Solid Mode' : 'Wireframe Mode'}
-                onClick={() => {
-                  const next = !isWireframe
-                  setIsWireframe(next)
-                  wireframe.toggle(modelGroupRef.current, next)
-                }}
-                whileTap={{ scale: 0.95 }}
-                disabled={!isModelLoaded}
-                className={`p-2 rounded-lg backdrop-blur-md ring-1 shadow-lg transition-colors ${
+            </motion.button>
+            <motion.button
+              title={isWireframe ? 'Solid Mode' : 'Wireframe Mode'}
+              onClick={() => {
+                const next = !isWireframe
+                setIsWireframe(next)
+                wireframe.toggle(modelGroupRef.current, next)
+              }}
+              data-testid="global-wireframe-toggle"
+              whileTap={{ scale: 0.95 }}
+              disabled={!isModelLoaded}
+              className={`p-2 rounded-lg backdrop-blur-md ring-1 shadow-lg transition-colors ${
                   isWireframe
                     ? 'bg-primary text-white ring-primary/50'
                     : isModelLoaded
@@ -1574,15 +1634,16 @@ export default function ViewerPage() {
                       </div>
                     </div>
                     {/* Color button */}
-                    {selectedElementIds.length === 1 && (
+                    {selectedElementIds.length >= 1 && (
                       <div className="relative mt-2">
                         <button
+                          data-testid="element-color-btn"
                           onClick={() => setShowColorPicker(!showColorPicker)}
                           className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition-colors"
                         >
                           <Palette size={10} />
-                          <span>Color</span>
-                          {customColors[`el-${selectedElement.id}`] && (
+                          <span>{selectedElementIds.length > 1 ? `Color (${selectedElementIds.length})` : 'Color'}</span>
+                          {selectedElementIds.length === 1 && customColors[`el-${selectedElement.id}`] && (
                             <div className="w-3 h-3 rounded-sm border border-border" style={{ backgroundColor: customColors[`el-${selectedElement.id}`] }} />
                           )}
                         </button>
@@ -1590,19 +1651,25 @@ export default function ViewerPage() {
                           <ColorPickerPopover
                             currentColor={customColors[`el-${selectedElement.id}`]}
                             onApply={(color) => {
-                              setCustomColor(`el-${selectedElement.id}`, color)
-                              const mesh = ifcServiceRef.current?.getMesh(selectedElement.id)
-                              if (mesh && mesh.material instanceof THREE.MeshPhysicalMaterial) {
-                                const mat = mesh.material.clone()
-                                mat.color.set(color)
-                                mesh.material = mat
+                              const ids = selectedElementIds.length > 1 ? selectedElementIds : [selectedElement.id]
+                              for (const id of ids) {
+                                setCustomColor(`el-${id}`, color)
+                                const mesh = ifcServiceRef.current?.getMesh(id)
+                                if (mesh && mesh.material instanceof THREE.MeshPhysicalMaterial) {
+                                  const mat = mesh.material.clone()
+                                  mat.color.set(color)
+                                  mesh.material = mat
+                                }
                               }
                             }}
                             onClear={() => {
-                              clearCustomColor(`el-${selectedElement.id}`)
-                              const entry = selectedMeshesRef.current.get(selectedElement.id)
-                              if (entry) {
-                                entry.mesh.material = entry.originalMaterial
+                              const ids = selectedElementIds.length > 1 ? selectedElementIds : [selectedElement.id]
+                              for (const id of ids) {
+                                clearCustomColor(`el-${id}`)
+                                const entry = selectedMeshesRef.current.get(id)
+                                if (entry) {
+                                  entry.mesh.material = entry.originalMaterial
+                                }
                               }
                             }}
                             onClose={() => setShowColorPicker(false)}

@@ -7,7 +7,7 @@ interface Props {
   revitProps: RevitProperties | undefined
   ifcProperties: { name: string; value: string }[]
   onUploadXlsx?: () => void
-  matchSource?: 'elementId' | 'globalId'
+  matchSource?: 'elementId' | 'globalId' | 'typeIfcGuid' | 'mixed'
   tag?: string
 }
 
@@ -124,6 +124,9 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, 
   const hasLocation = revitProps.level || revitProps.phaseCreated || revitProps.phaseDemolished
   const hasClassification = revitProps.classification || revitProps.assemblyCode || revitProps.structuralUsage
   const customEntries = revitProps.customParams ? Object.entries(revitProps.customParams).filter(([, v]) => v !== null && v !== undefined && v !== '') : []
+  const confidence = typeof revitProps.matchConfidence === 'number'
+    ? `${(revitProps.matchConfidence * 100).toFixed(1)}%`
+    : null
 
   return (
     <div>
@@ -135,7 +138,22 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, 
               Source: Revit
             </span>
             <span className="text-[10px] text-muted-foreground">
-              via {matchSource === 'elementId' ? 'ElementId' : 'GlobalId'}
+              via {
+                matchSource === 'elementId'
+                  ? 'ElementId'
+                  : matchSource === 'globalId'
+                    ? 'GlobalId'
+                    : matchSource === 'typeIfcGuid'
+                      ? 'Type IfcGUID'
+                      : 'Multi-key'
+              }
+            </span>
+          </div>
+        )}
+        {confidence && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded">
+              Confidence: {confidence}
             </span>
           </div>
         )}
@@ -148,6 +166,8 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, 
         <PropRow label="ElementId" value={revitProps.revitElementId} />
         <PropRow label="Tag (IFC)" value={tag} />
         <PropRow label="GlobalId" value={revitProps.globalId} />
+        <PropRow label="Model Version" value={revitProps.modelVersion} />
+        <PropRow label="Source File" value={revitProps.sourceFile} />
         <PropRow label="Comments" value={revitProps.comments} />
       </PropertyGroup>
 

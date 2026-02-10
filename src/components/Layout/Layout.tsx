@@ -8,20 +8,12 @@ export default function Layout() {
   const location = useLocation()
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="app-shell flex h-screen text-foreground">
       <Sidebar />
-      <div className="flex flex-col flex-1 transition-all duration-300 min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <main className="flex-1 overflow-auto p-6 relative">
-          {/* Subtle dot pattern background */}
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.04]"
-            style={{
-              backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-            }}
-          />
-          <div className="relative z-10">
+        <main className="app-grid-bg relative flex-1 overflow-auto">
+          <div className="relative z-10 mx-auto w-full max-w-[1560px] px-6 pb-10 pt-6 lg:px-8">
             <AnimatePresence mode="wait">
               <Outlet key={location.pathname} />
             </AnimatePresence>

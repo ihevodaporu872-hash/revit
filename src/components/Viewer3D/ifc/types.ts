@@ -64,7 +64,7 @@ export interface SavedSet {
 
 export interface ActiveSetDisplay {
   setId: string
-  mode: 'highlight' | 'isolate' | 'transparent'
+  mode: 'highlight' | 'isolate' | 'transparent' | 'wireframe'
 }
 
 // ── Drawing / Annotations ────────────────────────────────────────────
@@ -142,6 +142,9 @@ export interface AreaMeasurement {
 
 export interface RevitProperties {
   globalId: string
+  projectId?: string
+  modelVersion?: string
+  sourceFile?: string
   revitElementId?: number
   revitUniqueId?: string
   typeIfcGuid?: string
@@ -168,6 +171,24 @@ export interface RevitProperties {
   mark?: string
   comments?: string
   customParams?: Record<string, unknown>
+  matchConfidence?: number
+  matchedBy?: 'globalId' | 'elementId' | 'typeIfcGuid' | 'mixed'
+}
+
+export interface MatchDiagnostic {
+  expressID: number
+  reason: string
+  candidateCount: number
+  topScore: number
+}
+
+export interface CoverageSummary {
+  parsedRows: number
+  validRows: number
+  validRatio: number
+  withGlobalId: number
+  withElementId: number
+  withTypeIfcGuid: number
 }
 
 // ── Appearance Profiler ──────────────────────────────────────────────

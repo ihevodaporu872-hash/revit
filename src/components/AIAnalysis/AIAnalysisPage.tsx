@@ -62,10 +62,10 @@ interface QuickPreset {
 // ---- Mock Data ----
 
 const QUICK_PRESETS: QuickPreset[] = [
-  { id: 'group', label: 'Group by category', icon: <Columns3 size={14} />, prompt: 'Group the data by category and show counts and totals for each group.' },
-  { id: 'distribution', label: 'Show distribution', icon: <PieChart size={14} />, prompt: 'Show the distribution of values in the main numeric column. Include percentages and a histogram.' },
-  { id: 'anomalies', label: 'Find anomalies', icon: <Search size={14} />, prompt: 'Find anomalies and outliers in the data. Flag any values that deviate significantly from the mean.' },
-  { id: 'compare', label: 'Compare columns', icon: <GitBranch size={14} />, prompt: 'Compare the main numeric columns. Show correlation, differences, and trends between them.' },
+  { id: 'group', label: 'Группировка по категориям', icon: <Columns3 size={14} />, prompt: 'Сгруппируй данные по категориям и покажи количество и сумму по каждой группе.' },
+  { id: 'distribution', label: 'Распределение', icon: <PieChart size={14} />, prompt: 'Покажи распределение значений в основном числовом столбце, включая проценты и гистограмму.' },
+  { id: 'anomalies', label: 'Поиск аномалий', icon: <Search size={14} />, prompt: 'Найди аномалии и выбросы в данных. Отметь значения с сильным отклонением от среднего.' },
+  { id: 'compare', label: 'Сравнение столбцов', icon: <GitBranch size={14} />, prompt: 'Сравни основные числовые столбцы: корреляция, различия и тренды.' },
 ]
 
 function generateMockResponse(userMessage: string, fileName: string): { code: string; results: AnalysisResult } {
@@ -332,7 +332,7 @@ export default function AIAnalysisPage() {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return
     if (files.length === 0) {
-      addNotification('warning', 'Please upload a file before running analysis.')
+      addNotification('warning', 'Сначала загрузите файл для анализа.')
       return
     }
 
@@ -386,7 +386,7 @@ export default function AIAnalysisPage() {
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'ai',
-        content: mock.results.summary || 'Analysis complete. Here are the results:',
+        content: mock.results.summary || 'Анализ завершён. Ниже результаты:',
         timestamp: Date.now(),
         code: mock.code,
         results: mock.results,
@@ -401,7 +401,7 @@ export default function AIAnalysisPage() {
       }).then((saved) => { if (saved?.id) setChatSessionId(saved.id) }).catch(() => {})
       setAnalysesRun((prev) => prev + 1)
     } catch (err) {
-      addNotification('error', `Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      addNotification('error', `Ошибка анализа: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
     }
@@ -422,7 +422,7 @@ export default function AIAnalysisPage() {
 
   const clearChat = () => {
     setMessages([])
-    addNotification('info', 'Chat history cleared.')
+    addNotification('info', 'История чата очищена.')
   }
 
   const maxBarValue = (bars: AnalysisResult['chartBars']) => {
@@ -438,15 +438,15 @@ export default function AIAnalysisPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
               <BrainCircuit size={28} className="text-primary" />
-              AI Data Analysis
+              Анализ данных ИИ
             </h1>
             <p className="text-muted-foreground mt-1">
-              Upload data files and ask AI to analyze, visualize, and find insights
+              Загружайте данные и получайте анализ, визуализации и выводы с помощью ИИ
             </p>
           </div>
           {messages.length > 0 && (
             <Button variant="outline" icon={<RotateCcw size={16} />} onClick={clearChat}>
-              Clear Chat
+              Очистить чат
             </Button>
           )}
         </div>
@@ -459,16 +459,16 @@ export default function AIAnalysisPage() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           <motion.div variants={fadeInUp}>
-            <StatCard label="Analyses Run" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'this week' }} />
+            <StatCard label="Запусков анализа" value={analysesRun} icon={Zap} color="primary" trend={{ value: 23, label: 'за неделю' }} />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Avg Response" value={avgResponse} icon={Clock} color="success" />
+            <StatCard label="Средний ответ" value={avgResponse} icon={Clock} color="success" />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Files Processed" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'this month' }} />
+            <StatCard label="Обработано файлов" value={filesProcessed} icon={FileSpreadsheet} color="warning" trend={{ value: 8, label: 'за месяц' }} />
           </motion.div>
           <motion.div variants={fadeInUp}>
-            <StatCard label="Charts Generated" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'this week' }} />
+            <StatCard label="Построено графиков" value={chartsGenerated} icon={PieChart} color="primary" trend={{ value: 15, label: 'за неделю' }} />
           </motion.div>
         </motion.div>
 
@@ -477,17 +477,17 @@ export default function AIAnalysisPage() {
           {/* Left: Upload + Presets */}
           <div className="space-y-6">
             {/* File Upload */}
-            <Card title="Data Source" subtitle="Upload Excel or CSV files">
+            <Card title="Источник данных" subtitle="Загрузите Excel или CSV">
               <FileUpload
                 accept=".xlsx,.xls,.csv"
                 onFilesSelected={setFiles}
-                label="Drop data files here"
-                description="Supports .xlsx, .xls, .csv"
+                label="Перетащите файлы данных сюда"
+                description="Поддержка .xlsx, .xls, .csv"
               />
             </Card>
 
             {/* Quick Presets */}
-            <Card title="Quick Analysis" subtitle="Common analysis patterns">
+            <Card title="Быстрый анализ" subtitle="Частые шаблоны анализа">
               <motion.div
                 variants={staggerContainer}
                 initial="hidden"
@@ -533,10 +533,10 @@ export default function AIAnalysisPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">Jens AI Assistant</h3>
-                    <p className="text-xs text-muted-foreground">Powered by Google Gemini</p>
+                    <p className="text-xs text-muted-foreground">На базе Google Gemini</p>
                   </div>
                 </div>
-                <Badge variant="success">Online</Badge>
+                <Badge variant="success">Онлайн</Badge>
               </div>
 
               {/* Chat Messages */}
@@ -549,9 +549,9 @@ export default function AIAnalysisPage() {
                     className="flex flex-col items-center justify-center h-full text-muted-foreground py-12"
                   >
                     <Sparkles size={48} className="text-primary/20 mb-4" />
-                    <h3 className="text-lg font-semibold text-foreground">Start Your Analysis</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Начните анализ</h3>
                     <p className="text-sm mt-1 max-w-sm text-center">
-                      Upload a data file and describe what you want to analyze. Try the quick presets on the left, or type your own question below.
+                      Загрузите файл данных и опишите, что нужно проанализировать. Можно выбрать быстрый шаблон слева.
                     </p>
                   </motion.div>
                 )}
@@ -603,14 +603,14 @@ export default function AIAnalysisPage() {
                             <div className="flex items-center justify-between px-4 py-2 bg-[oklch(0.15_0.01_262)] text-muted-foreground">
                               <div className="flex items-center gap-2 text-xs">
                                 <Code2 size={14} />
-                                <span>Generated Python Code</span>
+                                <span>Сгенерированный Python-код</span>
                               </div>
                               <button
                                 onClick={() => copyCode(msg.id, msg.code!)}
                                 className="flex items-center gap-1 text-xs hover:text-white transition-colors"
                               >
                                 {copiedId === msg.id ? <Check size={12} /> : <Copy size={12} />}
-                                {copiedId === msg.id ? 'Copied' : 'Copy'}
+                                {copiedId === msg.id ? 'Скопировано' : 'Копировать'}
                               </button>
                             </div>
                             <pre className="bg-[oklch(0.12_0.01_262)] text-foreground/80 p-4 overflow-x-auto text-xs leading-relaxed">
@@ -623,9 +623,9 @@ export default function AIAnalysisPage() {
                         {msg.results && (
                           <Tabs
                             tabs={[
-                              ...(msg.results.tableData ? [{ id: 'table', label: 'Table', icon: <TableProperties size={14} /> }] : []),
-                              ...(msg.results.chartBars ? [{ id: 'chart', label: 'Chart', icon: <BarChart3 size={14} /> }] : []),
-                              ...(msg.results.stats ? [{ id: 'stats', label: 'Statistics', icon: <TrendingUp size={14} /> }] : []),
+                              ...(msg.results.tableData ? [{ id: 'table', label: 'Таблица', icon: <TableProperties size={14} /> }] : []),
+                              ...(msg.results.chartBars ? [{ id: 'chart', label: 'График', icon: <BarChart3 size={14} /> }] : []),
+                              ...(msg.results.stats ? [{ id: 'stats', label: 'Статистика', icon: <TrendingUp size={14} /> }] : []),
                             ]}
                             className="rounded-xl border border-border overflow-hidden bg-card"
                           >
@@ -660,7 +660,7 @@ export default function AIAnalysisPage() {
 
                                 {activeTab === 'chart' && msg.results?.chartBars && (
                                   <div className="space-y-3">
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distribution</p>
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Распределение</p>
                                     {msg.results.chartBars.map((bar, i) => (
                                       <div key={i} className="space-y-1">
                                         <div className="flex items-center justify-between text-sm">
@@ -732,7 +732,7 @@ export default function AIAnalysisPage() {
                       <div className="bg-muted border border-border rounded-xl rounded-bl-sm px-4 py-3">
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <Loader2 size={14} className="animate-spin" />
-                          <span>Analyzing data with Gemini AI</span>
+                          <span>Идёт анализ данных через Gemini AI</span>
                           <span className="flex items-center gap-0.5">
                             {[0, 1, 2].map((i) => (
                               <motion.span
@@ -768,7 +768,7 @@ export default function AIAnalysisPage() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={files.length > 0 ? 'Describe what you want to analyze...' : 'Upload a file first...'}
+                    placeholder={files.length > 0 ? 'Опишите, что хотите проанализировать...' : 'Сначала загрузите файл...'}
                     disabled={files.length === 0 || loading}
                     className="flex-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 transition-shadow duration-200"
                   />
@@ -778,11 +778,11 @@ export default function AIAnalysisPage() {
                     icon={loading ? undefined : <Send size={16} />}
                     loading={loading}
                   >
-                    Send
+                    Отправить
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 px-1">
-                  Press Enter to send. AI will generate Python code and show results from your data.
+                  Нажмите Enter для отправки. ИИ сгенерирует код и покажет результаты анализа.
                 </p>
               </motion.div>
             </Card>

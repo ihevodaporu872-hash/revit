@@ -26,6 +26,7 @@ import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { formatDate } from '../../lib/utils'
 import { MotionPage } from '../MotionPage'
+import './ConverterPage.css'
 import {
   staggerContainer,
   fadeInUp,
@@ -80,19 +81,19 @@ const MOCK_HISTORY: ConversionHistoryEntry[] = [
 ]
 
 const FORMAT_OPTIONS: { id: OutputFormat; label: string; description: string; icon: React.ReactNode }[] = [
-  { id: 'excel', label: 'Excel (.xlsx)', description: 'Property tables, quantities, schedules', icon: <FileSpreadsheet size={20} /> },
-  { id: 'dae', label: 'DAE 3D (.dae)', description: '3D geometry for viewers and engines', icon: <Box size={20} /> },
-  { id: 'pdf', label: 'PDF Report', description: 'Formatted property reports', icon: <FileText size={20} /> },
+  { id: 'excel', label: 'Excel (.xlsx)', description: 'Таблицы свойств, количества, расписания', icon: <FileSpreadsheet size={20} /> },
+  { id: 'dae', label: 'DAE 3D (.dae)', description: '3D-геометрия для зрителей и движков', icon: <Box size={20} /> },
+  { id: 'pdf', label: 'Отчёт в PDF', description: 'Отчёты о форматированных свойствах', icon: <FileText size={20} /> },
 ]
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 function statusBadge(status: ConversionStatus) {
   const map: Record<ConversionStatus, { variant: 'success' | 'warning' | 'danger' | 'info'; label: string }> = {
-    queued: { variant: 'info', label: 'Queued' },
-    converting: { variant: 'warning', label: 'Converting' },
-    completed: { variant: 'success', label: 'Completed' },
-    failed: { variant: 'danger', label: 'Failed' },
+    queued: { variant: 'info', label: 'В очереди' },
+    converting: { variant: 'warning', label: 'Конвертация' },
+    completed: { variant: 'success', label: 'Готово' },
+    failed: { variant: 'danger', label: 'Ошибка' },
   }
   const { variant, label } = map[status]
   return <Badge variant={variant}>{label}</Badge>
@@ -135,7 +136,7 @@ export default function ConverterPage() {
 
   const startConversion = async () => {
     if (selectedFiles.length === 0) {
-      addNotification('warning', 'Please select at least one file to convert.')
+      addNotification('warning', 'Выберите минимум один файл для конвертации.')
       return
     }
 
@@ -186,7 +187,7 @@ export default function ConverterPage() {
     }
 
     setIsConverting(false)
-    addNotification('success', `Batch conversion of ${selectedFiles.length} file(s) complete.`)
+    addNotification('success', `Пакетная конвертация завершена: ${selectedFiles.length} файл(ов).`)
 
     // Persist completed conversions to Supabase
     for (const job of newJobs) {
@@ -212,35 +213,35 @@ export default function ConverterPage() {
   }
 
   const openIn3DViewer = (job: ConversionJob) => {
-    addNotification('info', `Opening ${job.fileName} in 3D Viewer...`)
+    addNotification('info', `Открываю ${job.fileName} в 3D-просмотрщике...`)
     // In real implementation: navigate to /viewer?file=job.outputUrl
   }
 
   const runCostEstimate = (job: ConversionJob) => {
-    addNotification('info', `Running cost estimate for ${job.fileName}...`)
+    addNotification('info', `Запускаю смету для ${job.fileName}...`)
     // In real implementation: navigate to /cost?file=job.outputUrl
   }
 
   // ── Column definitions ──────────────────────────────────
 
   const jobColumns = [
-    { key: 'fileName', header: 'File', render: (j: ConversionJob) => (
+    { key: 'fileName', header: 'Файл', render: (j: ConversionJob) => (
       <div>
         <p className="font-medium">{j.fileName}</p>
         <p className="text-xs text-muted-foreground">{j.fileSize}</p>
       </div>
     )},
-    { key: 'inputFormat', header: 'Input', render: (j: ConversionJob) => <Badge variant="default">{j.inputFormat}</Badge> },
-    { key: 'outputFormat', header: 'Output', render: (j: ConversionJob) => (
+    { key: 'inputFormat', header: 'Вход', render: (j: ConversionJob) => <Badge variant="default">{j.inputFormat}</Badge> },
+    { key: 'outputFormat', header: 'Выход', render: (j: ConversionJob) => (
       <Badge variant="primary">{j.outputFormat.toUpperCase()}</Badge>
     )},
-    { key: 'status', header: 'Status', render: (j: ConversionJob) => (
+    { key: 'status', header: 'Статус', render: (j: ConversionJob) => (
       <div className="flex items-center gap-2">
         {statusBadge(j.status)}
         {j.status === 'converting' && <span className="text-xs text-muted-foreground">{j.progress}%</span>}
       </div>
     )},
-    { key: 'progress', header: 'Progress', render: (j: ConversionJob) => (
+    { key: 'progress', header: 'Прогресс', render: (j: ConversionJob) => (
       <div className="w-32">
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <motion.div
@@ -254,21 +255,21 @@ export default function ConverterPage() {
         </div>
       </div>
     )},
-    { key: 'duration', header: 'Duration', render: (j: ConversionJob) => (
+    { key: 'duration', header: 'Время', render: (j: ConversionJob) => (
       <span className="text-muted-foreground">{j.duration || '—'}</span>
     )},
-    { key: 'actions', header: 'Actions', render: (j: ConversionJob) => (
+    { key: 'actions', header: 'Действия', render: (j: ConversionJob) => (
       <div className="flex items-center gap-1">
         {j.status === 'completed' && (
           <>
-            <Button variant="ghost" size="sm" icon={<Download size={14} />} onClick={() => addNotification('info', `Downloading ${j.fileName}...`)}>
-              Download
+            <Button variant="ghost" size="sm" icon={<Download size={14} />} onClick={() => addNotification('info', `Скачивание ${j.fileName}...`)}>
+              Скачать
             </Button>
             <Button variant="ghost" size="sm" icon={<Eye size={14} />} onClick={() => openIn3DViewer(j)}>
               3D
             </Button>
             <Button variant="ghost" size="sm" icon={<Calculator size={14} />} onClick={() => runCostEstimate(j)}>
-              Cost
+              Смета
             </Button>
           </>
         )}
@@ -282,22 +283,22 @@ export default function ConverterPage() {
   ]
 
   const historyColumns = [
-    { key: 'fileName', header: 'File Name', render: (h: ConversionHistoryEntry) => (
+    { key: 'fileName', header: 'Файл', render: (h: ConversionHistoryEntry) => (
       <span className="font-medium">{h.fileName}</span>
     )},
-    { key: 'inputFormat', header: 'Input', render: (h: ConversionHistoryEntry) => <Badge variant="default">{h.inputFormat}</Badge> },
-    { key: 'outputFormat', header: 'Output', render: (h: ConversionHistoryEntry) => <Badge variant="primary">{h.outputFormat.toUpperCase()}</Badge> },
-    { key: 'status', header: 'Status', render: (h: ConversionHistoryEntry) => statusBadge(h.status) },
-    { key: 'fileSize', header: 'Size' },
-    { key: 'duration', header: 'Duration' },
-    { key: 'createdAt', header: 'Date', render: (h: ConversionHistoryEntry) => formatDate(h.createdAt) },
+    { key: 'inputFormat', header: 'Вход', render: (h: ConversionHistoryEntry) => <Badge variant="default">{h.inputFormat}</Badge> },
+    { key: 'outputFormat', header: 'Выход', render: (h: ConversionHistoryEntry) => <Badge variant="primary">{h.outputFormat.toUpperCase()}</Badge> },
+    { key: 'status', header: 'Статус', render: (h: ConversionHistoryEntry) => statusBadge(h.status) },
+    { key: 'fileSize', header: 'Размер' },
+    { key: 'duration', header: 'Время' },
+    { key: 'createdAt', header: 'Дата', render: (h: ConversionHistoryEntry) => formatDate(h.createdAt) },
   ]
 
   // ── Tabs definition ──────────────────────────────────────
 
   const tabs = [
-    { id: 'convert', label: 'New Conversion', icon: <FileOutput size={16} /> },
-    { id: 'history', label: 'Conversion History', icon: <Clock size={16} /> },
+    { id: 'convert', label: 'Новая конверсия', icon: <FileOutput size={16} /> },
+    { id: 'history', label: 'История преобразования', icon: <Clock size={16} /> },
   ]
 
   // ── Render ──────────────────────────────────────────────
@@ -306,10 +307,10 @@ export default function ConverterPage() {
     <MotionPage>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">CAD/BIM Converter</h1>
-          <p className="text-muted-foreground mt-1">
-            Convert Revit, IFC, DWG, and DGN files to Excel, 3D DAE, or PDF formats
+        <div className="space-y-1">
+          <h1 className="display-heading text-[30px] font-semibold leading-tight tracking-tight text-foreground xl:text-[34px]">Преобразователь CAD/BIM</h1>
+          <p className="max-w-5xl text-[14px] text-muted-foreground">
+            Конвертируйте файлы Revit, IFC, DWG и DGN в форматы Excel, 3D DAE или PDF
           </p>
         </div>
 
@@ -321,16 +322,16 @@ export default function ConverterPage() {
         animate="visible"
       >
         <motion.div variants={fadeInUp}>
-          <StatCard label="Files Converted" value={totalConverted} icon={FileOutput} color="primary" trend={{ value: 12, label: 'this week' }} />
+          <StatCard className="converter-stat-card" label="Конверсии на этой неделе" value={totalConverted} icon={FileOutput} color="primary" trend={{ value: 12, label: 'на этой неделе' }} />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Success Rate" value={`${successRate}%`} icon={CheckCircle2} color="success" />
+          <StatCard className="converter-stat-card" label="Процент успеха" value={`${successRate}%`} icon={CheckCircle2} color="success" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Avg Time" value="1m 48s" icon={Clock} color="warning" />
+          <StatCard className="converter-stat-card" label="Среднее время" value="1м 48с" icon={Clock} color="warning" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Formats" value={formatsUsed} icon={BarChart3} color="primary" />
+          <StatCard className="converter-stat-card" label="Форматы" value={`${formatsUsed} типа`} icon={BarChart3} color="primary" />
         </motion.div>
       </motion.div>
 
@@ -343,20 +344,21 @@ export default function ConverterPage() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* File Upload - spans 2 cols */}
                 <div className="lg:col-span-2">
-                  <Card title="Upload Files" subtitle="Supports batch upload of CAD/BIM files" hover>
+                  <Card className="converter-upload-card" title="Загрузка файлов" subtitle="Перетащите сюда CAD/BIM-файлы или нажмите для загрузки" hover>
                     <FileUpload
                       accept=".rvt,.ifc,.dwg,.dgn"
                       multiple
                       maxSize={500 * 1024 * 1024}
                       onFilesSelected={handleFilesSelected}
-                      label="Drop CAD/BIM files here or click to browse"
-                      description="Supports .rvt, .ifc, .dwg, .dgn up to 500 MB each"
+                      label="Загрузите CAD/BIM-файлы здесь"
+                      description="Поддержка файлов до 500 МБ"
+                      dropzoneClassName="converter-upload-dropzone"
                     />
                   </Card>
                 </div>
 
                 {/* Format Selection */}
-                <Card title="Output Format" subtitle="Select target format" hover>
+                <Card className="converter-format-card" title="Формат вывода" subtitle="Выберите целевой формат" hover>
                   <div className="space-y-3">
                     {FORMAT_OPTIONS.map((fmt) => (
                       <motion.button
@@ -366,18 +368,14 @@ export default function ConverterPage() {
                         initial="rest"
                         whileHover="hover"
                         whileTap="tap"
-                        className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
-                          outputFormat === fmt.id
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:border-primary/20 hover:bg-muted'
-                        }`}
+                        className={`converter-format-option ${outputFormat === fmt.id ? 'is-active' : ''}`}
                       >
-                        <div className={`p-2 rounded-lg ${outputFormat === fmt.id ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
+                        <div className={`converter-format-option-icon ${outputFormat === fmt.id ? 'is-active' : ''}`}>
                           {fmt.icon}
                         </div>
                         <div>
-                          <p className="font-medium text-sm text-foreground">{fmt.label}</p>
-                          <p className="text-xs text-muted-foreground">{fmt.description}</p>
+                          <p className="text-[15px] font-semibold leading-tight text-foreground">{fmt.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{fmt.description}</p>
                         </div>
                       </motion.button>
                     ))}
@@ -385,7 +383,7 @@ export default function ConverterPage() {
 
                   <div className="mt-4 pt-4 border-t border-border">
                     <Button
-                      className="w-full"
+                      className="primary-glow-btn converter-main-cta h-12 w-full rounded-2xl text-[16px] font-bold"
                       size="lg"
                       loading={isConverting}
                       disabled={selectedFiles.length === 0}
@@ -393,8 +391,8 @@ export default function ConverterPage() {
                       icon={isConverting ? <Loader2 size={18} className="animate-spin" /> : <FileOutput size={18} />}
                     >
                       {isConverting
-                        ? 'Converting...'
-                        : `Convert ${selectedFiles.length > 0 ? `${selectedFiles.length} file(s)` : ''}`}
+                        ? 'Конвертация...'
+                        : 'Конвертировать'}
                     </Button>
                   </div>
                 </Card>
@@ -403,16 +401,16 @@ export default function ConverterPage() {
               {/* Active Jobs */}
               {jobs.length > 0 && (
                 <Card
-                  title="Conversion Queue"
-                  subtitle={`${jobs.filter((j) => j.status === 'converting').length} active, ${jobs.filter((j) => j.status === 'queued').length} queued`}
+                  title="Очередь конвертации"
+                  subtitle={`${jobs.filter((j) => j.status === 'converting').length} активных, ${jobs.filter((j) => j.status === 'queued').length} в очереди`}
                   hover
                   actions={
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="sm" icon={<Trash2 size={14} />} onClick={clearCompleted}>
-                        Clear Completed
+                        Очистить завершённые
                       </Button>
-                      <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={() => addNotification('info', 'Refreshing queue...')}>
-                        Refresh
+                      <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={() => addNotification('info', 'Обновляю очередь...')}>
+                        Обновить
                       </Button>
                     </div>
                   }
@@ -421,7 +419,7 @@ export default function ConverterPage() {
                     columns={jobColumns as any}
                     data={jobs as any}
                     keyField="id"
-                    emptyMessage="No active conversions"
+                    emptyMessage="Нет активных конвертаций"
                   />
                 </Card>
               )}
@@ -440,23 +438,23 @@ export default function ConverterPage() {
                         <Button
                           variant="outline"
                           icon={<Eye size={16} />}
-                          onClick={() => addNotification('info', 'Opening latest result in 3D Viewer...')}
+                          onClick={() => addNotification('info', 'Открываю последний результат в 3D...')}
                         >
-                          Open in 3D Viewer
+                          Открыть в 3D
                         </Button>
                         <Button
                           variant="outline"
                           icon={<Calculator size={16} />}
-                          onClick={() => addNotification('info', 'Running cost estimate on latest result...')}
+                          onClick={() => addNotification('info', 'Запуск сметы по последнему результату...')}
                         >
-                          Run Cost Estimate
+                          Запустить смету
                         </Button>
                         <Button
                           variant="outline"
                           icon={<Download size={16} />}
-                          onClick={() => addNotification('info', 'Downloading all completed files...')}
+                          onClick={() => addNotification('info', 'Скачиваю все готовые файлы...')}
                         >
-                          Download All
+                          Скачать всё
                         </Button>
                       </div>
                     </Card>
@@ -467,12 +465,12 @@ export default function ConverterPage() {
           ) : (
             /* History Tab */
             <Card
-              title="Conversion History"
-              subtitle={`${history.length} conversions in the last 7 days`}
+              title="История преобразования"
+              subtitle={`${history.length} конвертаций за 7 дней`}
               hover
               actions={
                 <Button variant="outline" size="sm" icon={<Download size={14} />}>
-                  Export Log
+                  Экспорт лога
                 </Button>
               }
             >
@@ -480,7 +478,7 @@ export default function ConverterPage() {
                 columns={historyColumns as any}
                 data={history as any}
                 keyField="id"
-                emptyMessage="No conversion history yet"
+                emptyMessage="История пока пуста"
               />
             </Card>
           )

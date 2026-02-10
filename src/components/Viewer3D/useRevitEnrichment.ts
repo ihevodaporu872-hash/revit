@@ -1,20 +1,42 @@
 import { useState, useCallback, useRef } from 'react'
 import type { RevitProperties } from './ifc/types'
-import { fetchRevitPropertiesBulk, fetchRevitPropertiesByElementIds } from '../../services/supabase-api'
+import { fetchRevitPropertiesBulk } from '../../services/revit-api'
+
+interface RevitScope {
+  projectId: string
+  modelVersion?: string
+}
 
 export function useRevitEnrichment() {
   const cacheByGlobalId = useRef<Map<string, RevitProperties>>(new Map())
   const cacheByElementId = useRef<Map<number, RevitProperties>>(new Map())
+  const scopeRef = useRef<RevitScope>({ projectId: 'default' })
   const [isLoading, setIsLoading] = useState(false)
   const [hasData, setHasData] = useState(false)
 
-  const prefetchBulk = useCallback(async (globalIds: string[]) => {
+  const setScope = useCallback((scope: RevitScope) => {
+    scopeRef.current = {
+      projectId: scope.projectId || 'default',
+      modelVersion: scope.modelVersion,
+    }
+  }, [])
+
+  const prefetchBulk = useCallback(async (globalIds: string[], scope?: RevitScope) => {
     if (globalIds.length === 0) return
+    if (scope) setScope(scope)
+    const activeScope = scope || scopeRef.current
+
     setIsLoading(true)
     try {
-      const results = await fetchRevitPropertiesBulk(globalIds)
-      for (const [id, props] of results) {
-        cacheByGlobalId.current.set(id, props)
+      const { results } = await fetchRevitPropertiesBulk({
+        globalIds,
+        projectId: activeScope.projectId,
+        modelVersion: activeScope.modelVersion,
+      })
+
+      for (const props of results) {
+        if (!props.globalId) continue
+        cacheByGlobalId.current.set(props.globalId, props)
         if (props.revitElementId) {
           cacheByElementId.current.set(props.revitElementId, props)
         }
@@ -23,15 +45,25 @@ export function useRevitEnrichment() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [setScope])
 
-  const prefetchByElementIds = useCallback(async (ids: number[]) => {
+  const prefetchByElementIds = useCallback(async (ids: number[], scope?: RevitScope) => {
     if (ids.length === 0) return
+    if (scope) setScope(scope)
+    const activeScope = scope || scopeRef.current
+
     setIsLoading(true)
     try {
-      const results = await fetchRevitPropertiesByElementIds(ids)
-      for (const [id, props] of results) {
-        cacheByElementId.current.set(id, props)
+      const { results } = await fetchRevitPropertiesBulk({
+        elementIds: ids,
+        projectId: activeScope.projectId,
+        modelVersion: activeScope.modelVersion,
+      })
+
+      for (const props of results) {
+        if (props.revitElementId) {
+          cacheByElementId.current.set(props.revitElementId, props)
+        }
         if (props.globalId) {
           cacheByGlobalId.current.set(props.globalId, props)
         }
@@ -40,7 +72,7 @@ export function useRevitEnrichment() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [setScope])
 
   const getRevitProps = useCallback((globalId: string): RevitProperties | undefined => {
     return cacheByGlobalId.current.get(globalId)
@@ -86,10 +118,12 @@ export function useRevitEnrichment() {
     getRevitPropsAny,
     prefetchBulk,
     prefetchByElementIds,
+    setScope,
     hasRevitData,
     hasAnyData: hasData,
     isLoading,
     invalidateCache,
     getAllCachedProps,
+    scope: scopeRef.current,
   }
 }

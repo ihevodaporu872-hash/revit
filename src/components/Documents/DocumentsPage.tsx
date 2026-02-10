@@ -191,14 +191,14 @@ function DocumentsTab() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search documents..."
+            placeholder="Поиск документов..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
         <Button icon={<Plus size={16} />} onClick={() => setShowUpload(!showUpload)}>
-          Upload Document
+          Загрузить документ
         </Button>
       </div>
 
@@ -230,7 +230,7 @@ function DocumentsTab() {
       </AnimatePresence>
 
       <Card hover>
-        <Table columns={columns} data={filtered} emptyMessage="No documents found" />
+        <Table columns={columns} data={filtered} emptyMessage="Документы не найдены" />
       </Card>
     </div>
   )
@@ -307,10 +307,10 @@ function RFITab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Tracking {rfis.filter((r) => r.status === 'Open' || r.status === 'Overdue').length} open RFIs
+          Открытых RFI: {rfis.filter((r) => r.status === 'Open' || r.status === 'Overdue').length}
         </p>
         <Button icon={<Plus size={16} />} onClick={() => setShowForm(!showForm)}>
-          New RFI
+          Новый RFI
         </Button>
       </div>
 
@@ -382,7 +382,7 @@ function RFITab() {
       </AnimatePresence>
 
       <Card hover>
-        <Table columns={columns} data={rfis} emptyMessage="No RFIs found" />
+        <Table columns={columns} data={rfis} emptyMessage="RFI не найдены" />
       </Card>
     </div>
   )
@@ -419,11 +419,11 @@ function SubmittalsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {submittals.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length} submittals awaiting action
+          Ожидают действия: {submittals.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length} сабмитталов
         </p>
       </div>
       <Card hover>
-        <Table columns={columns} data={submittals} emptyMessage="No submittals found" />
+        <Table columns={columns} data={submittals} emptyMessage="Сабмитталы не найдены" />
       </Card>
     </div>
   )
@@ -483,7 +483,7 @@ Review and edit as needed before distribution.`
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card title="Meeting Notes" subtitle="Enter raw notes from the meeting" hover>
+      <Card title="Заметки встречи" subtitle="Введите сырые заметки по встрече" hover>
         <div className="space-y-4">
           <textarea
             value={notes}
@@ -500,12 +500,12 @@ Review and edit as needed before distribution.`
             size="lg"
             className="w-full"
           >
-            Generate Meeting Minutes
+            Сгенерировать протокол
           </Button>
         </div>
       </Card>
 
-      <Card title="Formatted Minutes" subtitle="AI-generated meeting minutes preview" hover>
+      <Card title="Готовый протокол" subtitle="Предпросмотр протокола, сгенерированного ИИ" hover>
         {minutes ? (
           <div className="space-y-4">
             <AnimatePresence>
@@ -570,10 +570,10 @@ export default function DocumentsPage() {
     MOCK_SUBMITTALS.filter((s) => new Date(s.dueDate) < new Date() && s.status !== 'Approved').length
 
   const tabs = [
-    { id: 'documents', label: 'Documents', icon: <FileText size={16} /> },
+    { id: 'documents', label: 'Документы', icon: <FileText size={16} /> },
     { id: 'rfis', label: 'RFIs', icon: <ClipboardList size={16} /> },
-    { id: 'submittals', label: 'Submittals', icon: <FileCheck2 size={16} /> },
-    { id: 'minutes', label: 'Meeting Minutes', icon: <MessageSquareText size={16} /> },
+    { id: 'submittals', label: 'Сабмитталы', icon: <FileCheck2 size={16} /> },
+    { id: 'minutes', label: 'Протоколы встреч', icon: <MessageSquareText size={16} /> },
   ]
 
   return (
@@ -581,9 +581,9 @@ export default function DocumentsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Document Control</h1>
+          <h1 className="text-2xl font-bold text-foreground">Контроль документов</h1>
           <p className="text-muted-foreground mt-1">
-            Manage project documents, RFIs, submittals, and generate meeting minutes
+            Управление документами проекта, RFI, сабмитталами и протоколами встреч
           </p>
         </div>
 
@@ -595,30 +595,30 @@ export default function DocumentsPage() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           <StatCard
-            label="Total Documents"
+            label="Всего документов"
             value={totalDocs}
             icon={FileText}
             color="primary"
           />
           <StatCard
-            label="Pending RFIs"
+            label="RFI в работе"
             value={pendingRFIs}
             icon={ClipboardList}
             color="warning"
-            trend={{ value: -12, label: 'vs last month' }}
+            trend={{ value: -12, label: 'к прошлому месяцу' }}
           />
           <StatCard
-            label="Open Submittals"
+            label="Открытые сабмитталы"
             value={openSubmittals}
             icon={FileCheck2}
             color="success"
           />
           <StatCard
-            label="Overdue Items"
+            label="Просроченные элементы"
             value={overdueItems}
             icon={AlertTriangle}
             color="danger"
-            trend={{ value: 5, label: 'vs last week' }}
+            trend={{ value: 5, label: 'к прошлой неделе' }}
           />
         </motion.div>
 

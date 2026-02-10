@@ -119,10 +119,10 @@ const MOCK_HISTORY: (QTOReportRecord & Record<string, unknown>)[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const GROUP_OPTIONS: { value: QTOOptions['groupBy']; label: string; icon: typeof Layers }[] = [
-  { value: 'type', label: 'Group by Type', icon: Layers },
-  { value: 'floor', label: 'Group by Floor', icon: Building2 },
-  { value: 'phase', label: 'Group by Phase', icon: GitBranch },
-  { value: 'detailed', label: 'Detailed View', icon: List },
+  { value: 'type', label: 'Группировать по типу', icon: Layers },
+  { value: 'floor', label: 'Группировать по этажу', icon: Building2 },
+  { value: 'phase', label: 'Группировать по фазе', icon: GitBranch },
+  { value: 'detailed', label: 'Детальный режим', icon: List },
 ]
 
 function exportToHtml(report: QTOReport) {
@@ -219,7 +219,7 @@ function GenerateTab() {
       }).catch(() => {})
     } catch {
       // Fallback: use mock data
-      const fallbackReport = { ...MOCK_QTO_REPORT, groupBy, fileName: files[0]?.name || 'Uploaded File' }
+      const fallbackReport = { ...MOCK_QTO_REPORT, groupBy, fileName: files[0]?.name || 'Загруженный файл' }
       setReport(fallbackReport)
       // Persist to Supabase
       saveQTOReport({
@@ -240,19 +240,19 @@ function GenerateTab() {
       {/* Upload + Options */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card hover title="Upload File" subtitle="IFC or Excel files for quantity extraction">
+          <Card hover title="Загрузка файла" subtitle="IFC или Excel для извлечения объёмов">
             <FileUpload
               accept=".ifc,.xlsx,.xls"
               onFilesSelected={setFiles}
-              label="Drop IFC or Excel file here"
-              description="Supports .ifc, .xlsx, .xls up to 500MB"
+              label="Перетащите IFC или Excel-файл сюда"
+              description="Поддержка .ifc, .xlsx, .xls до 500 МБ"
             />
           </Card>
         </div>
 
-        <Card hover title="Report Options">
+        <Card hover title="Параметры отчёта">
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground mb-2">Group By</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Группировка</label>
             {GROUP_OPTIONS.map((opt) => {
               const Icon = opt.icon
               return (
@@ -283,7 +283,7 @@ function GenerateTab() {
               size="lg"
               className="w-full mt-4"
             >
-              Generate Report
+              Сформировать отчёт
             </Button>
           </div>
         </Card>
@@ -300,24 +300,24 @@ function GenerateTab() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
           >
             <motion.div variants={fadeInUp}>
-              <StatCard label="Total Elements" value={report.summary.totalElements} icon={Layers} color="primary" />
+              <StatCard label="Всего элементов" value={report.summary.totalElements} icon={Layers} color="primary" />
             </motion.div>
             <motion.div variants={fadeInUp}>
-              <StatCard label="Categories" value={report.summary.totalCategories} icon={BarChart3} color="success" />
+              <StatCard label="Категории" value={report.summary.totalCategories} icon={BarChart3} color="success" />
             </motion.div>
             <motion.div variants={fadeInUp}>
-              <StatCard label="Floors" value={report.summary.totalFloors} icon={Building2} color="warning" />
+              <StatCard label="Этажи" value={report.summary.totalFloors} icon={Building2} color="warning" />
             </motion.div>
             <motion.div variants={fadeInUp}>
-              <StatCard label="Estimated Cost" value={formatCurrency(report.summary.estimatedCost)} color="primary" />
+              <StatCard label="Оценочная стоимость" value={formatCurrency(report.summary.estimatedCost)} color="primary" />
             </motion.div>
           </motion.div>
 
           {/* Report Table */}
           <Card
             hover
-            title={`QTO Report - ${report.fileName}`}
-            subtitle={`Grouped by ${report.groupBy} | Generated ${formatDate(report.createdAt)}`}
+            title={`QTO-отчёт — ${report.fileName}`}
+            subtitle={`Группировка: ${report.groupBy} | Сформирован: ${formatDate(report.createdAt)}`}
             actions={
               <div className="flex gap-2">
                 <Button
@@ -328,7 +328,7 @@ function GenerateTab() {
                     const csv = exportToCsv(report)
                     downloadBlob(csv, `qto-report-${report.id}.csv`, 'text/csv')
                   }}
-                  title="Export to Excel (CSV)"
+                  title="Экспорт в Excel (CSV)"
                 />
                 <Button
                   variant="outline"
@@ -338,7 +338,7 @@ function GenerateTab() {
                     const html = exportToHtml(report)
                     downloadBlob(html, `qto-report-${report.id}.pdf.html`, 'text/html')
                   }}
-                  title="Export as PDF"
+                  title="Экспорт в PDF"
                 />
                 <Button
                   variant="outline"
@@ -348,7 +348,7 @@ function GenerateTab() {
                     const html = exportToHtml(report)
                     downloadBlob(html, `qto-report-${report.id}.html`, 'text/html')
                   }}
-                  title="Export as HTML"
+                  title="Экспорт в HTML"
                 />
               </div>
             }
@@ -357,13 +357,13 @@ function GenerateTab() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Category / Element</th>
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Material</th>
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Floor</th>
-                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Quantity</th>
-                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit</th>
-                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Unit Cost</th>
-                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Total</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Категория / Элемент</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Материал</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Этаж</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Количество</th>
+                    <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Ед.</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Цена за ед.</th>
+                    <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Итого</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -389,7 +389,7 @@ function GenerateTab() {
                               &#9654;
                             </motion.span>
                             {cat.name}
-                            <Badge variant="default">{cat.elementCount} elements</Badge>
+                            <Badge variant="default">Элементов: {cat.elementCount}</Badge>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground text-right" />
@@ -436,7 +436,7 @@ function GenerateTab() {
                     animate="visible"
                   >
                     <td className="px-4 py-3 text-sm font-bold text-foreground" colSpan={6}>
-                      Grand Total
+                      Общий итог
                     </td>
                     <td className="px-4 py-3 text-sm font-bold text-primary text-right font-mono">
                       {formatCurrency(report.summary.estimatedCost)}
@@ -464,7 +464,7 @@ function HistoryTab() {
   const columns = [
     {
       key: 'fileName',
-      header: 'File Name',
+      header: 'Файл',
       render: (r: typeof history[0]) => (
         <div className="flex items-center gap-2">
           <FileSpreadsheet size={16} className="text-primary shrink-0" />
@@ -474,22 +474,22 @@ function HistoryTab() {
     },
     {
       key: 'groupBy',
-      header: 'Group By',
+      header: 'Группировка',
       render: (r: typeof history[0]) => (
         <Badge variant="primary">{r.groupBy}</Badge>
       ),
     },
-    { key: 'totalElements', header: 'Elements' },
+    { key: 'totalElements', header: 'Элементы' },
     {
       key: 'estimatedCost',
-      header: 'Estimated Cost',
+      header: 'Оценочная стоимость',
       render: (r: typeof history[0]) => (
         <span className="font-medium text-right font-mono">{formatCurrency(r.estimatedCost)}</span>
       ),
     },
     {
       key: 'createdAt',
-      header: 'Date',
+      header: 'Дата',
       render: (r: typeof history[0]) => formatDate(r.createdAt),
     },
     {
@@ -497,10 +497,10 @@ function HistoryTab() {
       header: '',
       render: () => (
         <div className="flex items-center gap-1">
-          <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Download">
+          <button className="p-1.5 rounded hover:bg-muted transition-colors" title="Скачать">
             <Download size={14} className="text-muted-foreground" />
           </button>
-          <button className="p-1.5 rounded hover:bg-destructive/10 transition-colors" title="Delete">
+          <button className="p-1.5 rounded hover:bg-destructive/10 transition-colors" title="Удалить">
             <Trash2 size={14} className="text-muted-foreground hover:text-destructive" />
           </button>
         </div>
@@ -509,8 +509,8 @@ function HistoryTab() {
   ]
 
   return (
-    <Card hover title="Report History" subtitle="Previously generated QTO reports">
-      <Table columns={columns} data={history} emptyMessage="No reports generated yet" />
+    <Card hover title="История отчётов" subtitle="Ранее сформированные QTO-отчёты">
+      <Table columns={columns} data={history} emptyMessage="Отчёты пока не сформированы" />
     </Card>
   )
 }
@@ -519,17 +519,17 @@ function HistoryTab() {
 
 export default function QTOReportsPage() {
   const tabs = [
-    { id: 'generate', label: 'Generate Report', icon: <Play size={16} /> },
-    { id: 'history', label: 'Report History', icon: <Clock size={16} /> },
+    { id: 'generate', label: 'Сформировать отчёт', icon: <Play size={16} /> },
+    { id: 'history', label: 'История отчётов', icon: <Clock size={16} /> },
   ]
 
   return (
     <MotionPage><div className="space-y-6">
       {/* Header */}
       <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-        <h1 className="text-2xl font-bold text-foreground">QTO Reports</h1>
+        <h1 className="text-2xl font-bold text-foreground">Отчёты QTO</h1>
         <p className="text-muted-foreground mt-1">
-          Generate Quantity Take-Off reports from IFC models and Excel files
+          Формируйте отчёты Quantity Take-Off из IFC-моделей и Excel-файлов
         </p>
       </motion.div>
 
@@ -542,7 +542,7 @@ export default function QTOReportsPage() {
       >
         <motion.div variants={fadeInUp}>
           <StatCard
-            label="Total Elements"
+            label="Всего элементов"
             value={MOCK_QTO_REPORT.summary.totalElements}
             icon={Layers}
             color="primary"
@@ -550,7 +550,7 @@ export default function QTOReportsPage() {
         </motion.div>
         <motion.div variants={fadeInUp}>
           <StatCard
-            label="Categories"
+            label="Категории"
             value={MOCK_QTO_REPORT.summary.totalCategories}
             icon={BarChart3}
             color="success"
@@ -558,7 +558,7 @@ export default function QTOReportsPage() {
         </motion.div>
         <motion.div variants={fadeInUp}>
           <StatCard
-            label="Floors"
+            label="Этажи"
             value={MOCK_QTO_REPORT.summary.totalFloors}
             icon={Building2}
             color="warning"
@@ -566,10 +566,10 @@ export default function QTOReportsPage() {
         </motion.div>
         <motion.div variants={fadeInUp}>
           <StatCard
-            label="Estimated Cost"
+            label="Оценочная стоимость"
             value={formatCurrency(MOCK_QTO_REPORT.summary.estimatedCost)}
             color="primary"
-            trend={{ value: 3.2, label: 'from last estimate' }}
+            trend={{ value: 3.2, label: 'к прошлой оценке' }}
           />
         </motion.div>
       </motion.div>
