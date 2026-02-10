@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Workflow, Activity, Play, RefreshCw, Loader2,
   CheckCircle2, XCircle, AlertTriangle, Clock, Zap,
-  Server, ExternalLink,
+  Server,
 } from 'lucide-react'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
@@ -15,9 +15,11 @@ import {
   getN8nHealth,
   getN8nWorkflows,
   getN8nExecutions,
+  getN8nWorkflowTriggers,
   triggerN8nWorkflow,
   type N8nWorkflow,
   type N8nExecution,
+  type N8nWorkflowTriggerMap,
 } from '../../services/api'
 
 export default function N8nStatusPanel() {
@@ -25,16 +27,18 @@ export default function N8nStatusPanel() {
   const [n8nUrl, setN8nUrl] = useState('')
   const [workflows, setWorkflows] = useState<N8nWorkflow[]>([])
   const [executions, setExecutions] = useState<N8nExecution[]>([])
+  const [workflowTriggers, setWorkflowTriggers] = useState<N8nWorkflowTriggerMap[]>([])
   const [loading, setLoading] = useState(true)
   const [triggeringId, setTriggeringId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [health, wfs, execs] = await Promise.allSettled([
+      const [health, wfs, execs, triggers] = await Promise.allSettled([
         getN8nHealth(),
         getN8nWorkflows(),
         getN8nExecutions(),
+        getN8nWorkflowTriggers(),
       ])
 
       if (health.status === 'fulfilled') {
@@ -46,6 +50,7 @@ export default function N8nStatusPanel() {
 
       if (wfs.status === 'fulfilled') setWorkflows(wfs.value)
       if (execs.status === 'fulfilled') setExecutions(execs.value)
+      if (triggers.status === 'fulfilled') setWorkflowTriggers(triggers.value)
     } finally {
       setLoading(false)
     }
@@ -70,7 +75,6 @@ export default function N8nStatusPanel() {
   }
 
   const activeCount = workflows.filter((w) => w.active).length
-  const successCount = executions.filter((e) => e.status === 'success').length
   const errorCount = executions.filter((e) => e.status === 'error').length
 
   const tabs = [
@@ -78,19 +82,18 @@ export default function N8nStatusPanel() {
     { id: 'executions', label: 'Executions', icon: <Activity size={16} /> },
   ]
 
-  // Known webhook mappings for manual trigger buttons
-  const webhookMap: Record<string, string> = {
-    'CWICR v10.9 Telegram Bot (5zNg8gkl)': 'telegram-bot-5zNg8gkl',
-    'Text Estimator v11 Telegram Bot': 'telegram-bot-ygHTL-eo',
-    'n8n_1 converter': 'run-cYpR0z9b',
-    'n8n_2 converter': 'run-DO7lywP4',
-  }
+  function getWorkflowWebhookPath(workflowId: string): string | null {
+    const wfTriggerMap = workflowTriggers.find((item) => item.workflowId === workflowId)
+    if (!wfTriggerMap) return null
 
-  function getWebhookForWorkflow(name: string): string | undefined {
-    for (const [key, val] of Object.entries(webhookMap)) {
-      if (name.toLowerCase().includes(key.toLowerCase().slice(0, 10))) return val
-    }
-    return undefined
+    const trigger = wfTriggerMap.triggers.find((item) =>
+      item.triggerType === 'webhook'
+      && item.method === 'POST'
+      && !item.disabled
+      && !!item.endpointPath,
+    )
+
+    return trigger?.endpointPath || null
   }
 
   return (
@@ -183,7 +186,7 @@ export default function N8nStatusPanel() {
                     </p>
                   )}
                   {workflows.map((wf) => {
-                    const webhook = getWebhookForWorkflow(wf.name)
+                    const webhookPath = getWorkflowWebhookPath(wf.id)
                     return (
                       <motion.div
                         key={wf.id}
@@ -197,6 +200,7 @@ export default function N8nStatusPanel() {
                             <p className="text-xs text-muted-foreground">
                               ID: {wf.id}
                               {wf.updatedAt && ` · Updated: ${new Date(wf.updatedAt).toLocaleDateString()}`}
+                              {webhookPath && ` · Trigger: ${webhookPath}`}
                             </p>
                           </div>
                         </div>
@@ -204,14 +208,14 @@ export default function N8nStatusPanel() {
                           <Badge variant={wf.active ? 'success' : 'default'}>
                             {wf.active ? 'Active' : 'Inactive'}
                           </Badge>
-                          {webhook && online && (
+                          {webhookPath && online && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              icon={triggeringId === webhook
+                              icon={triggeringId === webhookPath
                                 ? <Loader2 size={14} className="animate-spin" />
                                 : <Play size={14} />}
-                              onClick={() => handleTrigger(webhook)}
+                              onClick={() => handleTrigger(webhookPath)}
                               disabled={!!triggeringId}
                             >
                               Trigger

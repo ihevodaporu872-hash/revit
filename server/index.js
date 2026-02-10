@@ -1803,6 +1803,18 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
 
 import n8nBridge from './n8n-bridge.js'
 
+function sendN8nError(res, err, fallbackMessage) {
+  const status = Number(err?.status)
+  const httpStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 502
+  const payload = {
+    error: fallbackMessage,
+    code: err?.code || 'N8N_ERROR',
+    message: err?.message || fallbackMessage,
+  }
+  if (err?.url) payload.url = err.url
+  res.status(httpStatus).json(payload)
+}
+
 // GET /api/n8n/health — Check if n8n is reachable
 app.get('/api/n8n/health', async (_req, res) => {
   try {
@@ -1820,7 +1832,18 @@ app.get('/api/n8n/workflows', async (_req, res) => {
     res.json(workflows)
   } catch (err) {
     console.error('[n8n] Failed to list workflows:', err.message)
-    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+    sendN8nError(res, err, 'Cannot list n8n workflows')
+  }
+})
+
+// GET /api/n8n/workflow-triggers — Trigger map for each workflow
+app.get('/api/n8n/workflow-triggers', async (_req, res) => {
+  try {
+    const triggerMap = await n8nBridge.listWorkflowTriggers()
+    res.json(triggerMap)
+  } catch (err) {
+    console.error('[n8n] Failed to list workflow triggers:', err.message)
+    sendN8nError(res, err, 'Cannot list n8n workflow triggers')
   }
 })
 
@@ -1832,7 +1855,7 @@ app.get('/api/n8n/executions', async (req, res) => {
     res.json(executions)
   } catch (err) {
     console.error('[n8n] Failed to get executions:', err.message)
-    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+    sendN8nError(res, err, 'Cannot list n8n executions')
   }
 })
 
@@ -1843,20 +1866,52 @@ app.get('/api/n8n/status/:executionId', async (req, res) => {
     res.json(execution)
   } catch (err) {
     console.error('[n8n] Failed to get execution status:', err.message)
-    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+    sendN8nError(res, err, 'Cannot get n8n execution status')
   }
 })
 
-// POST /api/n8n/trigger/:webhookPath — Trigger a workflow via webhook
-app.post('/api/n8n/trigger/:webhookPath', async (req, res) => {
+const triggerN8nWorkflowHandler = async (req, res) => {
   try {
-    const result = await n8nBridge.triggerWorkflow(req.params.webhookPath, req.body)
-    res.status(result.status).json(result.data)
+    const rawPath = req.params?.webhookPath || req.params?.[0] || req.body?.webhookPath
+    if (!rawPath || typeof rawPath !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid n8n trigger request',
+        code: 'INVALID_WEBHOOK_PATH',
+        message: 'webhookPath is required in URL or request body',
+      })
+    }
+
+    let webhookPath = rawPath
+    try {
+      webhookPath = decodeURIComponent(rawPath)
+    } catch {
+      // keep raw value if decoding fails
+    }
+
+    const payload = { ...(req.body || {}) }
+    delete payload.webhookPath
+
+    const result = await n8nBridge.triggerWorkflow(webhookPath, payload)
+
+    if (typeof result.data === 'string') {
+      return res.status(result.status).send(result.data)
+    }
+    if (result.data == null) {
+      return res.status(result.status).end()
+    }
+    return res.status(result.status).json(result.data)
   } catch (err) {
     console.error('[n8n] Failed to trigger workflow:', err.message)
-    res.status(502).json({ error: 'Cannot reach n8n', message: err.message })
+    return sendN8nError(res, err, 'Cannot trigger n8n workflow')
   }
-})
+}
+
+// POST /api/n8n/trigger/:webhookPath — Trigger a workflow via webhook
+app.post('/api/n8n/trigger/:webhookPath', triggerN8nWorkflowHandler)
+// Supports encoded/full paths that may include slashes
+app.post(/^\/api\/n8n\/trigger\/(.+)$/, triggerN8nWorkflowHandler)
+// Optional JSON contract: { webhookPath, ...payload }
+app.post('/api/n8n/trigger', triggerN8nWorkflowHandler)
 
 // ---------------------------------------------------------------------------
 // Static file serving for uploaded outputs
@@ -1894,9 +1949,11 @@ app.use((_req, res) => {
       'POST   /api/revit/properties/bulk',
       'GET    /api/n8n/health',
       'GET    /api/n8n/workflows',
+      'GET    /api/n8n/workflow-triggers',
       'GET    /api/n8n/executions',
       'GET    /api/n8n/status/:executionId',
       'POST   /api/n8n/trigger/:webhookPath',
+      'POST   /api/n8n/trigger',
     ],
   })
 })

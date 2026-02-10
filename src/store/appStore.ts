@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ModuleId = 'converter' | 'cad-viewer' | 'viewer' | 'cost' | 'validation' | 'ai-analysis' | 'project' | 'documents' | 'qto'
+export type ModuleId = 'converter' | 'cad-viewer' | 'viewer' | 'cost' | 'validation' | 'ai-analysis' | 'project' | 'documents' | 'qto' | 'n8n'
 
 interface Notification {
   id: string

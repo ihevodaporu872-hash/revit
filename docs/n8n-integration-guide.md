@@ -419,7 +419,35 @@ for (const wf of converterWorkflows) {
 
 ---
 
-### 5.3 `GET /api/n8n/executions`
+### 5.3 `GET /api/n8n/workflow-triggers`
+
+**Назначение:** Получить карту trigger-ов workflow-ов для UI (без hardcoded webhookMap)
+**Параметры:** нет
+**Ответ (200):**
+```json
+[
+  {
+    "workflowId": "cYpR0z9bjhqynRbHiF01z",
+    "workflowName": "n8n_1_Revit_IFC_DWG_Conversation_simple",
+    "active": true,
+    "updatedAt": "2026-02-09T19:01:28.000Z",
+    "triggers": [
+      {
+        "nodeName": "Webhook Trigger",
+        "triggerType": "webhook",
+        "method": "POST",
+        "path": "run-cYpR0z9b",
+        "endpointPath": "/webhook/run-cYpR0z9b",
+        "disabled": false
+      }
+    ]
+  }
+]
+```
+
+---
+
+### 5.4 `GET /api/n8n/executions`
 
 **Назначение:** Получить историю выполнений
 **Query параметры:**
@@ -447,7 +475,7 @@ for (const wf of converterWorkflows) {
 
 ---
 
-### 5.4 `GET /api/n8n/status/:executionId`
+### 5.5 `GET /api/n8n/status/:executionId`
 
 **Назначение:** Получить детали конкретного выполнения
 **Параметры:** `executionId` в URL
@@ -456,19 +484,25 @@ for (const wf of converterWorkflows) {
 
 ---
 
-### 5.5 `POST /api/n8n/trigger/:webhookPath`
+### 5.6 `POST /api/n8n/trigger/:webhookPath` и `POST /api/n8n/trigger`
 
 **Назначение:** Запустить workflow через webhook
-**Параметры:**
-- URL: `webhookPath` — идентификатор webhook (например `run-cYpR0z9b`)
-- Body: JSON с произвольными данными для workflow
+**Поддерживаемые варианты:**
+- `POST /api/n8n/trigger/:webhookPath`
+- `POST /api/n8n/trigger` с body `{ "webhookPath": "...", ...payload }`
+
+`webhookPath` может быть:
+- токеном (`run-cYpR0z9b`)
+- полным path (`/webhook/run-cYpR0z9b`)
+- `form` path (`/form/run-DO7lywP4`)
 
 **Пример:**
 ```
-POST /api/n8n/trigger/run-cYpR0z9b
+POST /api/n8n/trigger
 Content-Type: application/json
 
 {
+  "webhookPath": "/webhook/run-cYpR0z9b",
   "filePath": "/uploads/model.rvt",
   "outputFormat": "ifc",
   "source": "jens-platform"
@@ -600,9 +634,9 @@ await triggerN8nWorkflow('run-cYpR0z9b', {
 ### Как загружает данные
 
 При монтировании компонента (первый рендер):
-1. `Promise.allSettled([getN8nHealth(), getN8nWorkflows(), getN8nExecutions()])`
-2. Три запроса параллельно — если один упадёт, остальные всё равно отобразятся
-3. При нажатии Refresh — повторяет все три запроса
+1. `Promise.allSettled([getN8nHealth(), getN8nWorkflows(), getN8nExecutions(), getN8nWorkflowTriggers()])`
+2. Четыре запроса параллельно — если один упадёт, остальные всё равно отобразятся
+3. При нажатии Refresh — повторяет все четыре запроса
 4. После Trigger — ждёт 2 секунды и делает Refresh (чтобы новое execution появилось)
 
 ---
@@ -614,52 +648,60 @@ await triggerN8nWorkflow('run-cYpR0z9b', {
 
 **Это автономный скрипт** — не зависит от Express backend, не зависит от React. Напрямую обращается к n8n и Telegram API.
 
-### Конфигурация (строки 9-18)
+### Конфигурация (env-only)
 
-```js
-N8N_BASE = process.env.N8N_URL || 'https://actor-won-translation-supervisor.trycloudflare.com'
-TELEGRAM_TOKEN = '7579656533:AAHlGxCm2kRRtjauanKvxpEfNY9KV6LmCdo'
-```
+Скрипт больше не использует hardcoded URL/токены.
 
-Можно переопределить через env:
+Обязательная переменная:
 ```bash
-N8N_URL=http://localhost:5678 node scripts/n8n-test.mjs
+N8N_URL=https://your-n8n.example.com
 ```
 
-### 6 тестовых секций
+Опциональные переменные:
+```bash
+N8N_WEBHOOK_BASE_URL=https://your-webhook-base.example.com
+N8N_API_KEY=your_n8n_api_key
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+```
 
-#### Тест 1: `testHealth()`
-- GET `{N8N_BASE}/healthz`
-- PASS если HTTP 200, FAIL если недоступен
-- Если FAIL — тесты 2-4 пропускаются
+Поддерживается автозагрузка локального `.env` (из корня проекта), поэтому достаточно:
+```bash
+node scripts/n8n-test.mjs
+```
 
-#### Тест 2: `testListWorkflows()`
-- GET `{N8N_BASE}/api/v1/workflows`
-- Показывает список с пометками ACTIVE/INACTIVE
-- PASS если получен список
+### 9 тестовых секций
 
-#### Тест 3: `testExecutions()`
-- GET `{N8N_BASE}/api/v1/executions?limit=20`
-- Считает success/error/unknown
-- Показывает последние 5 с деталями
+#### 1) `testHealth()`
+- GET `{N8N_URL}/healthz`
+- Проверка доступности n8n
 
-#### Тест 4: `testWebhooks()`
-- POST с тестовыми данными на 4 webhook-а:
-  - `/webhook/telegram-bot-5zNg8gkl` — CWICR v10.9
-  - `/webhook/telegram-bot-ygHTL-eo` — Text Estimator v11
-  - `/webhook/run-cYpR0z9b` — n8n_1 Converter
-  - `/webhook/run-DO7lywP4` — n8n_2 Converter
-- PASS = HTTP 200/201, WARN = 404 (workflow неактивен), FAIL = недоступен
+#### 2) `testApiAuth()`
+- GET `{N8N_URL}/api/v1/workflows`
+- Проверка API-ключа и загрузки списка workflow
 
-#### Тест 5: `testTelegramWebhookInfo()`
-- GET `https://api.telegram.org/bot{TOKEN}/getWebhookInfo`
-- Проверяет: установлен ли webhook URL, есть ли ошибки, сколько pending updates
-- **Работает даже если n8n offline** — проверяет настройку Telegram
+#### 3) `discoverTriggers()`
+- GET `{N8N_URL}/api/v1/workflows/{id}` по каждому workflow
+- Автоматически строит карту webhook/form trigger-ов
 
-#### Тест 6: `testFormTrigger()`
-- GET `{N8N_BASE}/form/run-DO7lywP4`
-- Проверяет, отдаёт ли n8n HTML форму
-- PASS если в ответе есть `<form>` / `<input>` / `<html>`
+#### 4) `testExecutions()`
+- GET `{N8N_URL}/api/v1/executions?limit=20`
+- Корректно нормализует статус (`success|error|running`)
+
+#### 5) `testExecutionStatus()`
+- GET `{N8N_URL}/api/v1/executions/{executionId}`
+
+#### 6) `testWebhookTriggers()`
+- Real-run POST по всем найденным активным webhook trigger-ам
+
+#### 7) `testFormTriggers()`
+- GET для form trigger-ов (с авто fallback `run-{workflowId[0..8]}`)
+
+#### 8) `testTelegramWebhookInfo()`
+- GET `https://api.telegram.org/bot{TOKEN}/getWebhookInfo` (если задан токен)
+
+#### 9) `testNegativeCases()`
+- Неверный webhook path
+- Неверный API ключ (ожидаем 401/403)
 
 ### Итоговый отчёт
 
@@ -672,15 +714,10 @@ N8N_URL=http://localhost:5678 node scripts/n8n-test.mjs
   Warnings: 2
 ============================================================
 
-  Known Issues & Recommendations:
-  ──────────────────────────────────
-  ! Qdrant not deployed — CWICR semantic search disabled
-  ! OpenAI API missing — replace with Gemini for embeddings
-  ~ Cloudflare tunnel URL is temporary — webhook URLs will break
-  ~ Hardcoded paths (C:\Users\Artem Boiko\...) in CAD workflows
-  ~ CAD workflows (n8n_1-9) require local RvtExporter.exe
-  + Photo Cost Estimate Pro v2.0 — should work (form trigger)
-  + CWICR Telegram bots — will work after Qdrant + embeddings
+  Warnings:
+  - workflow/webhook нестабилен или неактивен
+  - Telegram webhook не установлен
+  - form trigger недоступен по текущему endpoint
 ```
 
 ---

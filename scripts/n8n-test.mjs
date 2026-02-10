@@ -1,23 +1,33 @@
 #!/usr/bin/env node
 // ============================================================================
-// n8n Workflow Test Script — Jens Platform
+// n8n Workflow Test Suite — Jens Platform
 // ============================================================================
-// Tests all n8n workflows via API: health, workflows, executions, webhooks
-// Usage: node scripts/n8n-test.mjs
+// Remote-first full integration checks using env-only config.
+// Required env:
+//   N8N_URL
+// Optional env:
+//   N8N_WEBHOOK_BASE_URL
+//   N8N_API_KEY
+//   TELEGRAM_BOT_TOKEN
 // ============================================================================
 
-const N8N_BASE = process.env.N8N_URL || 'https://actor-won-translation-supervisor.trycloudflare.com'
-const N8N_API = `${N8N_BASE}/api/v1`
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '7579656533:AAHlGxCm2kRRtjauanKvxpEfNY9KV6LmCdo'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const WEBHOOK_ENDPOINTS = [
-  { name: 'CWICR v10.9 #1 (Telegram Bot)', path: '/webhook/telegram-bot-5zNg8gkl', method: 'POST' },
-  { name: 'Text Estimator v11 (Telegram Bot)', path: '/webhook/telegram-bot-ygHTL-eo', method: 'POST' },
-  { name: 'n8n_1 Converter', path: '/webhook/run-cYpR0z9b', method: 'POST' },
-  { name: 'n8n_2 Converter', path: '/webhook/run-DO7lywP4', method: 'POST' },
-]
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const N8N_BASE = (process.env.N8N_URL || '').replace(/\/+$/, '')
+const N8N_WEBHOOK_BASE = (process.env.N8N_WEBHOOK_BASE_URL || N8N_BASE || '').replace(/\/+$/, '')
+const N8N_API_KEY = process.env.N8N_API_KEY || ''
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
+
+if (!N8N_BASE) {
+  console.error('ERROR: N8N_URL is required. Example: N8N_URL=https://your-n8n-url node scripts/n8n-test.mjs')
+  process.exit(1)
+}
 
 const colors = {
   green: (t) => `\x1b[32m${t}\x1b[0m`,
@@ -36,267 +46,475 @@ const SKIP = colors.dim('SKIP')
 let passed = 0
 let failed = 0
 let warned = 0
+const records = []
 
-function logResult(status, name, detail = '') {
+function logResult(status, name, detail = '', meta = {}) {
   const icon = status === 'pass' ? PASS : status === 'fail' ? FAIL : status === 'warn' ? WARN : SKIP
   console.log(`  ${icon}  ${name}${detail ? colors.dim(` — ${detail}`) : ''}`)
+  records.push({
+    status,
+    name,
+    detail,
+    ...meta,
+  })
+
   if (status === 'pass') passed++
   else if (status === 'fail') failed++
   else if (status === 'warn') warned++
 }
 
+function normalizeExecutionStatus(execution) {
+  if (execution?.status) return String(execution.status)
+  if (execution?.finished === true) return 'success'
+  if (execution?.finished === false) return 'error'
+  if (execution?.stoppedAt) return 'success'
+  return 'running'
+}
+
 async function safeFetch(url, options = {}, timeoutMs = 15000) {
   const controller = new AbortController()
+  const startedAt = Date.now()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const res = await fetch(url, { ...options, signal: controller.signal })
-    clearTimeout(timer)
-    return res
+    const durationMs = Date.now() - startedAt
+    return { ok: true, res, durationMs }
   } catch (err) {
+    const durationMs = Date.now() - startedAt
+    return { ok: false, err, durationMs }
+  } finally {
     clearTimeout(timer)
-    return { ok: false, status: 0, statusText: err.message, _error: true, json: async () => ({}), text: async () => '' }
   }
 }
 
-// ─── Test Sections ───────────────────────────────────────────────────────────
+async function readJsonResponse(res) {
+  const text = await res.text().catch(() => '')
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { raw: text }
+  }
+}
+
+function apiHeaders(extra = {}) {
+  const headers = { Accept: 'application/json', ...extra }
+  if (N8N_API_KEY) headers['X-N8N-API-KEY'] = N8N_API_KEY
+  return headers
+}
+
+async function n8nApiGet(path) {
+  const url = `${N8N_BASE}/api/v1/${String(path).replace(/^\/+/, '')}`
+  const result = await safeFetch(url, { headers: apiHeaders() }, 20000)
+  if (!result.ok) {
+    return { ok: false, status: 0, data: null, error: result.err.message, durationMs: result.durationMs, url }
+  }
+  const data = await readJsonResponse(result.res)
+  return {
+    ok: result.res.ok,
+    status: result.res.status,
+    data,
+    error: result.res.ok ? '' : JSON.stringify(data).slice(0, 200),
+    durationMs: result.durationMs,
+    url,
+  }
+}
+
+function detectTriggerType(nodeType = '') {
+  const type = String(nodeType || '')
+  if (type === 'n8n-nodes-base.webhook') return 'webhook'
+  if (type === 'n8n-nodes-base.formTrigger') return 'form'
+  if (type === 'n8n-nodes-base.telegramTrigger') return 'telegram'
+  if (type === 'n8n-nodes-base.scheduleTrigger') return 'schedule'
+  if (type === 'n8n-nodes-base.manualTrigger') return 'manual'
+  if (type === 'n8n-nodes-base.chatTrigger') return 'chat'
+  return null
+}
+
+function buildEndpointPath(workflowId, triggerType, path, webhookId) {
+  const cleanPath = (path || '').toString().trim().replace(/^\/+/, '')
+  if (triggerType === 'webhook') return cleanPath ? `/webhook/${cleanPath}` : null
+  if (triggerType === 'form') {
+    if (cleanPath) return `/form/${cleanPath}`
+    if (webhookId) return `/form/${webhookId}`
+    return `/form/run-${String(workflowId).slice(0, 8)}`
+  }
+  return null
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
 
 async function testHealth() {
   console.log(colors.bold('\n1. Health Check'))
-  console.log(colors.dim(`   ${N8N_BASE}/healthz`))
+  const url = `${N8N_BASE}/healthz`
+  console.log(colors.dim(`   GET ${url}`))
 
-  const res = await safeFetch(`${N8N_BASE}/healthz`)
-  if (res.ok) {
-    logResult('pass', 'n8n instance is reachable', `HTTP ${res.status}`)
-  } else if (res._error) {
-    logResult('fail', 'n8n instance unreachable', res.statusText)
-  } else {
-    logResult('warn', 'n8n responded with non-200', `HTTP ${res.status}`)
+  const result = await safeFetch(url, { headers: apiHeaders() }, 8000)
+  if (!result.ok) {
+    logResult('fail', 'n8n unreachable', result.err.message, { url, latencyMs: result.durationMs })
+    return false
   }
-  return res.ok
+  if (!result.res.ok) {
+    logResult('warn', 'n8n non-200 health response', `HTTP ${result.res.status}`, { url, latencyMs: result.durationMs })
+    return false
+  }
+  logResult('pass', 'n8n instance reachable', `HTTP ${result.res.status}`, { url, latencyMs: result.durationMs })
+  return true
 }
 
-async function testListWorkflows() {
-  console.log(colors.bold('\n2. Workflows'))
-  console.log(colors.dim(`   GET ${N8N_API}/workflows`))
+async function testApiAuth() {
+  console.log(colors.bold('\n2. API Auth & Workflow List'))
+  console.log(colors.dim(`   GET ${N8N_BASE}/api/v1/workflows`))
 
-  const res = await safeFetch(`${N8N_API}/workflows`)
-  if (!res.ok) {
-    logResult('fail', 'Cannot fetch workflows', res._error ? res.statusText : `HTTP ${res.status}`)
+  const response = await n8nApiGet('/workflows')
+  if (!response.ok) {
+    const level = response.status === 401 || response.status === 403 ? 'fail' : 'warn'
+    logResult(level, 'Cannot access n8n API workflows', response.error || `HTTP ${response.status}`, {
+      url: response.url,
+      httpStatus: response.status,
+      latencyMs: response.durationMs,
+    })
     return []
   }
 
-  let data
-  try {
-    data = await res.json()
-  } catch {
-    logResult('fail', 'Invalid JSON response')
-    return []
-  }
-
-  const workflows = data.data || data || []
-  logResult('pass', `Found ${workflows.length} workflows`)
+  const workflows = response.data?.data || response.data || []
+  logResult('pass', `Loaded workflows: ${workflows.length}`, `HTTP ${response.status}`, {
+    url: response.url,
+    httpStatus: response.status,
+    latencyMs: response.durationMs,
+  })
 
   for (const wf of workflows) {
     const active = wf.active ? colors.green('ACTIVE') : colors.red('INACTIVE')
-    console.log(`         ${active}  ${colors.cyan(wf.name || wf.id)}  ${colors.dim(`id:${wf.id}`)}`)
+    console.log(`         ${active} ${colors.cyan(wf.name || wf.id)} ${colors.dim(`id:${wf.id}`)}`)
   }
-
   return workflows
 }
 
+async function discoverTriggers(workflows) {
+  console.log(colors.bold('\n3. Trigger Discovery'))
+  const triggerMap = []
+  let failures = 0
+
+  for (const workflow of workflows) {
+    const details = await n8nApiGet(`/workflows/${encodeURIComponent(workflow.id)}`)
+    if (!details.ok) {
+      failures++
+      logResult('warn', `Cannot inspect workflow ${workflow.id}`, details.error || `HTTP ${details.status}`, {
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+      })
+      continue
+    }
+
+    const nodes = Array.isArray(details.data?.nodes) ? details.data.nodes : []
+    const triggers = []
+
+    for (const node of nodes) {
+      const triggerType = detectTriggerType(node.type)
+      if (!triggerType) continue
+      const method = node?.parameters?.httpMethod ? String(node.parameters.httpMethod).toUpperCase() : (triggerType === 'webhook' ? 'POST' : triggerType === 'form' ? 'GET' : null)
+      const endpointPath = buildEndpointPath(workflow.id, triggerType, node?.parameters?.path, node?.webhookId)
+      triggers.push({
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        workflowActive: !!workflow.active,
+        nodeName: node.name || '',
+        nodeType: node.type || '',
+        triggerType,
+        method,
+        endpointPath,
+        disabled: !!node.disabled,
+      })
+    }
+
+    triggerMap.push(...triggers)
+  }
+
+  const activeTriggerCount = triggerMap.filter((t) => !t.disabled).length
+  const webhookCount = triggerMap.filter((t) => t.triggerType === 'webhook' && !t.disabled).length
+  const formCount = triggerMap.filter((t) => t.triggerType === 'form' && !t.disabled).length
+
+  if (failures > 0) {
+    logResult('warn', 'Trigger discovery completed with partial failures', `${failures} workflows not inspectable`)
+  }
+  logResult('pass', `Discovered active triggers: ${activeTriggerCount}`, `webhooks=${webhookCount}, forms=${formCount}`)
+
+  return triggerMap
+}
+
 async function testExecutions() {
-  console.log(colors.bold('\n3. Recent Executions'))
-  console.log(colors.dim(`   GET ${N8N_API}/executions?limit=20`))
-
-  const res = await safeFetch(`${N8N_API}/executions?limit=20`)
-  if (!res.ok) {
-    logResult('fail', 'Cannot fetch executions', res._error ? res.statusText : `HTTP ${res.status}`)
-    return
+  console.log(colors.bold('\n4. Executions'))
+  const response = await n8nApiGet('/executions?limit=20')
+  if (!response.ok) {
+    logResult('fail', 'Cannot fetch executions', response.error || `HTTP ${response.status}`, {
+      url: response.url,
+      httpStatus: response.status,
+      latencyMs: response.durationMs,
+    })
+    return []
   }
 
-  let data
-  try {
-    data = await res.json()
-  } catch {
-    logResult('fail', 'Invalid JSON response')
-    return
-  }
-
-  const execs = data.data || data || []
-  logResult('pass', `Found ${execs.length} recent executions`)
+  const executions = response.data?.data || response.data || []
+  logResult('pass', `Loaded executions: ${executions.length}`, `HTTP ${response.status}`, {
+    url: response.url,
+    latencyMs: response.durationMs,
+  })
 
   const statusCounts = {}
-  for (const ex of execs) {
-    const s = ex.status || ex.finished ? 'success' : 'unknown'
+  for (const ex of executions) {
+    const s = normalizeExecutionStatus(ex)
     statusCounts[s] = (statusCounts[s] || 0) + 1
   }
-
   for (const [status, count] of Object.entries(statusCounts)) {
     const color = status === 'success' ? colors.green : status === 'error' ? colors.red : colors.yellow
     console.log(`         ${color(status)}: ${count}`)
   }
 
-  // Show last 5 with details
-  const recent = execs.slice(0, 5)
-  if (recent.length > 0) {
-    console.log(colors.dim('         Last 5:'))
-    for (const ex of recent) {
-      const wfName = ex.workflowData?.name || ex.workflowId || '?'
-      const status = ex.status || (ex.finished ? 'finished' : 'running')
-      const started = ex.startedAt ? new Date(ex.startedAt).toLocaleString() : '?'
-      const statusColor = status === 'success' ? colors.green : status === 'error' ? colors.red : colors.yellow
-      console.log(`         ${statusColor(status.padEnd(8))} ${wfName}  ${colors.dim(started)}`)
-    }
-  }
+  return executions
 }
 
-async function testWebhooks() {
-  console.log(colors.bold('\n4. Webhook Endpoints'))
+async function testExecutionStatus(executions) {
+  console.log(colors.bold('\n5. Single Execution Status'))
+  const sample = executions[0]
+  if (!sample?.id) {
+    logResult('skip', 'No execution available for /status check')
+    return
+  }
+  const response = await n8nApiGet(`/executions/${encodeURIComponent(sample.id)}`)
+  if (!response.ok) {
+    logResult('fail', `Cannot fetch execution ${sample.id}`, response.error || `HTTP ${response.status}`)
+    return
+  }
+  const status = normalizeExecutionStatus(response.data)
+  logResult('pass', `Execution ${sample.id} status fetched`, status, {
+    executionId: sample.id,
+    latencyMs: response.durationMs,
+  })
+}
 
-  for (const ep of WEBHOOK_ENDPOINTS) {
-    const url = `${N8N_BASE}${ep.path}`
-    console.log(colors.dim(`   ${ep.method} ${url}`))
+async function testWebhookTriggers(triggerMap) {
+  console.log(colors.bold('\n6. Webhook Real-Run'))
+  const webhookTriggers = triggerMap
+    .filter((t) => t.triggerType === 'webhook' && !t.disabled && t.endpointPath && (t.method || 'POST') === 'POST')
 
-    const testPayload = {
-      test: true,
-      source: 'n8n-test.mjs',
+  if (webhookTriggers.length === 0) {
+    logResult('skip', 'No active webhook POST triggers found')
+    return []
+  }
+
+  const results = []
+  for (const trigger of webhookTriggers) {
+    const url = `${N8N_WEBHOOK_BASE}${trigger.endpointPath}`
+    console.log(colors.dim(`   POST ${url}`))
+
+    const payload = {
+      source: 'scripts/n8n-test.mjs',
+      workflowId: trigger.workflowId,
+      workflowName: trigger.workflowName,
       timestamp: new Date().toISOString(),
-      message: 'Test webhook from Jens Platform',
+      test: true,
+      message: 'Automated webhook integration test',
     }
 
-    const res = await safeFetch(url, {
-      method: ep.method,
+    const result = await safeFetch(url, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(testPayload),
-    })
+      body: JSON.stringify(payload),
+    }, 25000)
 
-    if (res._error) {
-      logResult('fail', ep.name, `Unreachable: ${res.statusText}`)
-    } else if (res.status === 404) {
-      logResult('warn', ep.name, 'Webhook not found (404) — workflow may be inactive')
-    } else if (res.status === 200 || res.status === 201) {
-      let body = ''
-      try { body = await res.text() } catch { /* */ }
-      logResult('pass', ep.name, `HTTP ${res.status}${body ? ` — ${body.slice(0, 80)}` : ''}`)
+    if (!result.ok) {
+      logResult('fail', `${trigger.workflowName} :: ${trigger.nodeName}`, result.err.message, {
+        endpoint: trigger.endpointPath,
+      })
+      results.push({ trigger, ok: false, error: result.err.message })
+      continue
+    }
+
+    const body = await readJsonResponse(result.res)
+    if (result.res.status === 404) {
+      logResult('warn', `${trigger.workflowName} :: ${trigger.nodeName}`, 'Webhook returned 404', {
+        endpoint: trigger.endpointPath,
+        httpStatus: result.res.status,
+      })
+    } else if (result.res.ok) {
+      logResult('pass', `${trigger.workflowName} :: ${trigger.nodeName}`, `HTTP ${result.res.status}`, {
+        endpoint: trigger.endpointPath,
+        httpStatus: result.res.status,
+        latencyMs: result.durationMs,
+      })
     } else {
-      logResult('warn', ep.name, `HTTP ${res.status} ${res.statusText}`)
+      logResult('warn', `${trigger.workflowName} :: ${trigger.nodeName}`, `HTTP ${result.res.status}`, {
+        endpoint: trigger.endpointPath,
+        httpStatus: result.res.status,
+      })
+    }
+    results.push({ trigger, ok: result.res.ok, status: result.res.status, body })
+  }
+  return results
+}
+
+async function testFormTriggers(triggerMap) {
+  console.log(colors.bold('\n7. Form Trigger Check'))
+  const formTriggers = triggerMap.filter((t) => t.triggerType === 'form' && !t.disabled && t.endpointPath)
+
+  if (formTriggers.length === 0) {
+    logResult('skip', 'No active form triggers found')
+    return
+  }
+
+  for (const trigger of formTriggers) {
+    const url = `${N8N_WEBHOOK_BASE}${trigger.endpointPath}`
+    console.log(colors.dim(`   GET ${url}`))
+    const result = await safeFetch(url, {}, 15000)
+    if (!result.ok) {
+      logResult('warn', `${trigger.workflowName} :: form`, result.err.message, { endpoint: trigger.endpointPath })
+      continue
+    }
+    const html = await result.res.text().catch(() => '')
+    const hasForm = /<form|<input|<html/i.test(html)
+    if (result.res.ok && hasForm) {
+      logResult('pass', `${trigger.workflowName} :: form reachable`, `HTTP ${result.res.status}`, {
+        endpoint: trigger.endpointPath,
+        httpStatus: result.res.status,
+      })
+    } else if (result.res.ok) {
+      logResult('warn', `${trigger.workflowName} :: form response unclear`, `${html.length} bytes`, {
+        endpoint: trigger.endpointPath,
+      })
+    } else {
+      logResult('warn', `${trigger.workflowName} :: form non-200`, `HTTP ${result.res.status}`, {
+        endpoint: trigger.endpointPath,
+      })
     }
   }
 }
 
 async function testTelegramWebhookInfo() {
-  console.log(colors.bold('\n5. Telegram Webhook Info'))
-  console.log(colors.dim(`   Checking bot webhook configuration...`))
+  console.log(colors.bold('\n8. Telegram Webhook Info'))
+  if (!TELEGRAM_TOKEN) {
+    logResult('skip', 'TELEGRAM_BOT_TOKEN not set, skipping Telegram API check')
+    return
+  }
 
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/getWebhookInfo`
-  const res = await safeFetch(url)
-
-  if (res._error) {
-    logResult('fail', 'Cannot reach Telegram API', res.statusText)
+  const result = await safeFetch(url, {}, 10000)
+  if (!result.ok) {
+    logResult('fail', 'Cannot reach Telegram API', result.err.message)
     return
   }
-
-  let data
-  try {
-    data = await res.json()
-  } catch {
-    logResult('fail', 'Invalid response from Telegram')
-    return
-  }
-
+  const data = await readJsonResponse(result.res)
   if (!data.ok) {
-    logResult('fail', 'Telegram API error', data.description || 'Unknown')
+    logResult('fail', 'Telegram API returned error', data.description || `HTTP ${result.res.status}`)
+    return
+  }
+  const info = data.result || {}
+  if (info.url) {
+    logResult('pass', 'Telegram webhook configured', info.url, { pendingUpdates: info.pending_update_count || 0 })
+  } else {
+    logResult('warn', 'Telegram webhook URL is empty')
+  }
+}
+
+async function testNegativeCases() {
+  console.log(colors.bold('\n9. Negative Cases'))
+  const invalidWebhook = `${N8N_WEBHOOK_BASE}/webhook/__non_existing_trigger_for_test__`
+  const res = await safeFetch(invalidWebhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ test: true }),
+  }, 10000)
+
+  if (!res.ok) {
+    logResult('warn', 'Invalid webhook path network error', res.err.message)
+    return
+  }
+  if (res.res.status === 404 || res.res.status === 400) {
+    logResult('pass', 'Invalid webhook path handled correctly', `HTTP ${res.res.status}`)
+  } else {
+    logResult('warn', 'Invalid webhook path unexpected status', `HTTP ${res.res.status}`)
+  }
+
+  if (!N8N_API_KEY) {
+    logResult('skip', 'N8N_API_KEY not set, skipping invalid-key API case')
     return
   }
 
-  const info = data.result
-  if (info.url) {
-    logResult('pass', 'Webhook is set', info.url)
-    if (info.last_error_date) {
-      const errorAge = Math.round((Date.now() / 1000 - info.last_error_date) / 60)
-      logResult('warn', 'Last webhook error', `${info.last_error_message} (${errorAge} min ago)`)
-    }
-    console.log(`         Pending updates: ${info.pending_update_count || 0}`)
-    if (info.ip_address) console.log(`         IP: ${info.ip_address}`)
+  const wrongKeyResult = await safeFetch(`${N8N_BASE}/api/v1/workflows`, {
+    headers: { 'X-N8N-API-KEY': 'invalid-key-for-test', Accept: 'application/json' },
+  }, 10000)
+
+  if (!wrongKeyResult.ok) {
+    logResult('warn', 'Invalid API key test failed by network error', wrongKeyResult.err.message)
+    return
+  }
+
+  if (wrongKeyResult.res.status === 401 || wrongKeyResult.res.status === 403) {
+    logResult('pass', 'Invalid API key correctly rejected', `HTTP ${wrongKeyResult.res.status}`)
   } else {
-    logResult('warn', 'No webhook URL set', 'Bot is not configured for webhooks')
+    logResult('warn', 'Invalid API key unexpected response', `HTTP ${wrongKeyResult.res.status}`)
   }
 }
-
-async function testFormTrigger() {
-  console.log(colors.bold('\n6. Form Trigger (n8n_2)'))
-
-  // Form triggers respond to GET with the form HTML
-  const formUrl = `${N8N_BASE}/form/run-DO7lywP4`
-  console.log(colors.dim(`   GET ${formUrl}`))
-
-  const res = await safeFetch(formUrl)
-  if (res._error) {
-    logResult('fail', 'Form trigger unreachable', res.statusText)
-  } else if (res.ok) {
-    const body = await res.text().catch(() => '')
-    const hasForm = body.includes('form') || body.includes('input') || body.includes('html')
-    if (hasForm) {
-      logResult('pass', 'Form trigger responds with form HTML')
-    } else {
-      logResult('warn', 'Form trigger responded but content unclear', `${body.length} bytes`)
-    }
-  } else {
-    logResult('warn', 'Form trigger returned', `HTTP ${res.status}`)
-  }
-}
-
-// ─── Report ──────────────────────────────────────────────────────────────────
 
 function printReport() {
-  console.log('\n' + '='.repeat(60))
-  console.log(colors.bold('  n8n Test Report'))
-  console.log('='.repeat(60))
+  console.log('\n' + '='.repeat(72))
+  console.log(colors.bold('  n8n Integration Test Report'))
+  console.log('='.repeat(72))
   console.log(`  ${colors.green(`Passed: ${passed}`)}`)
   console.log(`  ${colors.red(`Failed: ${failed}`)}`)
   console.log(`  ${colors.yellow(`Warnings: ${warned}`)}`)
-  console.log('='.repeat(60))
+  console.log('='.repeat(72))
 
-  console.log(colors.bold('\n  Known Issues & Recommendations:'))
-  console.log(colors.dim('  ──────────────────────────────────'))
-  console.log(`  ${colors.red('!')} Qdrant not deployed — CWICR semantic search disabled`)
-  console.log(`  ${colors.red('!')} OpenAI API missing — replace with Gemini for embeddings`)
-  console.log(`  ${colors.yellow('~')} Cloudflare tunnel URL is temporary — webhook URLs will break`)
-  console.log(`  ${colors.yellow('~')} Hardcoded paths (C:\\Users\\Artem Boiko\\...) in CAD workflows`)
-  console.log(`  ${colors.yellow('~')} CAD workflows (n8n_1-9) require local RvtExporter.exe`)
-  console.log(`  ${colors.green('+')} Photo Cost Estimate Pro v2.0 — should work (form trigger)`)
-  console.log(`  ${colors.green('+')} CWICR Telegram bots — will work after Qdrant + embeddings`)
-  console.log('')
+  const fails = records.filter((r) => r.status === 'fail')
+  const warns = records.filter((r) => r.status === 'warn')
+
+  if (fails.length > 0) {
+    console.log(colors.bold('\n  Failed cases:'))
+    for (const f of fails) {
+      console.log(`  - ${f.name}: ${f.detail || 'No details'}`)
+    }
+  }
+  if (warns.length > 0) {
+    console.log(colors.bold('\n  Warnings:'))
+    for (const w of warns) {
+      console.log(`  - ${w.name}: ${w.detail || 'No details'}`)
+    }
+  }
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('='.repeat(60))
+  console.log('='.repeat(72))
   console.log(colors.bold('  n8n Workflow Test Suite — Jens Platform'))
-  console.log(colors.dim(`  Target: ${N8N_BASE}`))
-  console.log(colors.dim(`  Time:   ${new Date().toLocaleString()}`))
-  console.log('='.repeat(60))
+  console.log(colors.dim(`  N8N_URL:            ${N8N_BASE}`))
+  console.log(colors.dim(`  N8N_WEBHOOK_BASE:   ${N8N_WEBHOOK_BASE || '(not set)'}`))
+  console.log(colors.dim(`  N8N_API_KEY:        ${N8N_API_KEY ? `set (len=${N8N_API_KEY.length})` : 'not set'}`))
+  console.log(colors.dim(`  TELEGRAM_BOT_TOKEN: ${TELEGRAM_TOKEN ? 'set' : 'not set'}`))
+  console.log(colors.dim(`  Time:               ${new Date().toLocaleString()}`))
+  console.log('='.repeat(72))
 
   const healthy = await testHealth()
-
-  if (healthy) {
-    await testListWorkflows()
-    await testExecutions()
-    await testWebhooks()
-  } else {
-    console.log(colors.red('\n  n8n is unreachable — skipping API tests'))
-    console.log(colors.dim('  Make sure n8n is running and the URL is correct'))
-    console.log(colors.dim(`  Current URL: ${N8N_BASE}`))
+  if (!healthy) {
+    printReport()
+    process.exit(failed > 0 ? 1 : 0)
   }
 
+  const workflows = await testApiAuth()
+  const triggerMap = workflows.length > 0 ? await discoverTriggers(workflows) : []
+  const executions = await testExecutions()
+  await testExecutionStatus(executions)
+  await testWebhookTriggers(triggerMap)
+  await testFormTriggers(triggerMap)
   await testTelegramWebhookInfo()
-  await testFormTrigger()
+  await testNegativeCases()
 
   printReport()
+  process.exit(failed > 0 ? 1 : 0)
 }
 
 main().catch((err) => {
-  console.error(colors.red('Fatal error:'), err.message)
+  console.error(colors.red(`Fatal error: ${err.message}`))
   process.exit(1)
 })

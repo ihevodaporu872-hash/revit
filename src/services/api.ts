@@ -418,6 +418,26 @@ export interface N8nExecution {
   mode: string
 }
 
+export interface N8nWorkflowTrigger {
+  nodeId: string | null
+  nodeName: string | null
+  nodeType: string | null
+  triggerType: 'webhook' | 'form' | 'telegram' | 'schedule' | 'manual' | 'chat'
+  method: string | null
+  path: string | null
+  endpointPath: string | null
+  webhookId: string | null
+  disabled: boolean
+}
+
+export interface N8nWorkflowTriggerMap {
+  workflowId: string
+  workflowName: string
+  active: boolean
+  updatedAt: string
+  triggers: N8nWorkflowTrigger[]
+}
+
 export async function getN8nHealth(): Promise<{ online: boolean; url: string }> {
   const response = await fetch(`${API_BASE}/n8n/health`)
   return handleResponse<{ online: boolean; url: string }>(response)
@@ -435,16 +455,22 @@ export async function getN8nExecutions(workflowId?: string, limit = 20): Promise
   return handleResponse<N8nExecution[]>(response)
 }
 
+export async function getN8nWorkflowTriggers(): Promise<N8nWorkflowTriggerMap[]> {
+  const response = await fetch(`${API_BASE}/n8n/workflow-triggers`)
+  return handleResponse<N8nWorkflowTriggerMap[]>(response)
+}
+
 export async function getN8nExecutionStatus(executionId: string): Promise<N8nExecution> {
   const response = await fetch(`${API_BASE}/n8n/status/${encodeURIComponent(executionId)}`)
   return handleResponse<N8nExecution>(response)
 }
 
 export async function triggerN8nWorkflow(webhookPath: string, data: Record<string, unknown> = {}): Promise<unknown> {
-  const response = await fetch(`${API_BASE}/n8n/trigger/${encodeURIComponent(webhookPath)}`, {
+  const payload = { ...data, webhookPath }
+  const response = await fetch(`${API_BASE}/n8n/trigger`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   })
   return handleResponse<unknown>(response)
 }
