@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "server": "node server/index.js",
-    "dev:server": "node --watch server/index.js",
+    "server": "set PORT=3101&& node server/index.js",
+    "dev:server": "set PORT=3101&& node --watch server/index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "postinstall": "node scripts/copy-cad-workers.js"
   },

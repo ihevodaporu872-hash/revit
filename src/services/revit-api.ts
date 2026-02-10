@@ -1,6 +1,53 @@
 import type { IFCElementInfo, RevitProperties, CoverageSummary, MatchDiagnostic } from '../components/Viewer3D/ifc/types'
 
-const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
+function normalizeApiRoot(base: string): string {
+  const trimmed = String(base || '').trim().replace(/\/+$/, '')
+  if (!trimmed) return ''
+  return trimmed.replace(/\/api$/i, '')
+}
+
+function buildApiBases(): string[] {
+  const envRoot = normalizeApiRoot(import.meta.env.VITE_API_URL || '')
+  const candidates = [
+    envRoot ? `${envRoot}/api` : '/api',
+    'http://127.0.0.1:3101/api',
+    'http://localhost:3101/api',
+    'http://127.0.0.1:3001/api',
+    'http://localhost:3001/api',
+  ]
+  const seen = new Set<string>()
+  return candidates.filter((candidate) => {
+    const key = candidate.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const API_BASES = buildApiBases()
+
+async function fetchWithFallback(endpoint: string, init: RequestInit): Promise<Response> {
+  let lastResponse: Response | null = null
+  let lastError: unknown = null
+
+  for (let i = 0; i < API_BASES.length; i += 1) {
+    const base = API_BASES[i]
+    try {
+      const response = await fetch(`${base}${endpoint}`, init)
+      // 404 often means wrong backend target (e.g. another app on same port).
+      if (response.status === 404 && i < API_BASES.length - 1) {
+        lastResponse = response
+        continue
+      }
+      return response
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  if (lastResponse) return lastResponse
+  throw lastError instanceof Error ? lastError : new Error('API request failed')
+}
 
 interface ApiErrorShape {
   error?: string
@@ -97,7 +144,7 @@ export interface RevitProcessModelResponse {
 }
 
 export async function uploadRevitXlsx(formData: FormData): Promise<RevitUploadResponse> {
-  const response = await fetch(`${API_BASE}/revit/upload-xlsx`, {
+  const response = await fetchWithFallback('/revit/upload-xlsx', {
     method: 'POST',
     body: formData,
   })
@@ -105,7 +152,7 @@ export async function uploadRevitXlsx(formData: FormData): Promise<RevitUploadRe
 }
 
 export async function processRevitModel(formData: FormData): Promise<RevitProcessModelResponse> {
-  const response = await fetch(`${API_BASE}/revit/process-model`, {
+  const response = await fetchWithFallback('/revit/process-model', {
     method: 'POST',
     body: formData,
   })
@@ -132,7 +179,7 @@ export async function fetchRevitPropertiesBulk(params: {
   results: RevitProperties[]
   unresolved: { globalIds: string[]; elementIds: number[] }
 }> {
-  const response = await fetch(`${API_BASE}/revit/properties/bulk`, {
+  const response = await fetchWithFallback('/revit/properties/bulk', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -173,7 +220,7 @@ export async function requestRevitMatchReport(params: {
   modelVersion?: string
   ifcElements: IFCElementInfo[]
 }): Promise<RevitMatchReportResponse> {
-  const response = await fetch(`${API_BASE}/revit/match-report`, {
+  const response = await fetchWithFallback('/revit/match-report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

@@ -129,36 +129,55 @@ const upload = multer({
 // Converter Paths
 // ---------------------------------------------------------------------------
 
-const PIPELINE_ROOT = path.join(
-  PROJECT_ROOT,
-  'cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto'
-)
+const DEFAULT_PIPELINE_DIRNAME = 'cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto'
+const userHome = process.env.USERPROFILE || process.env.HOME || ''
+const pipelineCandidates = [
+  process.env.DDC_PIPELINE_ROOT,
+  path.join(PROJECT_ROOT, DEFAULT_PIPELINE_DIRNAME),
+  path.join(userHome, 'PycharmProjects', 'PythonProject4', DEFAULT_PIPELINE_DIRNAME),
+  path.join(userHome, 'Documents', 'GitHub', 'ML-data-BIM'),
+].filter(Boolean)
+
+const PIPELINE_ROOT = pipelineCandidates.find((candidate) => existsSync(candidate))
+  || path.join(PROJECT_ROOT, DEFAULT_PIPELINE_DIRNAME)
+
+function envOr(value, fallback) {
+  const text = String(value || '').trim()
+  return text.length > 0 ? text : fallback
+}
 
 const CONVERTER_PATHS = {
   rvt: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_REVIT'),
-    exe: 'RvtExporter.exe',
+    dir: envOr(process.env.RVT_CONVERTER_DIR, path.join(PIPELINE_ROOT, 'DDC_CONVERTER_REVIT')),
+    exe: envOr(process.env.RVT_CONVERTER_EXE, 'RvtExporter.exe'),
     label: 'Revit',
   },
+  rvt_ifc: {
+    dir: envOr(process.env.RVT2IFC_CONVERTER_DIR, path.join(PIPELINE_ROOT, 'AI10_CONVERTER_Revit2IFC', 'DDC_REVIT2IFC_CONVERTER')),
+    exe: envOr(process.env.RVT2IFC_CONVERTER_EXE, 'RVT2IFCconverter.exe'),
+    label: 'Revit2IFC',
+  },
   ifc: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_IFC'),
-    exe: 'IfcExporter.exe',
+    dir: envOr(process.env.IFC_CONVERTER_DIR, path.join(PIPELINE_ROOT, 'DDC_CONVERTER_IFC')),
+    exe: envOr(process.env.IFC_CONVERTER_EXE, 'IfcExporter.exe'),
     label: 'IFC',
   },
   dwg: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DWG'),
-    exe: 'DwgExporter.exe',
+    dir: envOr(process.env.DWG_CONVERTER_DIR, path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DWG')),
+    exe: envOr(process.env.DWG_CONVERTER_EXE, 'DwgExporter.exe'),
     label: 'DWG',
   },
   dgn: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DGN'),
-    exe: 'DgnExporter.exe',
+    dir: envOr(process.env.DGN_CONVERTER_DIR, path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DGN')),
+    exe: envOr(process.env.DGN_CONVERTER_EXE, 'DgnExporter.exe'),
     label: 'DGN',
   },
 }
 
-const ENABLE_RVT_CONVERTER = ['1', 'true', 'yes', 'on']
-  .includes(String(process.env.ENABLE_RVT_CONVERTER || '').trim().toLowerCase())
+const rvConverterFlag = String(process.env.ENABLE_RVT_CONVERTER || '').trim().toLowerCase()
+const ENABLE_RVT_CONVERTER = ['0', 'false', 'no', 'off'].includes(rvConverterFlag)
+  ? false
+  : true
 
 const REQUIRED_SUPABASE_TABLES = ['ifc_element_properties']
 const OPTIONAL_SUPABASE_TABLES = ['model_runs', 'match_reports', 'match_overrides']
@@ -2271,8 +2290,24 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
 
     outputDir = path.join(UPLOADS_DIR, `rvt-${Date.now()}`)
     await fs.mkdir(outputDir, { recursive: true })
+    const uploadsSnapshotBefore = new Set(await fs.readdir(UPLOADS_DIR))
+    const isArtifactFile = (fileName) => {
+      const lower = String(fileName || '').toLowerCase()
+      return lower.endsWith('.ifc') || lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.dae')
+    }
+    const moveToOutputDir = async (fileName) => {
+      const source = path.join(UPLOADS_DIR, fileName)
+      const target = path.join(outputDir, fileName)
+      if (source === target) return
+      try {
+        await fs.rename(source, target)
+      } catch {
+        await fs.copyFile(source, target)
+        await safeUnlink(source)
+      }
+    }
 
-    const { execSync } = await import('child_process')
+    const { execSync, execFileSync } = await import('child_process')
     const candidateCommands = [
       {
         cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" --ifc-schema "${requestedIfcSchema}"`,
@@ -2293,26 +2328,130 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
 
     let executed = null
     let lastExecError = null
+    const converterAttempts = []
     for (const candidate of candidateCommands) {
       try {
         console.log(`[Revit Process] Running: ${candidate.cmd}`)
-        execSync(candidate.cmd, { timeout: 300000, stdio: 'pipe' })
-        executed = candidate
-        break
+        const stdout = execSync(candidate.cmd, { timeout: 300000, stdio: 'pipe', encoding: 'utf8' })
+        const outputDirFiles = await fs.readdir(outputDir)
+        const uploadsCurrent = await fs.readdir(UPLOADS_DIR)
+        const freshRootArtifacts = uploadsCurrent
+          .filter((name) => !uploadsSnapshotBefore.has(name))
+          .filter((name) => isArtifactFile(name))
+        for (const artifact of freshRootArtifacts) {
+          await moveToOutputDir(artifact)
+        }
+
+        const producedFiles = await fs.readdir(outputDir)
+        const hasAnyArtifacts = producedFiles.some((f) => isArtifactFile(f))
+        const hasIfcArtifact = producedFiles.some((f) => f.toLowerCase().endsWith('.ifc'))
+
+        converterAttempts.push({
+          mode: candidate.mode,
+          status: hasIfcArtifact ? 'ok' : (hasAnyArtifacts ? 'no_ifc' : 'no_output'),
+          producedFiles,
+          freshRootArtifacts,
+          stdoutTail: String(stdout || '').slice(-1200),
+        })
+
+        if (hasIfcArtifact) {
+          executed = candidate
+          break
+        }
+
+        console.warn(`[Revit Process] Command completed without IFC artifact (${candidate.mode}), trying next fallback`)
       } catch (execErr) {
         lastExecError = execErr
+        converterAttempts.push({
+          mode: candidate.mode,
+          status: 'failed',
+          message: execErr?.message || String(execErr),
+          stdoutTail: String(execErr?.stdout || '').slice(-1200),
+          stderrTail: String(execErr?.stderr || '').slice(-1200),
+        })
         console.warn(`[Revit Process] Command failed (${candidate.mode}), trying next fallback`)
       }
     }
 
     if (!executed) {
-      throw lastExecError || new Error('Revit converter failed for all command variants')
+      const rvt2IfcConverter = CONVERTER_PATHS.rvt_ifc
+      const rvt2IfcExe = path.join(rvt2IfcConverter.dir, rvt2IfcConverter.exe)
+      if (existsSync(rvt2IfcExe)) {
+        try {
+          const fallbackIfcName = `${path.parse(req.file.filename || req.file.originalname).name}_rvt2ifc.ifc`
+          const fallbackIfcPath = path.join(outputDir, fallbackIfcName)
+          const fallbackOut = execFileSync(
+            rvt2IfcExe,
+            [req.file.path, fallbackIfcPath, 'standard'],
+            { timeout: 300000, stdio: 'pipe', encoding: 'utf8' },
+          )
+
+          const fallbackFiles = await fs.readdir(outputDir)
+          const hasIfc = fallbackFiles.some((f) => f.toLowerCase().endsWith('.ifc'))
+          converterAttempts.push({
+            mode: 'rvt2ifc_fallback',
+            status: hasIfc ? 'ok' : 'no_output',
+            converterPath: rvt2IfcExe,
+            producedFiles: fallbackFiles,
+            stdoutTail: String(fallbackOut || '').slice(-1200),
+          })
+
+          if (hasIfc) {
+            executed = {
+              mode: 'rvt2ifc_fallback',
+              ifcSchemaApplied: 'converter-default',
+            }
+          }
+        } catch (fallbackErr) {
+          converterAttempts.push({
+            mode: 'rvt2ifc_fallback',
+            status: 'failed',
+            converterPath: rvt2IfcExe,
+            message: fallbackErr?.message || String(fallbackErr),
+            stdoutTail: String(fallbackErr?.stdout || '').slice(-1200),
+            stderrTail: String(fallbackErr?.stderr || '').slice(-1200),
+          })
+        }
+      } else {
+        converterAttempts.push({
+          mode: 'rvt2ifc_fallback',
+          status: 'missing_converter',
+          converterPath: rvt2IfcExe,
+        })
+      }
+    }
+
+    if (!executed) {
+      return res.status(502).json(errorPayload(
+        'RVT_CONVERTER_NO_IFC',
+        'Revit converter did not produce an IFC file',
+        {
+          projectId: modelScope.projectId,
+          modelVersion: modelScope.modelVersion,
+          converterPath: converterExe,
+          outputDir,
+          attempts: converterAttempts,
+          hint: 'Check converter logs and ensure IFC export is enabled for this Revit model/version',
+          details: lastExecError ? { message: lastExecError.message } : undefined,
+        },
+      ))
     }
 
     const outputFiles = await fs.readdir(outputDir)
     const ifcFile = outputFiles.find((f) => f.toLowerCase().endsWith('.ifc'))
     const xlsxFile = outputFiles.find((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
     const daeFile = outputFiles.find((f) => f.toLowerCase().endsWith('.dae'))
+
+    let detectedIfcSchema = null
+    if (ifcFile) {
+      try {
+        const ifcHead = await fs.readFile(path.join(outputDir, ifcFile), 'utf8')
+        const match = ifcHead.match(/FILE_SCHEMA\(\('([^']+)'\)\)/i)
+        detectedIfcSchema = match ? match[1] : null
+      } catch {
+        detectedIfcSchema = null
+      }
+    }
 
     const response = {
       status: 'success',
@@ -2329,7 +2468,7 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
       matchSummary: null,
       converter: {
         ifcSchemaRequested: requestedIfcSchema,
-        ifcSchemaApplied: executed.ifcSchemaApplied,
+        ifcSchemaApplied: detectedIfcSchema || executed.ifcSchemaApplied,
         mode: executed.mode,
       },
     }
