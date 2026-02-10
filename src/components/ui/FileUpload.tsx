@@ -73,10 +73,17 @@ export function FileUpload({ accept, multiple, maxSize = 500 * 1024 * 1024, onFi
 
   const handleFiles = useCallback((newFiles: FileList | null) => {
     if (!newFiles) return
-    const arr = Array.from(newFiles).filter((f) => f.size <= maxSize)
+    const arr = Array.from(newFiles).filter((f) => {
+      if (f.size > maxSize) return false
+      if (acceptedExtensions.length > 0) {
+        const ext = f.name.split('.').pop()?.toLowerCase() || ''
+        if (!acceptedExtensions.includes(ext)) return false
+      }
+      return true
+    })
     setFiles(arr)
     onFilesSelected(arr)
-  }, [maxSize, onFilesSelected])
+  }, [maxSize, onFilesSelected, acceptedExtensions])
 
   const removeFile = (index: number) => {
     const updated = files.filter((_, i) => i !== index)

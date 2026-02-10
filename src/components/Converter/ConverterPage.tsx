@@ -142,7 +142,6 @@ export default function ConverterPage() {
 
     setIsConverting(true)
 
-    // Create jobs for each file
     const newJobs: ConversionJob[] = selectedFiles.map((file, i) => ({
       id: `job-${Date.now()}-${i}`,
       fileName: file.name,
@@ -156,56 +155,77 @@ export default function ConverterPage() {
 
     setJobs((prev) => [...newJobs, ...prev])
 
-    // Simulate conversion with progress for each job
-    for (const job of newJobs) {
-      // Mark as converting
-      setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: 'converting' as ConversionStatus } : j))
+    for (const [idx, job] of newJobs.entries()) {
+      const file = selectedFiles[idx]
 
-      // Simulate progress
-      for (let p = 0; p <= 100; p += 10) {
-        await new Promise((r) => setTimeout(r, 200))
-        setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, progress: p } : j))
+      setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: 'converting' as ConversionStatus, progress: 10 } : j))
+
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('outputFormat', outputFormat)
+
+      try {
+        setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, progress: 30 } : j))
+
+        const response = await fetch('/api/converter/convert', {
+          method: 'POST',
+          body: formData,
+        })
+
+        setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, progress: 80 } : j))
+
+        const data = await response.json()
+
+        if (response.ok && data.status === 'completed') {
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === job.id
+                ? {
+                    ...j,
+                    status: 'completed',
+                    progress: 100,
+                    completedAt: data.completedAt || new Date().toISOString(),
+                    duration: data.duration ? `${Math.round(data.duration / 1000)}s` : '—',
+                    outputUrl: data.outputDir || undefined,
+                  }
+                : j,
+            ),
+          )
+
+          saveConversionRecord({
+            fileName: job.fileName,
+            inputFormat: job.inputFormat,
+            outputFormat: job.outputFormat,
+            status: 'completed',
+            fileSize: job.fileSize,
+            duration: data.duration ? `${Math.round(data.duration / 1000)}s` : '',
+          }).catch(() => {})
+        } else {
+          const errorMsg = data.error || data.message || `Сервер вернул статус ${response.status}`
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === job.id
+                ? { ...j, status: 'failed', progress: 100, completedAt: new Date().toISOString(), error: errorMsg }
+                : j,
+            ),
+          )
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Сервер недоступен'
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id
+              ? { ...j, status: 'failed', progress: 100, completedAt: new Date().toISOString(), error: errorMsg }
+              : j,
+          ),
+        )
       }
-
-      // Random success/failure (90% success rate)
-      const succeeded = Math.random() > 0.1
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === job.id
-            ? {
-                ...j,
-                status: succeeded ? 'completed' : 'failed',
-                progress: 100,
-                completedAt: new Date().toISOString(),
-                duration: `${Math.floor(Math.random() * 3)}m ${Math.floor(Math.random() * 59)}s`,
-                outputUrl: succeeded ? `/api/converter/download/${job.id}` : undefined,
-                error: succeeded ? undefined : 'Unsupported geometry type in source file',
-              }
-            : j,
-        ),
-      )
     }
 
     setIsConverting(false)
-    addNotification('success', `Пакетная конвертация завершена: ${selectedFiles.length} файл(ов).`)
 
-    // Persist completed conversions to Supabase
-    for (const job of newJobs) {
-      saveConversionRecord({
-        fileName: job.fileName,
-        inputFormat: job.inputFormat,
-        outputFormat: job.outputFormat,
-        status: 'completed',
-        fileSize: job.fileSize,
-        duration: job.duration || '',
-      }).catch(() => {})
-    }
-
-    // In real implementation:
-    // const formData = new FormData()
-    // selectedFiles.forEach(f => formData.append('files', f))
-    // formData.append('outputFormat', outputFormat)
-    // const res = await fetch('/api/converter/convert', { method: 'POST', body: formData })
+    const completedCount = newJobs.length
+    addNotification('success', `Обработка завершена: ${completedCount} файл(ов).`)
   }
 
   const clearCompleted = () => {
