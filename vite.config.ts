@@ -54,7 +54,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['web-ifc', '@mlightcad/cad-simple-viewer'],
+    exclude: ['web-ifc'],
     include: ['rxjs', '@wendellhu/redi', 'dayjs'],
   },
 })

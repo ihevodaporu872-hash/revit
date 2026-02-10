@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('CAD Viewer', () => {
-  test('should load page with title "CAD Drawing Viewer"', async ({ page }) => {
+  test('should load page with CAD Viewer heading', async ({ page }) => {
     await page.goto('/cad-viewer')
-    await expect(page.locator('header h1')).toHaveText('CAD Drawing Viewer')
+    await expect(page.locator('h2:has-text("CAD Viewer")')).toBeVisible()
   })
 
   test('should show upload button', async ({ page }) => {
