@@ -9,8 +9,6 @@ import {
   Clock,
   Database,
   Download,
-  FileSpreadsheet,
-  FileText,
   Sparkles,
   ChevronDown,
   Trash2,
@@ -18,7 +16,12 @@ import {
   Minus,
   BarChart3,
   Check,
+  GitCompare,
 } from 'lucide-react'
+import { VORExportButtons, EstimateExportButtons } from './VORExport'
+import VORValidation from './VORValidation'
+import VORAnalytics from './VORAnalytics'
+import VORCompare from './VORCompare'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -285,16 +288,6 @@ export default function CostEstimatePage() {
     addNotification('success', `Added ${newItems.length} classified items to cost estimate`)
   }
 
-  const exportToExcel = () => {
-    addNotification('info', 'Exporting cost estimate to Excel...')
-    // In real implementation: generate XLSX using xlsx library
-  }
-
-  const exportToPdf = () => {
-    addNotification('info', 'Exporting cost estimate to PDF...')
-    // In real implementation: generate PDF report
-  }
-
   // ── Column definitions ──────────────────────────────────
 
   const searchColumns = [
@@ -364,6 +357,7 @@ export default function CostEstimatePage() {
     { id: 'search', label: 'Семантический поиск', icon: <Search size={16} /> },
     { id: 'classify', label: 'Классификация ИИ', icon: <Sparkles size={16} /> },
     { id: 'estimate', label: 'Расчёт сметы', icon: <Calculator size={16} /> },
+    { id: 'compare', label: 'Сравнение ВОР', icon: <GitCompare size={16} /> },
     { id: 'history', label: 'История', icon: <Clock size={16} /> },
   ]
 
@@ -553,6 +547,11 @@ export default function CostEstimatePage() {
                   </div>
                 </Card>
 
+                {/* VOR Validation */}
+                <Card hover>
+                  <VORValidation file={vorFile} language={language} />
+                </Card>
+
                 {/* Classification results */}
                 <AnimatePresence>
                   {classificationResults.length > 0 && (
@@ -567,9 +566,12 @@ export default function CostEstimatePage() {
                         subtitle={`Классифицировано строк ВОР: ${classificationResults.length}`}
                         hover
                         actions={
-                          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
-                            Добавить всё в смету
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <VORExportButtons results={classificationResults} />
+                            <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
+                              Добавить всё в смету
+                            </Button>
+                          </div>
                         }
                       >
                         <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -600,8 +602,18 @@ export default function CostEstimatePage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Analytics */}
+                {classificationResults.length > 0 && (
+                  <VORAnalytics results={classificationResults} />
+                )}
               </div>
             )
+          }
+
+          // ── Compare Tab ─────────────────────────────────
+          if (activeTab === 'compare') {
+            return <VORCompare />
           }
 
           // ── Cost Calculation Tab ────────────────────────
@@ -612,16 +624,7 @@ export default function CostEstimatePage() {
                   title="Расчёт сметы"
                   subtitle={`Позиции в расчёте: ${costItems.length}`}
                   hover
-                  actions={
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" icon={<FileSpreadsheet size={14} />} onClick={exportToExcel}>
-                        Экспорт Excel
-                      </Button>
-                      <Button variant="outline" size="sm" icon={<FileText size={14} />} onClick={exportToPdf}>
-                        Экспорт PDF
-                      </Button>
-                    </div>
-                  }
+                  actions={<EstimateExportButtons costItems={costItems} grandTotal={grandTotal} />}
                 >
                   {costItems.length === 0 ? (
                     <motion.div variants={scaleIn} initial="hidden" animate="visible">
