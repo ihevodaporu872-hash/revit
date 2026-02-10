@@ -350,15 +350,28 @@ export async function listWorkflowTriggers() {
 
 export const WORKFLOW_MODULES = {
   converter: [
-    { webhook: '/webhook/run-cYpR0z9b', name: 'n8n_1 Converter' },
-    { webhook: '/webhook/run-DO7lywP4', name: 'n8n_2 Converter' },
+    { webhook: '/webhook/run-cYpR0z9b', name: 'n8n_1 Converter', callbackType: 'generic' },
+    { webhook: '/webhook/run-DO7lywP4', name: 'n8n_2 Converter', callbackType: 'generic' },
+    { webhook: '/webhook/batch-convert', name: 'n8n_3 Batch Converter', callbackType: 'generic' },
   ],
   costEstimate: [
-    { webhook: '/webhook/telegram-bot-5zNg8gkl', name: 'CWICR v10.9' },
+    { webhook: '/webhook/telegram-bot-5zNg8gkl', name: 'CWICR v10.9', callbackType: 'cost-estimate' },
+    { webhook: '/webhook/cost-text', name: 'n8n_6 Cost Text Query', callbackType: 'cost-estimate' },
+    { webhook: '/webhook/cost-photo', name: 'n8n_7 Cost Photo Analysis', callbackType: 'cost-estimate' },
+    { webhook: '/webhook/cost-pdf', name: 'n8n_8 Cost PDF Extract', callbackType: 'cost-estimate' },
   ],
-  projectMgmt: [],
-  validation: [],
-  qto: [],
+  projectMgmt: [
+    { webhook: '/webhook/task-notification', name: 'n8n_10 Task Telegram Notify', callbackType: 'generic' },
+    { webhook: '/webhook/field-report', name: 'n8n_11 Field Report', callbackType: 'field-report' },
+    { webhook: '/webhook/worker-location', name: 'n8n_12 Worker GPS', callbackType: 'worker-location' },
+  ],
+  validation: [
+    { webhook: '/webhook/bim-validate', name: 'n8n_4 BIM Validation', callbackType: 'generic' },
+    { webhook: '/webhook/auto-classify', name: 'n8n_5 Auto Classify', callbackType: 'generic' },
+  ],
+  qto: [
+    { webhook: '/webhook/qto-report', name: 'n8n_9 QTO Report', callbackType: 'generic' },
+  ],
 }
 
 export default {

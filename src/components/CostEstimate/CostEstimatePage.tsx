@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCostEstimates } from '../../services/supabase-api'
-import { classifyVOR } from '../../services/api'
+import { fetchCostEstimates, fetchN8nCostEstimates } from '../../services/supabase-api'
+import { classifyVOR, triggerN8nWorkflow } from '../../services/api'
 import {
   Search,
   Globe,
@@ -17,7 +17,14 @@ import {
   BarChart3,
   Check,
   GitCompare,
+  Zap,
+  Image,
+  FileText as FileTextIcon,
+  MessageSquare,
+  ChevronRight,
 } from 'lucide-react'
+import N8nWorkflowStatus from '../shared/N8nWorkflowStatus'
+import N8nModuleStatus from '../shared/N8nModuleStatus'
 import { VORExportButtons, EstimateExportButtons } from './VORExport'
 import VORValidation from './VORValidation'
 import VORAnalytics from './VORAnalytics'
@@ -148,9 +155,21 @@ export default function CostEstimatePage() {
   // Recent estimates
   const [recentEstimates, setRecentEstimates] = useState<RecentEstimate[]>(MOCK_RECENT_ESTIMATES)
 
+  // n8n cost estimates
+  const [n8nEstimates, setN8nEstimates] = useState<Array<{
+    id: string; source: string; queryText: string | null; photoUrl: string | null
+    language: string; items: unknown[]; totalCost: number; currency: string
+    region: string | null; confidence: number | null; createdAt: string
+  }>>([])
+  const [expandedN8nRow, setExpandedN8nRow] = useState<string | null>(null)
+  const [n8nPipelineExecId, setN8nPipelineExecId] = useState<string | null>(null)
+
   useEffect(() => {
     fetchCostEstimates()
       .then((rows) => { if (rows.length > 0) setRecentEstimates(rows as RecentEstimate[]) })
+      .catch(() => {})
+    fetchN8nCostEstimates()
+      .then((rows) => setN8nEstimates(rows))
       .catch(() => {})
   }, [])
 
@@ -357,6 +376,7 @@ export default function CostEstimatePage() {
     { id: 'classify', label: 'Классификация ИИ', icon: <Sparkles size={16} /> },
     { id: 'estimate', label: 'Расчёт сметы', icon: <Calculator size={16} /> },
     { id: 'compare', label: 'Сравнение ВОР', icon: <GitCompare size={16} /> },
+    { id: 'n8n', label: 'n8n Оценки', icon: <Zap size={16} /> },
     { id: 'history', label: 'История', icon: <Clock size={16} /> },
   ]
 
@@ -367,7 +387,10 @@ export default function CostEstimatePage() {
       <div className="space-y-6">
         {/* Header */}
         <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-          <h1 className="text-2xl font-bold text-foreground">Смета стоимости CWICR</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-foreground">Смета стоимости CWICR</h1>
+            <N8nModuleStatus module="costEstimate" />
+          </div>
           <p className="text-muted-foreground mt-1">
             Поиск по 55 719 строительным позициям на 9 языках с BIM-классификацией на базе ИИ
           </p>
@@ -534,7 +557,21 @@ export default function CostEstimatePage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const result = await triggerN8nWorkflow('/webhook/cost-text', { query: searchQuery || 'cost estimate', language }) as Record<string, unknown>
+                          const execId = (result?.executionId || result?.id || '') as string
+                          if (execId) setN8nPipelineExecId(execId)
+                          addNotification('info', 'n8n пайплайн запущен')
+                        } catch { addNotification('error', 'Не удалось запустить n8n пайплайн') }
+                      }}
+                      icon={<Zap size={16} />}
+                    >
+                      Запустить n8n Pipeline
+                    </Button>
                     <Button
                       onClick={handleClassifyUpload}
                       loading={isClassifying}
@@ -544,6 +581,17 @@ export default function CostEstimatePage() {
                       {isClassifying ? 'Классификация ИИ...' : 'Классифицировать ВОР'}
                     </Button>
                   </div>
+                  {n8nPipelineExecId && (
+                    <div className="mt-3">
+                      <N8nWorkflowStatus
+                        executionId={n8nPipelineExecId}
+                        onComplete={() => {
+                          addNotification('success', 'n8n пайплайн завершён')
+                          fetchN8nCostEstimates().then(setN8nEstimates).catch(() => {})
+                        }}
+                      />
+                    </div>
+                  )}
                 </Card>
 
                 {/* VOR Validation */}
@@ -732,6 +780,115 @@ export default function CostEstimatePage() {
                         </div>
                       </div>
                     </>
+                  )}
+                </Card>
+              </div>
+            )
+          }
+
+          // ── n8n Estimates Tab ─────────────────────────────
+          if (activeTab === 'n8n') {
+            return (
+              <div className="space-y-6">
+                <Card
+                  title="Оценки стоимости из n8n"
+                  subtitle={`${n8nEstimates.length} оценок из Telegram-ботов и n8n пайплайнов`}
+                  hover
+                  actions={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<Zap size={14} />}
+                      onClick={() => fetchN8nCostEstimates().then(setN8nEstimates).catch(() => {})}
+                    >
+                      Обновить
+                    </Button>
+                  }
+                >
+                  {n8nEstimates.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Zap size={48} className="mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-muted-foreground">Оценки из n8n пока отсутствуют</p>
+                      <p className="text-muted-foreground/60 text-xs mt-1">
+                        Результаты появятся автоматически после запуска n8n-воркфлоу
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {n8nEstimates.map((est) => (
+                        <motion.div key={est.id} variants={listItem}>
+                          <div
+                            className="p-4 bg-muted rounded-lg border border-border hover:border-primary/30 cursor-pointer transition-colors"
+                            onClick={() => setExpandedN8nRow(expandedN8nRow === est.id ? null : est.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {est.source === 'telegram' && <MessageSquare size={16} className="text-blue-500" />}
+                                {est.source === 'photo' && <Image size={16} className="text-purple-500" />}
+                                {est.source === 'pdf' && <FileTextIcon size={16} className="text-orange-500" />}
+                                {!['telegram', 'photo', 'pdf'].includes(est.source) && <Zap size={16} className="text-primary" />}
+                                <div>
+                                  <span className="text-sm font-medium text-foreground">
+                                    {est.queryText ? est.queryText.slice(0, 80) + (est.queryText.length > 80 ? '...' : '') : `Оценка от ${est.source}`}
+                                  </span>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs text-muted-foreground">{est.source}</span>
+                                    <span className="text-xs text-muted-foreground">{est.language}</span>
+                                    {est.region && <span className="text-xs text-muted-foreground">{est.region}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm font-bold text-foreground">
+                                  {est.totalCost.toLocaleString()} {est.currency}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(est.createdAt).toLocaleDateString()}
+                                </span>
+                                <ChevronRight size={14} className={`text-muted-foreground transition-transform ${expandedN8nRow === est.id ? 'rotate-90' : ''}`} />
+                              </div>
+                            </div>
+
+                            <AnimatePresence>
+                              {expandedN8nRow === est.id && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="mt-4 pt-4 border-t border-border space-y-3">
+                                    {est.photoUrl && (
+                                      <div>
+                                        <p className="text-xs text-muted-foreground mb-1">Фото</p>
+                                        <img src={est.photoUrl} alt="Query" className="max-h-40 rounded-lg border border-border" />
+                                      </div>
+                                    )}
+                                    {Array.isArray(est.items) && est.items.length > 0 && (
+                                      <div>
+                                        <p className="text-xs text-muted-foreground mb-2">Позиции ({est.items.length})</p>
+                                        <div className="space-y-1">
+                                          {(est.items as Array<Record<string, unknown>>).map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between text-xs p-2 bg-background rounded border border-border">
+                                              <span className="text-foreground">{String(item.description || item.name || `#${idx + 1}`)}</span>
+                                              <span className="font-medium text-foreground">{Number(item.cost || item.totalPrice || 0).toLocaleString()} {est.currency}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {est.confidence != null && (
+                                      <p className="text-xs text-muted-foreground">Уверенность: {est.confidence}%</p>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
                   )}
                 </Card>
               </div>

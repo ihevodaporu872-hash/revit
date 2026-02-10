@@ -15,8 +15,11 @@ import {
   FileText,
   AlertCircle,
   Loader2,
+  Zap,
+  Layers,
 } from 'lucide-react'
 import { fetchConversionHistory, saveConversionRecord } from '../../services/supabase-api'
+import { triggerN8nWorkflow } from '../../services/api'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -26,6 +29,8 @@ import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { formatDate } from '../../lib/utils'
 import { MotionPage } from '../MotionPage'
+import N8nWorkflowStatus from '../shared/N8nWorkflowStatus'
+import N8nModuleStatus from '../shared/N8nModuleStatus'
 import './ConverterPage.css'
 import {
   staggerContainer,
@@ -113,6 +118,13 @@ export default function ConverterPage() {
   const [jobs, setJobs] = useState<ConversionJob[]>([])
   const [isConverting, setIsConverting] = useState(false)
   const [history, setHistory] = useState<ConversionHistoryEntry[]>(MOCK_HISTORY)
+
+  // n8n post-processing
+  const [n8nValidation, setN8nValidation] = useState(false)
+  const [n8nClassify, setN8nClassify] = useState(false)
+  const [n8nQto, setN8nQto] = useState(false)
+  const [n8nPipelineIds, setN8nPipelineIds] = useState<Array<{ name: string; execId: string }>>([])
+  const [batchMode, setBatchMode] = useState(false)
 
   useEffect(() => {
     fetchConversionHistory()
@@ -328,7 +340,10 @@ export default function ConverterPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="display-heading text-[30px] font-semibold leading-tight tracking-tight text-foreground xl:text-[34px]">Преобразователь CAD/BIM</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="display-heading text-[30px] font-semibold leading-tight tracking-tight text-foreground xl:text-[34px]">Преобразователь CAD/BIM</h1>
+            <N8nModuleStatus module="converter" />
+          </div>
           <p className="max-w-5xl text-[14px] text-muted-foreground">
             Конвертируйте файлы Revit, IFC, DWG и DGN в форматы Excel, 3D DAE или PDF
           </p>
@@ -401,20 +416,89 @@ export default function ConverterPage() {
                     ))}
                   </div>
 
+                  {/* n8n Post-processing */}
+                  <div className="mt-4 pt-4 border-t border-border space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <Zap size={12} /> Пост-обработка n8n
+                    </p>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                      <input type="checkbox" checked={n8nValidation} onChange={(e) => setN8nValidation(e.target.checked)} className="accent-primary" />
+                      <span className="text-foreground">Валидация BIM</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                      <input type="checkbox" checked={n8nClassify} onChange={(e) => setN8nClassify(e.target.checked)} className="accent-primary" />
+                      <span className="text-foreground">Авто-классификация</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                      <input type="checkbox" checked={n8nQto} onChange={(e) => setN8nQto(e.target.checked)} className="accent-primary" />
+                      <span className="text-foreground">QTO-отчёт</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                      <input type="checkbox" checked={batchMode} onChange={(e) => setBatchMode(e.target.checked)} className="accent-primary" />
+                      <Layers size={14} className="text-muted-foreground" />
+                      <span className="text-foreground">Батч-конвертация (n8n)</span>
+                    </label>
+                  </div>
+
                   <div className="mt-4 pt-4 border-t border-border">
                     <Button
                       className="primary-glow-btn converter-main-cta h-12 w-full rounded-2xl text-[16px] font-bold"
                       size="lg"
                       loading={isConverting}
                       disabled={selectedFiles.length === 0}
-                      onClick={startConversion}
+                      onClick={async () => {
+                        if (batchMode && selectedFiles.length > 0) {
+                          // Delegate to n8n batch converter
+                          try {
+                            const result = await triggerN8nWorkflow('/webhook/batch-convert', {
+                              files: selectedFiles.map(f => f.name),
+                              outputFormat,
+                            }) as Record<string, unknown>
+                            addNotification('info', 'Батч-конвертация запущена в n8n')
+                            const execId = (result?.executionId || result?.id || '') as string
+                            if (execId) setN8nPipelineIds(prev => [...prev, { name: 'Batch Convert', execId }])
+                          } catch { addNotification('error', 'Не удалось запустить батч-конвертацию') }
+                          return
+                        }
+                        await startConversion()
+                        // After conversion, trigger selected n8n pipelines
+                        const pipelines: Array<{ webhook: string; name: string }> = []
+                        if (n8nValidation) pipelines.push({ webhook: '/webhook/bim-validate', name: 'BIM Validation' })
+                        if (n8nClassify) pipelines.push({ webhook: '/webhook/auto-classify', name: 'Auto Classify' })
+                        if (n8nQto) pipelines.push({ webhook: '/webhook/qto-report', name: 'QTO Report' })
+                        for (const p of pipelines) {
+                          try {
+                            const result = await triggerN8nWorkflow(p.webhook, {
+                              fileName: selectedFiles[0]?.name,
+                              outputFormat,
+                            }) as Record<string, unknown>
+                            const execId = (result?.executionId || result?.id || '') as string
+                            if (execId) setN8nPipelineIds(prev => [...prev, { name: p.name, execId }])
+                          } catch { addNotification('warning', `Не удалось запустить ${p.name}`) }
+                        }
+                      }}
                       icon={isConverting ? <Loader2 size={18} className="animate-spin" /> : <FileOutput size={18} />}
                     >
                       {isConverting
                         ? 'Конвертация...'
-                        : 'Конвертировать'}
+                        : batchMode ? 'Батч-конвертация (n8n)' : 'Конвертировать'}
                     </Button>
                   </div>
+
+                  {/* n8n Pipeline Status */}
+                  {n8nPipelineIds.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {n8nPipelineIds.map((p, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">{p.name}:</span>
+                          <N8nWorkflowStatus
+                            executionId={p.execId}
+                            onComplete={(status) => addNotification(status === 'success' ? 'success' : 'error', `${p.name}: ${status}`)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Card>
               </div>
 

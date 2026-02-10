@@ -488,3 +488,112 @@ export async function saveChatSession(session: {
   if (error) { console.error('[Supabase] saveChatSession insert:', error.message); return null }
   return data
 }
+
+// ── n8n Results ─────────────────────────────────────────────────────────────
+
+export async function fetchN8nResults(module?: string, limit = 50) {
+  if (!supabase) return []
+  let query = supabase
+    .from('n8n_results')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (module) query = query.eq('module', module)
+  query = query.limit(limit)
+  const { data, error } = await query
+  if (error) { console.error('[Supabase] fetchN8nResults:', error.message); return [] }
+  return (data || []).map((row) => ({
+    id: row.id,
+    executionId: row.execution_id,
+    workflowId: row.workflow_id,
+    workflowName: row.workflow_name,
+    module: row.module,
+    status: row.status,
+    inputData: row.input_data,
+    outputData: row.output_data,
+    errorMessage: row.error_message,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    createdAt: row.created_at,
+  }))
+}
+
+// ── n8n Cost Estimates ──────────────────────────────────────────────────────
+
+export async function fetchN8nCostEstimates(source?: string, limit = 50) {
+  if (!supabase) return []
+  let query = supabase
+    .from('n8n_cost_estimates')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (source) query = query.eq('source', source)
+  query = query.limit(limit)
+  const { data, error } = await query
+  if (error) { console.error('[Supabase] fetchN8nCostEstimates:', error.message); return [] }
+  return (data || []).map((row) => ({
+    id: row.id,
+    source: row.source,
+    queryText: row.query_text,
+    photoUrl: row.photo_url,
+    language: row.language,
+    items: row.items || [],
+    totalCost: Number(row.total_cost),
+    currency: row.currency,
+    region: row.region,
+    confidence: row.confidence ? Number(row.confidence) : null,
+    rawResponse: row.raw_response,
+    createdAt: row.created_at,
+  }))
+}
+
+// ── Field Reports ───────────────────────────────────────────────────────────
+
+export async function fetchFieldReports(taskId?: string, limit = 50) {
+  if (!supabase) return []
+  let query = supabase
+    .from('field_reports')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (taskId) query = query.eq('task_id', taskId)
+  query = query.limit(limit)
+  const { data, error } = await query
+  if (error) { console.error('[Supabase] fetchFieldReports:', error.message); return [] }
+  return (data || []).map((row) => ({
+    id: row.id,
+    taskId: row.task_id,
+    reporter: row.reporter,
+    description: row.description,
+    photoUrls: row.photo_urls || [],
+    gpsLat: row.gps_lat ? Number(row.gps_lat) : null,
+    gpsLon: row.gps_lon ? Number(row.gps_lon) : null,
+    address: row.address,
+    reportType: row.report_type,
+    metadata: row.metadata,
+    createdAt: row.created_at,
+  }))
+}
+
+// ── Worker Locations ────────────────────────────────────────────────────────
+
+export async function fetchWorkerLocations() {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('worker_locations')
+    .select('*')
+    .order('worker_name', { ascending: true })
+    .order('recorded_at', { ascending: false })
+  if (error) { console.error('[Supabase] fetchWorkerLocations:', error.message); return [] }
+  // Deduplicate: latest per worker
+  const latest = new Map<string, typeof data[0]>()
+  for (const row of (data || [])) {
+    if (!latest.has(row.worker_name)) latest.set(row.worker_name, row)
+  }
+  return [...latest.values()].map((row) => ({
+    id: row.id,
+    workerName: row.worker_name,
+    lat: Number(row.lat),
+    lon: Number(row.lon),
+    accuracy: row.accuracy ? Number(row.accuracy) : null,
+    recordedAt: row.recorded_at,
+    metadata: row.metadata,
+  }))
+}

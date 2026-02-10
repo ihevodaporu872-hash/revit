@@ -3204,6 +3204,245 @@ app.post(/^\/api\/n8n\/trigger\/(.+)$/, triggerN8nWorkflowHandler)
 app.post('/api/n8n/trigger', triggerN8nWorkflowHandler)
 
 // ---------------------------------------------------------------------------
+// n8n Callback Receivers — n8n posts results here after execution
+// ---------------------------------------------------------------------------
+
+// POST /api/n8n/callback — Universal workflow result receiver
+app.post('/api/n8n/callback', express.json(), async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { executionId, workflowId, workflowName, module, status, inputData, outputData, errorMessage, startedAt, finishedAt } = req.body
+    const { data, error } = await supabaseServer
+      .from('n8n_results')
+      .insert({
+        execution_id: executionId || null,
+        workflow_id: workflowId || null,
+        workflow_name: workflowName || null,
+        module: module || 'general',
+        status: status || 'completed',
+        input_data: inputData || {},
+        output_data: outputData || {},
+        error_message: errorMessage || null,
+        started_at: startedAt || null,
+        finished_at: finishedAt || new Date().toISOString(),
+      })
+      .select()
+      .single()
+    if (error) {
+      console.error('[n8n callback] Insert failed:', error.message)
+      return res.status(500).json({ error: error.message })
+    }
+    console.log(`[n8n callback] Saved result for ${module} (exec: ${executionId})`)
+    res.json({ ok: true, id: data.id })
+  } catch (err) {
+    console.error('[n8n callback] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/n8n/callback/cost-estimate — Cost estimation result from Telegram/n8n
+app.post('/api/n8n/callback/cost-estimate', express.json(), async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { source, queryText, photoUrl, language, items, totalCost, currency, region, confidence, rawResponse } = req.body
+    const { data, error } = await supabaseServer
+      .from('n8n_cost_estimates')
+      .insert({
+        source: source || 'telegram',
+        query_text: queryText || null,
+        photo_url: photoUrl || null,
+        language: language || 'EN',
+        items: items || [],
+        total_cost: totalCost || 0,
+        currency: currency || 'EUR',
+        region: region || null,
+        confidence: confidence || null,
+        raw_response: rawResponse || {},
+      })
+      .select()
+      .single()
+    if (error) {
+      console.error('[n8n callback/cost] Insert failed:', error.message)
+      return res.status(500).json({ error: error.message })
+    }
+    console.log(`[n8n callback/cost] Saved estimate from ${source}: ${totalCost} ${currency}`)
+    res.json({ ok: true, id: data.id })
+  } catch (err) {
+    console.error('[n8n callback/cost] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/n8n/callback/field-report — Field photo report from site
+app.post('/api/n8n/callback/field-report', express.json(), async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { taskId, reporter, description, photoUrls, gpsLat, gpsLon, address, reportType, metadata } = req.body
+    const { data, error } = await supabaseServer
+      .from('field_reports')
+      .insert({
+        task_id: taskId || null,
+        reporter: reporter || 'Unknown',
+        description: description || null,
+        photo_urls: photoUrls || [],
+        gps_lat: gpsLat || null,
+        gps_lon: gpsLon || null,
+        address: address || null,
+        report_type: reportType || 'progress',
+        metadata: metadata || {},
+      })
+      .select()
+      .single()
+    if (error) {
+      console.error('[n8n callback/field-report] Insert failed:', error.message)
+      return res.status(500).json({ error: error.message })
+    }
+    console.log(`[n8n callback/field-report] Saved report from ${reporter}`)
+    res.json({ ok: true, id: data.id })
+  } catch (err) {
+    console.error('[n8n callback/field-report] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/n8n/callback/worker-location — GPS update (upsert latest)
+app.post('/api/n8n/callback/worker-location', express.json(), async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { workerName, lat, lon, accuracy, metadata } = req.body
+    if (!workerName || lat == null || lon == null) {
+      return res.status(400).json({ error: 'workerName, lat, lon are required' })
+    }
+    const { data, error } = await supabaseServer
+      .from('worker_locations')
+      .insert({
+        worker_name: workerName,
+        lat,
+        lon,
+        accuracy: accuracy || null,
+        recorded_at: new Date().toISOString(),
+        metadata: metadata || {},
+      })
+      .select()
+      .single()
+    if (error) {
+      console.error('[n8n callback/worker-location] Insert failed:', error.message)
+      return res.status(500).json({ error: error.message })
+    }
+    console.log(`[n8n callback/worker-location] Updated ${workerName}: ${lat},${lon}`)
+    res.json({ ok: true, id: data.id })
+  } catch (err) {
+    console.error('[n8n callback/worker-location] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/n8n/cost-estimates — Read cost estimates from Supabase
+app.get('/api/n8n/cost-estimates', async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { source, limit, language } = req.query
+    let query = supabaseServer.from('n8n_cost_estimates').select('*').order('created_at', { ascending: false })
+    if (source) query = query.eq('source', source)
+    if (language) query = query.eq('language', language)
+    query = query.limit(Number(limit) || 20)
+    const { data, error } = await query
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/field-reports — Read field reports
+app.get('/api/field-reports', async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { taskId, limit } = req.query
+    let query = supabaseServer.from('field_reports').select('*').order('created_at', { ascending: false })
+    if (taskId) query = query.eq('task_id', taskId)
+    query = query.limit(Number(limit) || 50)
+    const { data, error } = await query
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/worker-locations — Latest location per worker
+app.get('/api/worker-locations', async (_req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    // Get latest location for each worker using distinct on
+    const { data, error } = await supabaseServer
+      .from('worker_locations')
+      .select('*')
+      .order('worker_name', { ascending: true })
+      .order('recorded_at', { ascending: false })
+    if (error) return res.status(500).json({ error: error.message })
+    // Deduplicate: keep only latest per worker
+    const latest = new Map()
+    for (const row of (data || [])) {
+      if (!latest.has(row.worker_name)) latest.set(row.worker_name, row)
+    }
+    res.json([...latest.values()])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/tasks/:id/notify — Trigger n8n Telegram notification for a task
+app.post('/api/tasks/:id/notify', express.json(), async (req, res) => {
+  try {
+    if (!supabaseServer) return res.status(503).json({ error: 'Supabase not configured' })
+    const { id } = req.params
+    const { data: task, error } = await supabaseServer.from('tasks').select('*').eq('id', id).single()
+    if (error || !task) return res.status(404).json({ error: 'Task not found' })
+    // Trigger n8n workflow for Telegram notification
+    const result = await n8nBridge.triggerWorkflow('/webhook/task-notification', {
+      taskId: task.id,
+      title: task.title,
+      description: task.description,
+      assignee: task.assignee,
+      priority: task.priority,
+      status: task.status,
+    })
+    res.json({ ok: true, n8nResult: result })
+  } catch (err) {
+    console.error('[task notify] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/converter/pipeline — Post-processing pipeline after conversion
+app.post('/api/converter/pipeline', express.json(), async (req, res) => {
+  try {
+    const { fileName, outputFormat, pipelines } = req.body
+    if (!pipelines || !Array.isArray(pipelines) || pipelines.length === 0) {
+      return res.status(400).json({ error: 'pipelines array is required' })
+    }
+    const results = []
+    for (const pipeline of pipelines) {
+      try {
+        const result = await n8nBridge.triggerWorkflow(pipeline.webhook, {
+          fileName,
+          outputFormat,
+          ...pipeline.data,
+        })
+        results.push({ pipeline: pipeline.name, status: 'triggered', result: result.data })
+      } catch (err) {
+        results.push({ pipeline: pipeline.name, status: 'failed', error: err.message })
+      }
+    }
+    res.json({ ok: true, results })
+  } catch (err) {
+    console.error('[converter/pipeline] Error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // 23. POST /api/cost/validate-vor — AI validation of VOR Excel file
 // ---------------------------------------------------------------------------
 app.post('/api/cost/validate-vor', upload.single('file'), async (req, res) => {

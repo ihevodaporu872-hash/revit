@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchTasks, createTask as sbCreateTask, updateTask as sbUpdateTask, addTaskComment as sbAddComment } from '../../services/supabase-api'
+import { triggerN8nWorkflow } from '../../services/api'
 import {
   LayoutDashboard,
   Plus,
@@ -21,12 +22,18 @@ import {
   Send as SendIcon,
   BotMessageSquare,
   ArrowRight,
+  Map,
+  Camera,
+  MapPin,
 } from 'lucide-react'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
+import FieldReportsPanel from './FieldReportsPanel'
+import WorkerMapView from './WorkerMapView'
+import N8nModuleStatus from '../shared/N8nModuleStatus'
 import {
   staggerContainer,
   fadeInUp,
@@ -219,6 +226,7 @@ export default function ProjectMgmtPage() {
   const [filterAssignee, setFilterAssignee] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<TaskPriority | ''>('')
   const [showFilters, setShowFilters] = useState(false)
+  const [viewMode, setViewMode] = useState<'kanban' | 'map'>('kanban')
 
   // New task form state
   const [newTitle, setNewTitle] = useState('')
@@ -325,10 +333,13 @@ export default function ProjectMgmtPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-              <LayoutDashboard size={28} className="text-primary" />
-              Управление проектом
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+                <LayoutDashboard size={28} className="text-primary" />
+                Управление проектом
+              </h1>
+              <N8nModuleStatus module="projectMgmt" />
+            </div>
             <p className="text-muted-foreground mt-1">
               Контролируйте задачи, команду и сроки проекта
             </p>
@@ -341,6 +352,21 @@ export default function ProjectMgmtPage() {
                 Telegram Bot: {telegramConnected ? 'Подключен' : 'Отключен'}
               </span>
               <div className={`w-2 h-2 rounded-full ${telegramConnected ? 'bg-success' : 'bg-muted-foreground'}`} />
+            </div>
+            {/* View mode switcher */}
+            <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'kanban' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              >
+                Kanban
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1 ${viewMode === 'map' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              >
+                <Map size={12} /> Карта
+              </button>
             </div>
             <Button
               variant="outline"
@@ -419,8 +445,11 @@ export default function ProjectMgmtPage() {
           </Card>
         )}
 
+        {/* Map View */}
+        {viewMode === 'map' && <WorkerMapView />}
+
         {/* Kanban Board */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {viewMode === 'kanban' && <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {STATUS_COLUMNS.map((col) => {
             const columnTasks = getColumnTasks(col.id)
             return (
@@ -495,6 +524,8 @@ export default function ProjectMgmtPage() {
                               <span>{task.assignee.split(' ')[0]}</span>
                             </div>
                             <div className="flex items-center gap-3">
+                              <Camera size={12} className="text-muted-foreground/50" />
+                              <MapPin size={12} className="text-muted-foreground/50" />
                               {task.comments.length > 0 && (
                                 <div className="flex items-center gap-1">
                                   <MessageSquare size={12} />
@@ -521,7 +552,7 @@ export default function ProjectMgmtPage() {
               </div>
             )
           })}
-        </div>
+        </div>}
 
         {/* Timeline / Gantt */}
         <Card title="Таймлайн проекта" subtitle="Упрощённый Gantt по активным задачам">
@@ -690,6 +721,24 @@ export default function ProjectMgmtPage() {
 
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
                   <Button variant="outline" onClick={() => setShowAddDialog(false)}>Отмена</Button>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      await addTask()
+                      try {
+                        await triggerN8nWorkflow('/webhook/task-notification', {
+                          title: newTitle,
+                          description: newDescription,
+                          assignee: newAssignee,
+                          priority: newPriority,
+                        })
+                        addNotification('info', 'Уведомление отправлено в Telegram')
+                      } catch { addNotification('warning', 'Задача создана, но Telegram-уведомление не отправлено') }
+                    }}
+                    icon={<BotMessageSquare size={16} />}
+                  >
+                    Создать + Telegram
+                  </Button>
                   <Button onClick={addTask} icon={<Plus size={16} />}>Создать задачу</Button>
                 </div>
               </motion.div>
@@ -800,6 +849,15 @@ export default function ProjectMgmtPage() {
                         </Button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Field Reports */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <Camera size={14} className="text-primary" />
+                      Фотоотчёты
+                    </p>
+                    <FieldReportsPanel taskId={selectedTask.id} />
                   </div>
 
                   {/* Comments */}

@@ -3,9 +3,11 @@ import { AnimatePresence } from 'framer-motion'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import Notifications from './Notifications'
+import { useN8nNotifications } from '../../hooks/useN8nNotifications'
 
 export default function Layout() {
   const location = useLocation()
+  useN8nNotifications()
 
   return (
     <div className="app-shell flex h-screen text-foreground">

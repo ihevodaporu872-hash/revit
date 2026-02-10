@@ -16,6 +16,7 @@ import { staggerContainer, fadeInUp, scaleIn, listItem, interactiveScale } from 
 import type { QTOReport, QTOOptions, QTOReportRecord } from '../../services/api'
 import { generateQTO } from '../../services/api'
 import { MotionPage } from '../MotionPage'
+import N8nModuleStatus from '../shared/N8nModuleStatus'
 import { fetchQTOHistory, saveQTOReport } from '../../services/supabase-api'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -527,7 +528,10 @@ export default function QTOReportsPage() {
     <MotionPage><div className="space-y-6">
       {/* Header */}
       <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-        <h1 className="text-2xl font-bold text-foreground">Отчёты QTO</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-foreground">Отчёты QTO</h1>
+          <N8nModuleStatus module="qto" />
+        </div>
         <p className="text-muted-foreground mt-1">
           Формируйте отчёты Quantity Take-Off из IFC-моделей и Excel-файлов
         </p>
