@@ -3204,6 +3204,223 @@ app.post(/^\/api\/n8n\/trigger\/(.+)$/, triggerN8nWorkflowHandler)
 app.post('/api/n8n/trigger', triggerN8nWorkflowHandler)
 
 // ---------------------------------------------------------------------------
+// 23. POST /api/cost/validate-vor — AI validation of VOR Excel file
+// ---------------------------------------------------------------------------
+app.post('/api/cost/validate-vor', upload.single('file'), async (req, res) => {
+  try {
+    if (!requireGemini(res)) return
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Excel file is required' })
+    }
+
+    const language = (req.body.language || 'en').toLowerCase()
+
+    // 1. Parse uploaded Excel
+    const XLSX = (await import('xlsx')).default
+    const workbook = XLSX.readFile(req.file.path)
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rawRows.length === 0) {
+      return res.status(400).json({ error: 'Excel file is empty or has no data rows' })
+    }
+
+    // 2. Auto-detect columns
+    const headers = Object.keys(rawRows[0])
+    const findCol = (patterns) => headers.find(h => {
+      const lower = h.toLowerCase()
+      return patterns.some(p => lower.includes(p))
+    })
+
+    const nameCol = findCol(['наименование', 'name', 'описание', 'description', 'работа', 'item', 'позиция', 'material'])
+    const unitCol = findCol(['ед', 'unit', 'единица', 'изм'])
+    const qtyCol = findCol(['кол', 'объём', 'объем', 'qty', 'quantity', 'volume', 'amount', 'количество'])
+
+    if (!nameCol) {
+      return res.status(400).json({
+        error: 'Cannot detect name column in Excel',
+        detectedHeaders: headers,
+      })
+    }
+
+    // 3. Map rows
+    const vorRows = rawRows
+      .map((row, idx) => ({
+        index: idx,
+        name: String(row[nameCol] || '').trim(),
+        unit: unitCol ? String(row[unitCol] || '').trim() : '',
+        quantity: qtyCol ? (parseFloat(row[qtyCol]) || 0) : 0,
+      }))
+      .filter(r => r.name.length > 0)
+
+    console.log(`[VOR Validate] Parsed ${vorRows.length} rows from ${req.file.originalname}`)
+
+    // 4. Send to Gemini for validation
+    const langLabel = language === 'ru' ? 'Russian' : language === 'de' ? 'German' : 'English'
+    const prompt = `You are a construction cost estimating QA expert. Analyze this Bill of Quantities (ВОР / BOQ) for issues.
+
+Check for these problems:
+1. DUPLICATE entries (same or very similar work item names)
+2. UNIT MISMATCHES (wrong unit for work type, e.g. m² for concrete volume)
+3. ZERO or NEGATIVE quantities
+4. SUSPICIOUS values (unrealistically high or low quantities)
+5. MISSING related work (e.g. concrete without reinforcement, painting without primer)
+6. INCONSISTENT naming conventions
+7. EMPTY or unclear descriptions
+
+For each issue, provide a JSON object:
+- type: "error" | "warning" | "info"
+- message: clear description of the issue (in ${langLabel})
+- rowIndex: row number (0-based) if applicable
+- itemName: the item name if applicable
+- details: additional context
+
+Items to validate (${vorRows.length} rows):
+${JSON.stringify(vorRows.slice(0, 100), null, 2)}
+
+Respond ONLY with a JSON array of issue objects, no markdown, no explanation. If no issues found, return [].`
+
+    const result = await geminiModel.generateContent(prompt)
+    const responseText = result.response.text()
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
+    let issues = []
+    if (jsonMatch) {
+      issues = JSON.parse(jsonMatch[0])
+    }
+
+    // Cleanup
+    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+
+    const summary = {
+      errors: issues.filter(i => i.type === 'error').length,
+      warnings: issues.filter(i => i.type === 'warning').length,
+      info: issues.filter(i => i.type === 'info').length,
+    }
+
+    console.log(`[VOR Validate] Found ${issues.length} issues (${summary.errors}E/${summary.warnings}W/${summary.info}I)`)
+    res.json({ issues, summary })
+  } catch (err) {
+    console.error('[VOR Validate] Error:', err)
+    res.status(500).json({ error: 'VOR validation failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 24. POST /api/cost/compare-vor — Compare two VOR Excel files
+// ---------------------------------------------------------------------------
+app.post('/api/cost/compare-vor', upload.array('files', 2), async (req, res) => {
+  try {
+    if (!req.files || req.files.length < 2) {
+      return res.status(400).json({ error: 'Two Excel files are required for comparison' })
+    }
+
+    const XLSX = (await import('xlsx')).default
+
+    // Parse both files
+    const parseFile = (filePath) => {
+      const workbook = XLSX.readFile(filePath)
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      if (rawRows.length === 0) return []
+
+      const headers = Object.keys(rawRows[0])
+      const findCol = (patterns) => headers.find(h => {
+        const lower = h.toLowerCase()
+        return patterns.some(p => lower.includes(p))
+      })
+
+      const nameCol = findCol(['наименование', 'name', 'описание', 'description', 'работа', 'item', 'позиция', 'material'])
+      const unitCol = findCol(['ед', 'unit', 'единица', 'изм'])
+      const qtyCol = findCol(['кол', 'объём', 'объем', 'qty', 'quantity', 'volume', 'amount', 'количество'])
+
+      if (!nameCol) return []
+
+      return rawRows
+        .map(row => ({
+          name: String(row[nameCol] || '').trim(),
+          unit: unitCol ? String(row[unitCol] || '').trim() : '',
+          quantity: qtyCol ? (parseFloat(row[qtyCol]) || 0) : 0,
+        }))
+        .filter(r => r.name.length > 0)
+    }
+
+    const rows1 = parseFile(req.files[0].path)
+    const rows2 = parseFile(req.files[1].path)
+
+    console.log(`[VOR Compare] File1: ${rows1.length} rows, File2: ${rows2.length} rows`)
+
+    // Build maps by normalized name
+    const normalize = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+    const map1 = new Map()
+    rows1.forEach(r => map1.set(normalize(r.name), r))
+    const map2 = new Map()
+    rows2.forEach(r => map2.set(normalize(r.name), r))
+
+    const added = []
+    const removed = []
+    const changed = []
+    let unchangedCount = 0
+
+    // Items in file2 but not in file1 = added
+    for (const [key, row] of map2) {
+      if (!map1.has(key)) {
+        added.push({ name: row.name, unit: row.unit, quantity: row.quantity })
+      }
+    }
+
+    // Items in file1 but not in file2 = removed
+    for (const [key, row] of map1) {
+      if (!map2.has(key)) {
+        removed.push({ name: row.name, unit: row.unit, quantity: row.quantity })
+      }
+    }
+
+    // Items in both = check for changes
+    for (const [key, row1] of map1) {
+      if (map2.has(key)) {
+        const row2 = map2.get(key)
+        if (row1.quantity !== row2.quantity) {
+          const diff = row2.quantity - row1.quantity
+          const pct = row1.quantity !== 0 ? (diff / row1.quantity) * 100 : 100
+          changed.push({
+            name: row1.name,
+            unit: row2.unit || row1.unit,
+            oldQuantity: row1.quantity,
+            newQuantity: row2.quantity,
+            quantityDiff: Math.round(diff * 100) / 100,
+            percentChange: Math.round(pct * 10) / 10,
+          })
+        } else {
+          unchangedCount++
+        }
+      }
+    }
+
+    // Cleanup
+    for (const f of req.files) {
+      try { await fs.unlink(f.path) } catch { /* ignore */ }
+    }
+
+    const summary = {
+      totalFile1: rows1.length,
+      totalFile2: rows2.length,
+      addedCount: added.length,
+      removedCount: removed.length,
+      changedCount: changed.length,
+      unchangedCount,
+    }
+
+    console.log(`[VOR Compare] +${added.length} -${removed.length} ~${changed.length} =${unchangedCount}`)
+    res.json({ added, removed, changed, summary })
+  } catch (err) {
+    console.error('[VOR Compare] Error:', err)
+    res.status(500).json({ error: 'VOR comparison failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Static file serving for uploaded outputs
 // ---------------------------------------------------------------------------
 app.use('/uploads', express.static(UPLOADS_DIR))
@@ -3221,6 +3438,8 @@ app.use((_req, res) => {
       'POST   /api/cost/search',
       'POST   /api/cost/classify',
       'POST   /api/cost/calculate',
+      'POST   /api/cost/validate-vor',
+      'POST   /api/cost/compare-vor',
       'POST   /api/validation/run',
       'POST   /api/ai/analyze',
       'GET    /api/tasks',

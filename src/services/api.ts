@@ -239,6 +239,48 @@ export interface VORClassificationResponse {
   summary: { totalRows: number; classifiedRows: number }
 }
 
+export interface VORIssue {
+  type: 'error' | 'warning' | 'info'
+  message: string
+  rowIndex?: number
+  itemName?: string
+  details?: string
+}
+
+export interface VORValidationResponse {
+  issues: VORIssue[]
+  summary: { errors: number; warnings: number; info: number }
+}
+
+export interface VORComparisonItem {
+  name: string
+  unit: string
+  quantity: number
+}
+
+export interface VORChangedItem {
+  name: string
+  unit: string
+  oldQuantity: number
+  newQuantity: number
+  quantityDiff: number
+  percentChange: number
+}
+
+export interface VORComparisonResponse {
+  added: VORComparisonItem[]
+  removed: VORComparisonItem[]
+  changed: VORChangedItem[]
+  summary: {
+    totalFile1: number
+    totalFile2: number
+    addedCount: number
+    removedCount: number
+    changedCount: number
+    unchangedCount: number
+  }
+}
+
 // ─── Error Helper ─────────────────────────────────────────────────────────────
 
 class ApiError extends Error {
@@ -303,6 +345,22 @@ export async function calculateCost(items: CostItem[]): Promise<CostReport> {
     body: JSON.stringify({ items }),
   })
   return handleResponse<CostReport>(response)
+}
+
+export async function validateVOR(formData: FormData): Promise<VORValidationResponse> {
+  const response = await fetch(`${API_BASE}/cost/validate-vor`, {
+    method: 'POST',
+    body: formData,
+  })
+  return handleResponse<VORValidationResponse>(response)
+}
+
+export async function compareVOR(formData: FormData): Promise<VORComparisonResponse> {
+  const response = await fetch(`${API_BASE}/cost/compare-vor`, {
+    method: 'POST',
+    body: formData,
+  })
+  return handleResponse<VORComparisonResponse>(response)
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
