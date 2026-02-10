@@ -67,6 +67,8 @@ import { MatchingReport } from './MatchingReport'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
 import { uploadRevitXlsx, processRevitModel } from '../../services/revit-api'
+import type { RevitProcessModelResponse } from '../../services/revit-api'
+import { RevitUploadModal } from './RevitUploadModal'
 import {
   fadeInUp,
   fadeInLeft,
@@ -202,6 +204,7 @@ export default function ViewerPage() {
   const matchOverlayRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map())
   const [revitScope, setRevitScopeState] = useState<{ projectId: string; modelVersion?: string }>({ projectId: 'default' })
   const [xlsxCoverage, setXlsxCoverage] = useState<CoverageSummary | null>(null)
+  const [showRevitUploadModal, setShowRevitUploadModal] = useState(false)
 
   const setRvtProgress = useCallback((percent: number, message: string, stage: LoadingProgress['stage'] = 'parsing') => {
     const bounded = Math.max(0, Math.min(100, Math.round(percent)))
@@ -780,6 +783,53 @@ export default function ViewerPage() {
     input.click()
   }, [addNotification, handleFileUpload, revitScope, setRevitScope, setRvtProgress])
 
+  // ── Revit Upload Modal completion handler ────────────────
+
+  const handleRevitConversionComplete = useCallback(async (result: RevitProcessModelResponse) => {
+    setShowRevitUploadModal(false)
+
+    const nextScope = {
+      projectId: result.projectId || revitScope.projectId,
+      modelVersion: result.modelVersion || revitScope.modelVersion,
+    }
+    setRevitScope(nextScope.projectId, nextScope.modelVersion)
+
+    if (result.xlsxImport?.coverage) {
+      setXlsxCoverage(result.xlsxImport.coverage)
+    }
+
+    if (!result.outputs?.ifcPath) {
+      addNotification('error', 'RVT processed, but IFC output is missing.')
+      return
+    }
+
+    try {
+      setRvtProgress(90, 'Loading converted IFC model...', 'geometry')
+      const backendBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+      const ifcUrl = /^https?:\/\//i.test(result.outputs.ifcPath)
+        ? result.outputs.ifcPath
+        : `${backendBase}${result.outputs.ifcPath}`
+      const ifcResponse = await fetch(ifcUrl)
+      if (!ifcResponse.ok) {
+        throw new Error(`Failed to load converted IFC (${ifcResponse.status})`)
+      }
+      const ifcBlob = await ifcResponse.blob()
+      const ifcFileName = result.outputs.ifcPath.split('/').pop() || 'model.ifc'
+      const ifcFile = new File([ifcBlob], ifcFileName, { type: 'application/octet-stream' })
+      await handleFileUpload([ifcFile], nextScope)
+      setRvtProgress(100, 'Done', 'done')
+      setTimeout(() => setLoadingProgress(null), 800)
+
+      const extras: string[] = []
+      if (result.outputs.xlsxPath) extras.push('XLSX')
+      if (result.outputs.daePath) extras.push('DAE')
+      addNotification('success', `RVT converted to IFC4X3${extras.length ? ` + ${extras.join(' + ')}` : ''}`)
+    } catch (err) {
+      setLoadingProgress(null)
+      addNotification('error', `Failed to load IFC: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    }
+  }, [addNotification, handleFileUpload, revitScope, setRevitScope, setRvtProgress, setXlsxCoverage])
+
   // ── XLSX Upload handler ─────────────────────────────────
 
   const handleXlsxUpload = useCallback(() => {
@@ -1260,7 +1310,7 @@ export default function ViewerPage() {
           }}>
             Upload IFC
           </Button>
-          <Button data-testid="upload-revit-rvt-btn" variant="secondary" icon={<Upload size={16} />} onClick={handleRvtUpload}>
+          <Button data-testid="upload-revit-rvt-btn" variant="secondary" icon={<Upload size={16} />} onClick={() => setShowRevitUploadModal(true)}>
             Upload Revit (.rvt auto)
           </Button>
           <Button data-testid="upload-revit-xlsx-btn" variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
@@ -1829,6 +1879,13 @@ export default function ViewerPage() {
           />
         )}
       </AnimatePresence>
+      <RevitUploadModal
+        open={showRevitUploadModal}
+        onClose={() => setShowRevitUploadModal(false)}
+        onComplete={handleRevitConversionComplete}
+        projectId={revitScope.projectId}
+        modelVersion={revitScope.modelVersion}
+      />
     </MotionPage>
   )
 }
