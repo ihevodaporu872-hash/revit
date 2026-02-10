@@ -1,0 +1,352 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1a32c92c-ecde-4405-8cd7-53d2568df80e",
+      "name": "Start - Click to begin",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -2304,
+        544
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9cbd4ec9-df24-41e8-b47a-720a4cdb733b",
+              "name": "path_to_revit_converter",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\DDC_Converter_Revit\\RvtExporter.exe"
+            },
+            {
+              "id": "aa834467-80fb-476a-bac1-6728478834f0",
+              "name": "revit_file",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\Sample_Projects\\2023 racbasicsampleproject.rvt"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0214c52e-1740-4e67-8f20-f186a6d20bca",
+      "name": "Setup - Define file paths",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2080,
+        544
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "4116306a-1c21-40e3-a6eb-7a155925ca07",
+      "name": "Extract - Run Revit converter",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1824,
+        544
+      ],
+      "typeVersion": 2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition1",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "rightType": "any"
+              },
+              "leftValue": "={{ $node[\"Extract - Run Revit converter\"].json.error }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "51a56147-6875-48f3-a54c-84e81448da70",
+      "name": "Check - Did extraction succeed?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1632,
+        544
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9cbd4ec9-df24-41e8-b47a-720a4cdb733b",
+              "name": "xlsx_filename",
+              "type": "string",
+              "value": "={{ $node[\"Setup - Define file paths\"].json[\"revit_file\"].slice(0, -4) + \"_rvt.xlsx\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0f2dcc9d-f5c1-47f1-9d41-5fb5e3beb5d5",
+      "name": "Success - Create Excel filename",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1440,
+        560
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error-message-id",
+              "name": "error_message",
+              "type": "string",
+              "value": "=Extraction failed: {{ $node[\"Extract - Run Revit converter\"].json.error || \"Unknown error\" }}"
+            },
+            {
+              "id": "error-code-id",
+              "name": "error_code",
+              "type": "number",
+              "value": "={{ $node[\"Extract - Run Revit converter\"].json.code || -1 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "037547c1-8601-44c5-8110-f7a5a6e52487",
+      "name": "Error - Show what went wrong",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1440,
+        384
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $json[\"xlsx_filename\"] }}"
+      },
+      "id": "9c38682a-8351-4b5d-b05a-3e47492b0dd0",
+      "name": "Extract - Read Excel file from disk",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "position": [
+        -1232,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "1b4a27d9-ab94-429d-9c14-8733f2063f37",
+      "name": "Extract - Parse Excel to data",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        -1024,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🔷 EXTRACT Phase\n\n**E**xtract data from Revit file:\n1. Setup file paths\n2. Run Revit converter (RVT → Excel)\n3. Check if conversion succeeded\n4. Read Excel file from disk\n5. Parse Excel into structured data",
+        "height": 504,
+        "width": 552,
+        "color": 6
+      },
+      "id": "92c871ef-5c14-47de-b9a4-133b09aa2d24",
+      "name": "Extract Phase Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2432,
+        256
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "# ETL with CAD (BIM)  \n**Extract. Transform. Load — the future of data processing in construction**\n\nETL (Extract, Transform, Load) is a time-tested and universal approach at the heart of every mature digital infrastructure. When applied to CAD and BIM data, it becomes not just relevant — but essential.\nETL is more than just a technical process. It’s a mindset shift — one that takes BIM out of the siloed world of 3D modeling and into the open world of transparent, interoperable, and machine-readable data. It is this paradigm that powers platforms like [DataDrivenConstruction.io](https://datadrivenconstruction.io) and drives the future of digital transformation in the built environment.\n",
+        "height": 712,
+        "width": 1908,
+        "color": 7
+      },
+      "id": "05ffd118-6d70-488b-a8e3-e4763b758fba",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2448,
+        80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## ⬇️ Only modify the variables here  \neverything else works automatically",
+        "height": 368,
+        "color": 4
+      },
+      "id": "2b98677d-a569-4a5a-8597-4b6ec38cdba7",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2144,
+        368
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 504,
+        "width": 1288,
+        "color": 5
+      },
+      "id": "2fb2954c-6654-48ab-92f4-4fc50d87e899",
+      "name": "Extract Phase Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1856,
+        256
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json['On the standard 3D View'] }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "bf86a769-0ca9-4904-a72d-e0839737cd86",
+      "name": "On the standard 3D View",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -816,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "run-MRC9gvYp",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-MRC9gvYp",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        704
+      ],
+      "webhookId": "2a423e24-0cb4-468a-be3d-2ced827a7680"
+    }
+  ],
+  "connections": {
+    "Start - Click to begin": {
+      "main": [
+        [
+          {
+            "node": "Setup - Define file paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check - Did extraction succeed?": {
+      "main": [
+        [
+          {
+            "node": "Error - Show what went wrong",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success - Create Excel filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success - Create Excel filename": {
+      "main": [
+        [
+          {
+            "node": "Extract - Read Excel file from disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract - Read Excel file from disk": {
+      "main": [
+        [
+          {
+            "node": "Extract - Parse Excel to data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract - Parse Excel to data": {
+      "main": [
+        [
+          {
+            "node": "On the standard 3D View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Setup - Define file paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Start - Click to begin": [
+      {}
+    ]
+  },
+  "meta": {
+    "instanceId": "06264f9623e205074e9489830ccdc830bd45718f4ec7a306f423b0c7a104f1a6"
+  }
+}

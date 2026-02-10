@@ -1,0 +1,154 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ⚠️ Troubleshooting\nIf you encounter errors during conversion, be sure to reference the executable inside the **`datadrivenlibs`** folder. Use this path:\n\n```text\n\"DDC_Exporter_XXXXXXX\\datadrivenlibs\\XxxExporter.exe\"\n```\ninstead of:\n```text\n\"DDC_Exporter_XXXXXXX\\XxxExporter.exe\"\n```",
+        "height": 300,
+        "width": 560,
+        "color": 7
+      },
+      "id": "dcf2fb6a-3721-4ce0-a3ab-1412edf69116",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -688,
+        656
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "f06bbea1-49d6-4c5f-a4d6-f2215d60a15a",
+      "name": "When clicking ‘Execute workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -736,
+        416
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9cbd4ec9-df24-41e8-b47a-720a4cdb733b",
+              "name": "path_to_converter",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\DDC_Converter_Revit\\datadrivenlibs\\RvtExporter.exe"
+            },
+            {
+              "id": "aa834467-80fb-476a-bac1-6728478834f0",
+              "name": "path_project_file",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\Sample_Projects\\2023 racbasicsampleproject.rvt"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "97af6e88-ea40-49c6-8ad7-a562da896d53",
+      "name": "Set path to file and converter",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -528,
+        416
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "e4d7520e-ee73-4ade-b517-44dd8a7d5757",
+      "name": "Converting the project into a structured form",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -336,
+        416
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "content": "## ⬇️ Only modify the variables here  \n— everything else works automatically",
+        "height": 384,
+        "width": 192,
+        "color": 4
+      },
+      "id": "366d5b1b-5c09-4a04-acb2-3738f3ca4168",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -576,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "Simple n8n workflow",
+        "height": 464,
+        "width": 688,
+        "color": 7
+      },
+      "id": "25df559f-aed9-4dfb-ae21-993fc0c756c0",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -816,
+        176
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "run-cYpR0z9b",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-cYpR0z9b",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        576
+      ],
+      "webhookId": "218791a5-08da-44e2-84be-00a2431873aa"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set path to file and converter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set path to file and converter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {}
+    ]
+  },
+  "meta": {
+    "instanceId": "06264f9623e205074e9489830ccdc830bd45718f4ec7a306f423b0c7a104f1a6"
+  }
+}

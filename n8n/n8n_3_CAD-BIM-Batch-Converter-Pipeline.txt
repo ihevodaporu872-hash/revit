@@ -1,0 +1,840 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📋 Quick Start Guide\n\n**1️⃣ Configure Settings**\nEdit \"Set Configuration Parameters\":\n- `converter_path`: Path to RvtExporter.exe\n- `source_folder`: Your CAD files location\n- `output_folder`: Where to save results\n- `file_extension`: .rvt, .ifc, .dwg, or .dgn\n\n**2️⃣ Run Pipeline**\nClick \"Execute Workflow\"\n\n**3️⃣ Get Results**\n✅ Excel data files\n✅ 3D DAE models\n✅ HTML report",
+        "height": 368,
+        "width": 376
+      },
+      "id": "3e8cf816-a0b2-4cc9-9a48-4b94f45ddbff",
+      "name": "Sticky Note23",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        448
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🎓 Video Tutorials\n\n**📹 [CAD-BIM Pipeline Tutorial](https://www.youtube.com/watch?v=PMTZNRFjD6c)**\nComplete walkthrough of CAD-BIM automation\n\n**⚡ [Automated Validation](https://www.youtube.com/watch?v=p84AmP2dcvg)**\nStop manual BIM checking forever\n\n💡 **Pro tip:** Watch before first run!",
+        "height": 224,
+        "width": 380,
+        "color": 2
+      },
+      "id": "f90ca2a1-61ec-47a3-9378-09ae98c1468f",
+      "name": "Sticky Note25",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        832
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🆘 Support\n\n**Resources:**\n🌐 [DataDrivenConstruction.io](https://datadrivenconstruction.io)\n📧 support@datadrivenconstruction.io\n💬 [Community Forum](https://t.me/datadrivenconstruction)\n\n**Documentation:**\n📚 [n8n Docs](https://docs.n8n.io)\n🎥 [YouTube Channel](https://youtube.com/@datadrivenconstruction)",
+        "height": 244,
+        "width": 372,
+        "color": 2
+      },
+      "id": "c4afbaf1-c053-4864-9b92-54f4895bd4b3",
+      "name": "Sticky Note28",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        1392
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 Use Cases\n\n**Weekly Reports**\nAutomate Monday conversions\n\n**Quality Control**\nValidate before client delivery\n\n**Archive Projects**\nConvert old files to lightweight formats\n\n**BI Integration**\nFeed Excel data to Power BI",
+        "height": 304,
+        "width": 380,
+        "color": 2
+      },
+      "id": "6fd1bfde-21f0-4564-b8a3-10f12d9769b7",
+      "name": "Sticky Note29",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        1072
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📋 Options Parameter Configuration Guide\n\n## 🎯 Overview\nThe Options parameter allows you to customize the export process with various flags and settings. Multiple options can be combined using spaces.\n\n## 🚀 Available Options\n\n### 📦 Export Modes\n| Mode   | Description |\n|------|-------------|\n| `basic`   |  Minimal export with essential data only |\n| `standard`   | Default export level with standard properties |\n| `complete`   | Full export including all available data |\n| `custom`   | Custom export using category file specification |\n\n### 🛠️ Feature Flags\n| Option | Description |\n|--------|-------------|\n| `bbox` | Add BoundingBox geometry of each element in XLSX |\n| `schedule` | Export all Schedules |\n| `sheets2pdf` | Export all Sheets to PDF format |\n| `[<output file>]` | Specify custom output file path |\n| `[<category file>]` | Text file with category names (required for custom mode) |\n\n### 🚫 Disable Options\n| Option | Description |\n|--------|-------------|\n| `-no-xlsx` | Disable export to .xlsx format |\n| `-no-collada` | Disable export to .dae format |\n\n---\n\n## 💡 Usage Examples\n\n### Example 1: **Basic Export with BoundingBox**\n```bash\nOptions: bbox basic\n```\n> Exports basic data with BoundingBox geometry included\n\n### Example 2: **Complete Export with Schedules**\n```bash\nOptions: complete schedule sheets2pdf\n```\n> Full data export including all schedules and sheets converted to PDF\n\n### Example 3: **Custom Mode with Category File**\n```bash\nOptions: custom categories.txt bbox\n```\n> Custom export using categories.txt file with BoundingBox geometry\n\n### Example 4: **Export Without Specific Formats**\n```bash\nOptions: standard -no-xlsx -no-collada\n```\n> Standard export excluding XLSX and Collada formats\n\n### Example 5: **Schedules Only Export**\n```bash\nOptions: schedule -no-collada\n```\n> Export only schedules without Collada format\n\n### Example 6: **Custom Output Path**\n```bash\nOptions: C:\\Output\\result.xlsx complete bbox\n```\n> Complete export with BoundingBox to specific output file\n\n---\n\n## ⚡ Quick Tips\n- **Combine multiple options** by separating them with spaces\n- **Order matters** - export mode should come before other options\n- **Custom mode** requires a category file to function properly\n- **Disable flags** can be used to exclude unwanted formats\n\n---\n\n## 📝 Notes\n- All options are case-sensitive\n- Invalid combinations will be ignored\n- Default behavior applies when no options are specified",
+        "height": 1940,
+        "width": 520
+      },
+      "id": "d404c31c-7fe9-4062-b440-c048838e5693",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        256,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "01c01be2-7304-4d24-8902-6b938b1716cd",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        864,
+        928
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Capture pipeline start time at the very beginning\nconst now = new Date();\nreturn [{\n  json: {\n    pipeline_start_time: now.toISOString(),\n    pipeline_start_timestamp: now.getTime(),\n    pipeline_start_message: `Pipeline started at ${now.toLocaleString()}`\n  }\n}];"
+      },
+      "id": "f4e7f69e-01eb-4882-9bb8-9db62cab6ce1",
+      "name": "Capture Pipeline Start Time1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1088,
+        880
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "08e0e625-1e43-44cc-a8d6-8e4489599417",
+      "name": "Merge Pipeline Start with Config1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1632,
+        896
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "converter-path",
+              "name": "converter_path",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\DDC_Converter_Revit\\datadrivenlibs\\RvtExporter.exe"
+            },
+            {
+              "id": "source-folder",
+              "name": "source_folder",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\Sample_Projects"
+            },
+            {
+              "id": "output-folder",
+              "name": "output_folder",
+              "type": "string",
+              "value": "C:\\Users\\Artem Boiko\\Desktop\\n8n\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\cad2data-Revit-IFC-DWG-DGN-pipeline-with-conversion-validation-qto-main\\Sample_Projects"
+            },
+            {
+              "id": "include-subfolders",
+              "name": "include_subfolders",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "file-extension",
+              "name": "file_extension",
+              "type": "string",
+              "value": ".rvt"
+            },
+            {
+              "id": "a811f4ba-b7a5-4774-a1fa-90d9c43a0de6",
+              "name": "options",
+              "type": "string",
+              "value": "basic schedule  -no-collada"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3e547b85-92e6-405b-bdc0-7f821c0ef106",
+      "name": "Set Configuration Parameters1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1360,
+        736
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "e8b43e09-aa59-47a5-a8bf-c31030d4b8c2",
+      "name": "Find CAD Files1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1792,
+        912
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "e039ebdd-4132-4e03-a907-45f483d867d1",
+      "name": "Merge Config with Search Results1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1952,
+        800
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process file list with configuration and pipeline start time\nconst configData = $input.first().json || {};\nconst searchData = $input.last().json || {};\n\nconst output = searchData.stdout || '';\nconst stderr = searchData.stderr || '';\n\n// Preserve pipeline start time\nconst pipeline_start_time = configData.pipeline_start_time || '';\nconst pipeline_start_timestamp = configData.pipeline_start_timestamp || Date.now();\n\nconsole.log('=== Processing File List ===');\nconsole.log('Pipeline start time:', pipeline_start_time);\nconsole.log('Config data:', configData);\nconsole.log('Raw output:', output);\nconsole.log('Files found:', output ? output.split(/\\r?\\n/).filter(x => x.trim()).length : 0);\n\nconst config = {\n  converter_path: configData.converter_path || '',\n  source_folder: configData.source_folder || '',\n  output_folder: configData.output_folder || '',\n  include_subfolders: configData.include_subfolders || false,\n  file_extension: configData.file_extension || '.rvt',\n  options: configData.options || ''\n};\n\nif (!output || !output.trim()) {\n  return [{\n    json: {\n      files: [],\n      total_files: 0,\n      message: `No files found with extension '${config.file_extension}' in ${config.source_folder}`,\n      error: stderr || 'No output from search command',\n      config: config,\n      pipeline_start_time: pipeline_start_time,\n      pipeline_start_timestamp: pipeline_start_timestamp\n    }\n  }];\n}\n\nlet normalizedExtension = (config.file_extension || '').trim();\nif (normalizedExtension && !normalizedExtension.startsWith('.')) {\n  normalizedExtension = '.' + normalizedExtension;\n}\n\nlet rawPaths = [];\ntry {\n  rawPaths = output.trim().split(/\\r?\\n/)\n    .map(path => (path || '').trim())\n    .filter(path => path && path.length > 0);\n} catch (error) {\n  console.log('Error splitting output:', error);\n  return [{\n    json: {\n      files: [],\n      total_files: 0,\n      message: `Error processing search results: ${error.message}`,\n      config: config,\n      pipeline_start_time: pipeline_start_time,\n      pipeline_start_timestamp: pipeline_start_timestamp\n    }\n  }];\n}\n\nconst filePaths = rawPaths.filter(path => {\n  if (!path || !normalizedExtension) return false;\n  const lowerPath = path.toLowerCase();\n  const lowerExt = normalizedExtension.toLowerCase();\n  return lowerPath.endsWith(lowerExt);\n});\n\nif (filePaths.length === 0) {\n  return [{\n    json: {\n      files: [],\n      total_files: 0,\n      message: `No files found with extension '${normalizedExtension}' in ${config.source_folder}`,\n      config: config,\n      pipeline_start_time: pipeline_start_time,\n      pipeline_start_timestamp: pipeline_start_timestamp\n    }\n  }];\n}\n\nconst files = filePaths.map((filePath, index) => {\n  let fileName = 'unknown_file';\n  let fileNameWithoutExt = 'unknown_file';\n  \n  try {\n    if (filePath && typeof filePath === 'string') {\n      const normalizedPath = filePath.replace(/\\\\/g, '/');\n      const pathParts = normalizedPath.split('/');\n      fileName = pathParts[pathParts.length - 1] || 'unknown_file';\n      \n      console.log(`Processing file ${index + 1}: ${fileName} from path: ${filePath}`);\n      \n      const lastDotIndex = fileName.lastIndexOf('.');\n      if (lastDotIndex > 0) {\n        fileNameWithoutExt = fileName.substring(0, lastDotIndex);\n      } else {\n        fileNameWithoutExt = fileName;\n      }\n    }\n  } catch (error) {\n    console.log(`Error parsing file path ${filePath}:`, error);\n  }\n  \n  const extWithoutDot = normalizedExtension ? normalizedExtension.substring(1) : 'unknown';\n  \n  return {\n    index: index + 1,\n    file_path: filePath,\n    file_name: fileName,\n    file_name_without_ext: fileNameWithoutExt,\n    converter_path: config.converter_path,\n    expected_output: `${config.output_folder}\\\\${fileNameWithoutExt}_${extWithoutDot}.xlsx`,\n    expected_output_dae: `${config.output_folder}\\\\${fileNameWithoutExt}_${extWithoutDot}.dae`,\n    config: config,\n    options: config.options,\n    pipeline_start_time: pipeline_start_time,\n    pipeline_start_timestamp: pipeline_start_timestamp\n  };\n});\n\nconsole.log('Processed files:', files.map(f => f.file_name));\n\nreturn [{\n  json: {\n    files: files,\n    total_files: files.length,\n    message: `Found ${files.length} files to convert`,\n    config: config,\n    pipeline_start_time: pipeline_start_time,\n    pipeline_start_timestamp: pipeline_start_timestamp\n  }\n}];"
+      },
+      "id": "d9833286-a2a1-401e-a66d-480a7515e090",
+      "name": "Process File List1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2112,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "files-exist-condition",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.files && $json.files.length || 0 }}",
+              "rightValue": 0
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0c704054-b717-474d-bfbc-d680bd58b257",
+      "name": "Check if Files Exist1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2272,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "id": "131a4b6a-6a85-4da1-a9f4-2991d4531a6a",
+      "name": "Split Files for Processing1",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2464,
+        784
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "ebc70c8d-a827-49aa-af1d-cdefda264852",
+      "name": "Create Output Directory1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2640,
+        880
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "b740d7d1-be2b-4080-a6e3-61559827108c",
+      "name": "Merge File Data1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2800,
+        800
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "// Capture conversion start time and preserve ALL data including pipeline start\nreturn $input.all().map(item => {\n  const json = {...item.json};\n  json.conversion_start_time = new Date().toISOString();\n  json.conversion_start_timestamp = Date.now();\n  console.log(`Starting conversion for: ${json.file_name} at ${json.conversion_start_time}`);\n  console.log(`Pipeline started at: ${json.pipeline_start_time}`);\n  return {json};\n});"
+      },
+      "id": "24035e5c-72d0-415d-ab8c-76d10700aca2",
+      "name": "Capture Start Time1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2976,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "unit": "milliseconds"
+      },
+      "id": "d92f112c-9afb-4206-9bf5-477f67248857",
+      "name": "Small Delay",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        3136,
+        800
+      ],
+      "webhookId": "5a1cb608-ec3e-4832-a289-f6a52ef8bc7a",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "525cff8f-c378-4dde-80a5-e5d64df686d5",
+      "name": "Execute Conversion1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3296,
+        912
+      ],
+      "typeVersion": 2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate actual conversion time and rename outputs - preserve pipeline start time\nreturn $input.all().map(item => {\n  const json = {...item.json};\n  \n  // Rename stdout/stderr\n  json.conversion_stdout = json.stdout || '';\n  json.conversion_stderr = json.stderr || '';\n  json.conversion_exitCode = json.exitCode || 0;\n  delete json.stdout;\n  delete json.stderr;\n  delete json.exitCode;\n  \n  // Calculate actual processing time with decimal precision\n  if (json.conversion_start_timestamp) {\n    const endTime = Date.now();\n    const startTime = json.conversion_start_timestamp;\n    const processingTimeMs = endTime - startTime;\n    json.processing_time = processingTimeMs / 1000;\n    json.processing_time_ms = processingTimeMs;\n    json.conversion_end_time = new Date().toISOString();\n    json.conversion_end_timestamp = endTime;\n    console.log(`Conversion completed for: ${json.file_name} in ${json.processing_time.toFixed(2)} seconds`);\n  } else {\n    json.processing_time = 0;\n    json.processing_time_ms = 0;\n    console.warn(`No start timestamp found for: ${json.file_name}`);\n  }\n  \n  // Ensure pipeline start time is preserved\n  console.log(`Pipeline start preserved: ${json.pipeline_start_timestamp}`);\n  \n  return {json};\n});"
+      },
+      "id": "fce80ef3-2ebc-435b-944b-021fd99e8285",
+      "name": "Calculate Conversion Time1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3456,
+        912
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "cedcc470-a747-428c-bef0-e1962ad49baa",
+      "name": "Merge Data Before Verification1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        3616,
+        800
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "ee69bbe0-37a5-4c01-bb86-2e253313fc2e",
+      "name": "Verify Output Files and Get Sizes1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3776,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Complete file verification with processing time - preserve pipeline start time\nconst allInputs = $input.all();\nconst mergedDataItems = $('Merge Data Before Verification1').all();\n\nconsole.log(`=== Complete File Verification ===`);\nconsole.log(`Total verification inputs: ${allInputs.length}`);\nconsole.log(`Total merged data items: ${mergedDataItems.length}`);\n\nconst results = [];\n\n// Process each file\nallInputs.forEach((input, index) => {\n  const verificationData = input.json || {};\n  \n  // Find corresponding merged data by matching index\n  const mergedData = mergedDataItems[index]?.json || {};\n  \n  // Extract all necessary data from merged node\n  const fileName = mergedData.file_name || 'unknown_file';\n  const filePath = mergedData.file_path || '';\n  const expectedOutput = mergedData.expected_output || '';\n  const expectedOutputDae = mergedData.expected_output_dae || '';\n  const fileIndex = mergedData.index || index + 1;\n  const processingTime = mergedData.processing_time || 0;\n  const config = mergedData.config || {};\n  const conversionStartTime = mergedData.conversion_start_time || '';\n  const conversionEndTime = mergedData.conversion_end_time || '';\n  const conversionEndTimestamp = mergedData.conversion_end_timestamp || Date.now();\n  \n  // IMPORTANT: Preserve pipeline start time\n  const pipelineStartTime = mergedData.pipeline_start_time || '';\n  const pipelineStartTimestamp = mergedData.pipeline_start_timestamp || 0;\n\n  console.log(`Processing verification for file ${fileIndex}: ${fileName}`);\n  console.log('Actual processing time:', processingTime, 'seconds');\n  console.log('Pipeline start timestamp:', pipelineStartTimestamp);\n\n  // Get verification output from the current input\n  let verificationOutput = verificationData.stdout || verificationData.verification_output || '';\n\n  // Parse PowerShell output\n  let successXlsx = false;\n  let successDae = false;\n  let successRevit = false;\n  let fileSizeXlsx = 0;\n  let fileSizeDae = 0;\n  let fileSizeRevit = 0;\n\n  try {\n    if (verificationOutput && verificationOutput.includes('|')) {\n      const parts = verificationOutput.split('|');\n      \n      parts.forEach(part => {\n        if (part && part.includes('XLSX_EXISTS:')) {\n          successXlsx = part.includes('XLSX_EXISTS:True');\n        }\n        if (part && part.includes('XLSX_SIZE:')) {\n          const sizeStr = part.replace('XLSX_SIZE:', '').trim();\n          fileSizeXlsx = parseInt(sizeStr) || 0;\n        }\n        if (part && part.includes('DAE_EXISTS:')) {\n          successDae = part.includes('DAE_EXISTS:True');\n        }\n        if (part && part.includes('DAE_SIZE:')) {\n          const sizeStr = part.replace('DAE_SIZE:', '').trim();\n          fileSizeDae = parseInt(sizeStr) || 0;\n        }\n        if (part && part.includes('REVIT_EXISTS:')) {\n          successRevit = part.includes('REVIT_EXISTS:True');\n        }\n        if (part && part.includes('REVIT_SIZE:')) {\n          const sizeStr = part.replace('REVIT_SIZE:', '').trim();\n          fileSizeRevit = parseInt(sizeStr) || 0;\n        }\n      });\n    }\n  } catch (error) {\n    console.log('Error parsing verification output:', error);\n  }\n\n  const finalSuccess = successXlsx && successDae && fileSizeXlsx > 0 && fileSizeDae > 0;\n\n  const statusMessage = finalSuccess \n    ? `✅ [${fileIndex}] Successfully converted: ${fileName} (XLSX: ${Math.round(fileSizeXlsx/1024)}KB, DAE: ${Math.round(fileSizeDae/1024)}KB, ${processingTime.toFixed(1)}s)`\n    : `❌ [${fileIndex}] Failed to convert: ${fileName} (XLSX: ${successXlsx && fileSizeXlsx > 0 ? '✓' : '✗'}, DAE: ${successDae && fileSizeDae > 0 ? '✓' : '✗'}, ${processingTime.toFixed(1)}s)`;\n\n  const result = {\n    file_name: fileName,\n    file_path: filePath,\n    expected_output: expectedOutput,\n    expected_output_dae: expectedOutputDae,\n    success: finalSuccess,\n    success_xlsx: successXlsx && fileSizeXlsx > 0,\n    success_dae: successDae && fileSizeDae > 0,\n    processing_time: processingTime,\n    file_size: fileSizeXlsx + fileSizeDae,\n    file_size_xlsx: fileSizeXlsx,\n    file_size_dae: fileSizeDae,\n    file_size_revit: fileSizeRevit,\n    index: fileIndex,\n    status: finalSuccess ? 'converted' : 'failed',\n    message: statusMessage,\n    timestamp: new Date().toISOString(),\n    verification_output: verificationOutput,\n    config: config,\n    conversion_start_time: conversionStartTime,\n    conversion_end_time: conversionEndTime,\n    conversion_end_timestamp: conversionEndTimestamp,\n    pipeline_start_time: pipelineStartTime,\n    pipeline_start_timestamp: pipelineStartTimestamp\n  };\n\n  console.log(`Verification complete for ${fileName}: ${result.message}`);\n  results.push({ json: result });\n});\n\nconsole.log(`=== Returning ${results.length} verification results ===`);\nreturn results;"
+      },
+      "id": "53145ff5-42ab-4ef0-aa9e-f3c5f2b30620",
+      "name": "Complete File Verification1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3936,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate HTML Report with CORRECT pipeline timing and no-collada handling\nconst results = $input.all();\n\n// Get the current time as pipeline end\nconst pipelineEndTime = Date.now();\n\n// Find the pipeline start timestamp from the data\nlet pipelineStartTimestamp = null;\nlet config = {};\n\n// Extract timing and config from results\nfor (const result of results) {\n  if (result.json) {\n    // Get pipeline start timestamp\n    if (result.json.pipeline_start_timestamp && !pipelineStartTimestamp) {\n      pipelineStartTimestamp = result.json.pipeline_start_timestamp;\n      console.log('Found pipeline start timestamp:', pipelineStartTimestamp);\n    }\n    \n    // Get config\n    if (result.json.config && Object.keys(result.json.config).length > 0) {\n      config = result.json.config;\n    }\n  }\n}\n\n// Check if no-collada option is enabled\nconst noColladaEnabled = config.options && config.options.includes('no-collada');\nconsole.log('No-collada mode enabled:', noColladaEnabled);\n\n// Calculate total pipeline time in minutes\nlet totalPipelineMinutes = '0.00';\nif (pipelineStartTimestamp) {\n  const totalMs = pipelineEndTime - pipelineStartTimestamp;\n  totalPipelineMinutes = (totalMs / 60000).toFixed(2);\n  console.log('Pipeline timing:', {\n    start: pipelineStartTimestamp,\n    end: pipelineEndTime,\n    totalMs: totalMs,\n    totalMinutes: totalPipelineMinutes\n  });\n} else {\n  console.warn('No pipeline start timestamp found!');\n}\n\n// Use config output folder or fallback\nconst outputFolder = config.output_folder || 'C:\\\\temp';\n\n// Count successful and failed conversions\nlet totalFiles = 0;\nlet successfulConversions = 0;\nlet failedConversions = 0;\nlet totalInputSize = 0;\nlet totalOutputSize = 0;\n\nconst successfulFiles = [];\nconst failedFiles = [];\n\nresults.forEach((result, index) => {\n  const data = result.json || {};\n  totalFiles++;\n  \n  const processingTime = data.processing_time || 0;\n  const xlsxSuccess = data.success_xlsx || false;\n  const daeSuccess = data.success_dae || false;\n  const fileSizeRevit = data.file_size_revit || 0;\n  const fileSizeXlsx = data.file_size_xlsx || 0;\n  const fileSizeDae = data.file_size_dae || 0;\n  \n  totalInputSize += fileSizeRevit;\n  \n  // Modified success logic for no-collada mode\n  let isSuccess = false;\n  if (noColladaEnabled) {\n    // In no-collada mode, only XLSX matters\n    isSuccess = xlsxSuccess;\n    if (isSuccess) {\n      totalOutputSize += fileSizeXlsx;\n    }\n  } else {\n    // Normal mode: both XLSX and DAE must succeed\n    isSuccess = xlsxSuccess && daeSuccess;\n    if (isSuccess) {\n      totalOutputSize += fileSizeXlsx + fileSizeDae;\n    }\n  }\n  \n  if (isSuccess) {\n    successfulConversions++;\n    successfulFiles.push({\n      name: data.file_name || `File ${index + 1}`,\n      originalSize: Math.round(fileSizeRevit / 1024),\n      xlsxSize: Math.round(fileSizeXlsx / 1024),\n      daeSize: Math.round(fileSizeDae / 1024),\n      totalSize: Math.round((fileSizeXlsx + (noColladaEnabled ? 0 : fileSizeDae)) / 1024),\n      xlsxPath: data.expected_output || '',\n      daePath: data.expected_output_dae || '',\n      noCollada: noColladaEnabled\n    });\n  } else {\n    failedConversions++;\n    failedFiles.push({\n      name: data.file_name || `File ${index + 1}`,\n      originalSize: Math.round(fileSizeRevit / 1024),\n      xlsxStatus: xlsxSuccess ? '✓' : '✗',\n      daeStatus: daeSuccess ? '✓' : '✗'\n    });\n  }\n});\n\nconst successRate = totalFiles > 0 ? Math.round((successfulConversions / totalFiles) * 100) : 0;\n\n// Generate timestamp for filename\nconst now = new Date();\nconst timestamp = now.toISOString().slice(0,19).replace(/:/g, '-');\nconst fileName = `CAD_Conversion_Report_${timestamp}.html`;\nconst fullPath = `${outputFolder}\\\\${fileName}`.replace(/\\\\\\\\/g, '\\\\');\n\nconsole.log('Report summary:', {\n  totalFiles,\n  successfulConversions,\n  failedConversions,\n  successRate: successRate + '%',\n  totalPipelineTime: totalPipelineMinutes + ' minutes',\n  outputPath: fullPath,\n  noColladaMode: noColladaEnabled\n});\n\n// Create HTML content with professional styling\nconst htmlContent = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>CAD Project Batch Conversion Report</title>\n    <style>\n        * {\n            margin: 0;\n            padding: 0;\n            box-sizing: border-box;\n        }\n        \n        body { \n            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; \n            background: #f5f6fa;\n            color: #2c3e50;\n            line-height: 1.6;\n        }\n        \n        .container { \n            max-width: 1400px; \n            margin: 0 auto; \n            background: white; \n            box-shadow: 0 0 40px rgba(0, 0, 0, 0.08); \n        }\n        \n        .header { \n            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);\n            color: white; \n            padding: 60px 40px;\n            position: relative;\n            overflow: hidden;\n        }\n        \n        .header::before {\n            content: '';\n            position: absolute;\n            top: -50%;\n            right: -10%;\n            width: 40%;\n            height: 200%;\n            background: rgba(255, 255, 255, 0.05);\n            transform: rotate(35deg);\n        }\n        \n        .header-content {\n            position: relative;\n            z-index: 1;\n        }\n        \n        .header h1 { \n            font-size: 2.8rem; \n            font-weight: 300;\n            letter-spacing: -1px;\n            margin-bottom: 15px;\n        }\n        \n        .header .subtitle { \n            font-size: 1.1rem;\n            opacity: 0.85;\n            font-weight: 400;\n        }\n        \n        .header .timestamp {\n            margin-top: 20px;\n            font-size: 0.95rem;\n            opacity: 0.7;\n        }\n        \n        .content {\n            padding: 40px;\n        }\n        \n        .metrics { \n            display: grid; \n            grid-template-columns: repeat(5, 1fr); \n            gap: 20px; \n            margin: -20px 0 40px 0;\n            position: relative;\n            z-index: 10;\n        }\n        \n        @media (max-width: 1200px) {\n            .metrics {\n                grid-template-columns: repeat(3, 1fr);\n            }\n        }\n        \n        @media (max-width: 768px) {\n            .metrics {\n                grid-template-columns: repeat(2, 1fr);\n            }\n        }\n        \n        @media (max-width: 480px) {\n            .metrics {\n                grid-template-columns: 1fr;\n            }\n        }\n        \n        .metric { \n            background: white;\n            padding: 30px 20px;\n            border-radius: 12px;\n            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);\n            transition: all 0.3s ease;\n            border: 1px solid #e8ecf1;\n            position: relative;\n            overflow: hidden;\n            text-align: center;\n        }\n        \n        .metric::before {\n            content: '';\n            position: absolute;\n            top: 0;\n            left: 0;\n            width: 100%;\n            height: 4px;\n            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);\n        }\n        \n        .metric:hover {\n            transform: translateY(-3px);\n            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);\n        }\n        \n        .metric-value { \n            font-size: 2.2rem; \n            font-weight: 600;\n            color: #1e3c72;\n            margin-bottom: 8px;\n            line-height: 1;\n        }\n        \n        .metric-label { \n            font-size: 0.85rem; \n            color: #64748b;\n            font-weight: 500;\n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        \n        .metric.highlight {\n            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);\n            border-color: #3b82f6;\n        }\n        \n        .metric.highlight::before {\n            background: linear-gradient(90deg, #10b981 0%, #059669 100%);\n        }\n        \n        .section { \n            margin: 40px 0;\n            background: white;\n            border-radius: 12px;\n            overflow: hidden;\n            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.06);\n            border: 1px solid #e8ecf1;\n        }\n        \n        .section-header {\n            background: #f8fafc;\n            padding: 24px 32px;\n            border-bottom: 1px solid #e8ecf1;\n        }\n        \n        .section h2 { \n            color: #1e293b;\n            font-size: 1.4rem;\n            font-weight: 600;\n            display: flex;\n            align-items: center;\n            gap: 10px;\n        }\n        \n        .section-content {\n            padding: 0;\n        }\n        \n        table { \n            width: 100%; \n            border-collapse: collapse;\n        }\n        \n        th, td { \n            padding: 16px 24px;\n            text-align: left;\n            border-bottom: 1px solid #f1f5f9;\n        }\n        \n        th { \n            background: #f8fafc;\n            font-weight: 600;\n            color: #475569;\n            font-size: 0.875rem;\n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n            position: sticky;\n            top: 0;\n            z-index: 1;\n        }\n        \n        tr:last-child td {\n            border-bottom: none;\n        }\n        \n        tr:hover { \n            background: #f8fafc;\n        }\n        \n        .status-success { \n            background: #10b981;\n            color: white;\n            padding: 6px 12px;\n            border-radius: 6px;\n            font-size: 0.75rem;\n            font-weight: 600;\n            display: inline-block;\n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        \n        .status-failed { \n            background: #ef4444;\n            color: white;\n            padding: 6px 12px;\n            border-radius: 6px;\n            font-size: 0.75rem;\n            font-weight: 600;\n            display: inline-block;\n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        \n        .status-skipped { \n            background: #6b7280;\n            color: white;\n            padding: 6px 12px;\n            border-radius: 6px;\n            font-size: 0.75rem;\n            font-weight: 600;\n            display: inline-block;\n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        \n        .config-section {\n            background: #f8fafc;\n            padding: 32px;\n            border-radius: 12px;\n            margin: 40px 0;\n        }\n        \n        .config-grid {\n            display: grid;\n            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));\n            gap: 24px;\n            margin-top: 20px;\n        }\n        \n        .config-item {\n            display: flex;\n            align-items: flex-start;\n            gap: 16px;\n        }\n        \n        .config-label {\n            font-weight: 600;\n            color: #475569;\n            min-width: 140px;\n            font-size: 0.9rem;\n        }\n        \n        .config-value {\n            color: #1e293b;\n            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;\n            background: white;\n            padding: 8px 12px;\n            border-radius: 6px;\n            font-size: 0.85rem;\n            word-break: break-all;\n            flex: 1;\n            border: 1px solid #e2e8f0;\n        }\n        \n        .footer { \n            background: #f8fafc;\n            padding: 40px;\n            text-align: center;\n            color: #64748b;\n            border-top: 1px solid #e8ecf1;\n        }\n        \n        .footer .company {\n            font-size: 1.1rem;\n            font-weight: 600;\n            color: #1e293b;\n            margin-bottom: 8px;\n        }\n        \n        .footer .version {\n            font-size: 0.85rem;\n            margin-top: 16px;\n            color: #94a3b8;\n        }\n        \n        .report-location {\n            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);\n            border: 1px solid #3b82f6;\n            border-radius: 12px;\n            padding: 20px 28px;\n            margin: 30px 0;\n            text-align: center;\n            color: #1e3c72;\n            font-size: 0.95rem;\n        }\n        \n        .report-location strong {\n            color: #1e3c72;\n            font-weight: 600;\n        }\n        \n        .size-cell {\n            font-family: 'SF Mono', Monaco, monospace;\n            font-size: 0.9rem;\n        }\n        \n        .file-link {\n            color: #3b82f6;\n            text-decoration: none;\n            font-weight: 500;\n            transition: all 0.2s ease;\n            position: relative;\n            display: inline-block;\n            padding: 2px 0;\n        }\n        \n        .file-link:hover {\n            color: #2563eb;\n            text-decoration: underline;\n        }\n        \n        .tooltip {\n            position: relative;\n            display: inline-block;\n        }\n        \n        .tooltip .tooltiptext {\n            visibility: hidden;\n            width: 280px;\n            background-color: #333;\n            color: #fff;\n            text-align: center;\n            border-radius: 8px;\n            padding: 12px 16px;\n            position: absolute;\n            z-index: 1000;\n            bottom: 125%;\n            left: 50%;\n            margin-left: -140px;\n            opacity: 0;\n            transition: opacity 0.3s;\n            font-size: 0.85rem;\n            line-height: 1.4;\n            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);\n        }\n        \n        .tooltip .tooltiptext::after {\n            content: \"\";\n            position: absolute;\n            top: 100%;\n            left: 50%;\n            margin-left: -5px;\n            border-width: 5px;\n            border-style: solid;\n            border-color: #333 transparent transparent transparent;\n        }\n        \n        .tooltip:hover .tooltiptext {\n            visibility: visible;\n            opacity: 1;\n        }\n        \n        .no-collada-notice {\n            background: #fef3c7;\n            border: 1px solid #fbbf24;\n            border-radius: 8px;\n            padding: 16px;\n            margin: 20px 0;\n            color: #92400e;\n            font-size: 0.9rem;\n            text-align: center;\n        }\n        \n        .no-collada-notice strong {\n            color: #78350f;\n        }\n        \n        @media print {\n            body { background: white; }\n            .container { box-shadow: none; }\n            .metric { box-shadow: none; border: 1px solid #e5e7eb; }\n            .section { box-shadow: none; page-break-inside: avoid; }\n            .tooltip .tooltiptext { display: none; }\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <div class=\"header-content\">\n                <h1>CAD Project Batch Conversion Report</h1>\n                <p class=\"subtitle\">Automated conversion pipeline execution summary</p>\n                <p class=\"timestamp\">${now.toLocaleString('en-US', { \n                    weekday: 'long', \n                    year: 'numeric', \n                    month: 'long', \n                    day: 'numeric', \n                    hour: '2-digit', \n                    minute: '2-digit' \n                })}</p>\n            </div>\n        </div>\n        \n        <div class=\"content\">\n            <div class=\"metrics\">\n                <div class=\"metric\">\n                    <div class=\"metric-value\">${totalFiles}</div>\n                    <div class=\"metric-label\">Total Files</div>\n                </div>\n                <div class=\"metric highlight\">\n                    <div class=\"metric-value\">${successRate}%</div>\n                    <div class=\"metric-label\">Success Rate</div>\n                </div>\n                <div class=\"metric\">\n                    <div class=\"metric-value\">${totalPipelineMinutes}</div>\n                    <div class=\"metric-label\">Total Time (Minutes)</div>\n                </div>\n                <div class=\"metric\">\n                    <div class=\"metric-value\">${Math.round(totalInputSize / 1048576)} MB</div>\n                    <div class=\"metric-label\">Total Input Size</div>\n                </div>\n                <div class=\"metric\">\n                    <div class=\"metric-value\">${Math.round(totalOutputSize / 1048576)} MB</div>\n                    <div class=\"metric-label\">Total Output Size</div>\n                </div>\n            </div>\n\n            <div class=\"report-location\">\n                <strong>Report Location:</strong> ${fullPath}\n            </div>\n\n            ${noColladaEnabled ? `\n            <div class=\"no-collada-notice\">\n                <strong>Note:</strong> DAE (Collada) file generation was skipped as per configuration (no-collada option enabled).\n            </div>\n            ` : ''}\n\n            ${successfulFiles.length > 0 ? `\n            <div class=\"section\">\n                <div class=\"section-header\">\n                    <h2>✅ Successfully Converted Files (${successfulFiles.length})</h2>\n                </div>\n                <div class=\"section-content\">\n                    <table>\n                        <thead>\n                            <tr>\n                                <th>File Name</th>\n                                <th>Original Size</th>\n                                <th>Excel Output</th>\n                                ${noColladaEnabled ? '<th>DAE Output</th>' : '<th>DAE Output</th>'}\n                                <th>Total Output</th>\n                            </tr>\n                        </thead>\n                        <tbody>\n                            ${successfulFiles.map(file => `\n                                <tr>\n                                    <td><strong>${file.name}</strong></td>\n                                    <td class=\"size-cell\">${file.originalSize} KB</td>\n                                    <td class=\"size-cell\">\n                                        <a href=\"file:///${file.xlsxPath.replace(/\\\\/g, '/')}\" class=\"file-link\" target=\"_blank\">${file.xlsxSize} KB</a>\n                                    </td>\n                                    <td class=\"size-cell\">\n                                        ${noColladaEnabled ? \n                                            '<span class=\"status-skipped\">SKIPPED</span>' : \n                                            `<div class=\"tooltip\">\n                                                <a href=\"file:///${file.daePath.replace(/\\\\/g, '/')}\" class=\"file-link\" target=\"_blank\">${file.daeSize} KB</a>\n                                                <span class=\"tooltiptext\">💡 Tip: Use the free CAD Assistant software for the best viewing experience of DAE files</span>\n                                            </div>`\n                                        }\n                                    </td>\n                                    <td class=\"size-cell\"><strong>${file.totalSize} KB</strong></td>\n                                </tr>\n                            `).join('')}\n                        </tbody>\n                    </table>\n                </div>\n            </div>\n            ` : ''}\n\n            ${failedFiles.length > 0 ? `\n            <div class=\"section\">\n                <div class=\"section-header\">\n                    <h2>❌ Failed Conversions (${failedFiles.length})</h2>\n                </div>\n                <div class=\"section-content\">\n                    <table>\n                        <thead>\n                            <tr>\n                                <th>File Name</th>\n                                <th>Original Size</th>\n                                <th>XLSX Status</th>\n                                <th>DAE Status</th>\n                            </tr>\n                        </thead>\n                        <tbody>\n                            ${failedFiles.map(file => `\n                                <tr>\n                                    <td><strong>${file.name}</strong></td>\n                                    <td class=\"size-cell\">${file.originalSize} KB</td>\n                                    <td><span class=\"status-${file.xlsxStatus === '✓' ? 'success' : 'failed'}\">${file.xlsxStatus === '✓' ? 'SUCCESS' : 'FAILED'}</span></td>\n                                    <td>${noColladaEnabled && file.xlsxStatus === '✓' ? \n                                        '<span class=\"status-skipped\">SKIPPED</span>' : \n                                        `<span class=\"status-${file.daeStatus === '✓' ? 'success' : 'failed'}\">${file.daeStatus === '✓' ? 'SUCCESS' : 'FAILED'}</span>`\n                                    }</td>\n                                </tr>\n                            `).join('')}\n                        </tbody>\n                    </table>\n                </div>\n            </div>\n            ` : ''}\n\n            <div class=\"config-section\">\n                <h2 style=\"color: #1e293b; font-size: 1.4rem; font-weight: 600; margin-bottom: 20px;\">\n                    ⚙️ Configuration Details\n                </h2>\n                <div class=\"config-grid\">\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Source Folder:</span>\n                        <span class=\"config-value\">${config.source_folder || 'Not specified'}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Output Folder:</span>\n                        <span class=\"config-value\">${config.output_folder || 'Not specified'}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">File Extension:</span>\n                        <span class=\"config-value\">${config.file_extension || 'Not specified'}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Include Subfolders:</span>\n                        <span class=\"config-value\">${config.include_subfolders ? 'Yes' : 'No'}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Converter Options:</span>\n                        <span class=\"config-value\">${config.options || 'None'}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Generated:</span>\n                        <span class=\"config-value\">${now.toLocaleString()}</span>\n                    </div>\n                    <div class=\"config-item\">\n                        <span class=\"config-label\">Workflow ID:</span>\n                        <span class=\"config-value\">FYFQhblt4gILLSpe</span>\n                    </div>\n                </div>\n            </div>\n        </div>\n\n        <div class=\"footer\">\n            <div class=\"company\">DataDrivenConstruction.io</div>\n            <div>Professional CAD Conversion Pipeline</div>\n            <div class=\"version\">Version 2.0 | Automated Batch Processing System</div>\n        </div>\n    </div>\n</body>\n</html>`;\n\n// Return data for saving and opening\nreturn [{\n    json: {\n        html_content: htmlContent,\n        file_name: fileName,\n        full_path: fullPath,\n        output_folder: outputFolder,\n        total_files: totalFiles,\n        successful_conversions: successfulConversions,\n        failed_conversions: failedConversions,\n        success_rate: successRate,\n        total_pipeline_time: totalPipelineMinutes,\n        config: config,\n        summary_message: `✅ Conversion Complete! ${successfulConversions}/${totalFiles} files converted successfully (${successRate}% success rate) in ${totalPipelineMinutes} minutes`\n    }\n}];"
+      },
+      "id": "7d8eaa98-dc34-470e-9a76-cd0f58ed22b3",
+      "name": "Generate HTML Report1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4096,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare binary data for file saving\nconst item = $input.first().json;\n\nconsole.log('Preparing binary data for file:', item.file_name);\nconsole.log('Full path:', item.full_path);\n\nif (!item.html_content) {\n  throw new Error('No HTML content found');\n}\n\nreturn [{\n  json: item,\n  binary: {\n    report: {\n      data: Buffer.from(item.html_content, 'utf-8').toString('base64'),\n      mimeType: 'text/html',\n      fileName: item.file_name,\n      fileExtension: 'html'\n    }\n  }\n}];"
+      },
+      "id": "b014f503-824f-454d-8aa0-0b1ff420f4e1",
+      "name": "Prepare Binary Data1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4256,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "fileName": "={{ $json.full_path }}",
+        "dataPropertyName": "report",
+        "options": {}
+      },
+      "id": "709a1432-182e-4fcc-827d-fde9b64b8687",
+      "name": "Save HTML File1",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "position": [
+        4416,
+        800
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify file was saved and prepare for opening\nconst data = $input.first().json;\nconst fullPath = data.full_path || '';\n\nconsole.log('Preparing to open file:', fullPath);\n\n// Normalize path for Windows\nconst windowsPath = fullPath.replace(/\\\\\\\\/g, '\\\\').replace(/\\//g, '\\\\');\n\nreturn [{\n  json: {\n    ...data,\n    windows_path: windowsPath,\n    command_to_open: `cmd /c start \"\" \"${windowsPath}\"`\n  }\n}];"
+      },
+      "id": "9e7e7e62-f81c-41d3-a85d-5f410c50d2e7",
+      "name": "Verify and Prepare Path1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4576,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "b47a5f1a-33cd-4376-86ee-ff91bcfe7925",
+      "name": "Open HTML Report1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4736,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const { execSync } = require('child_process');\ntry {\n  const cmd = \"// TODO: set command\";\n  const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });\n  return [{ json: { stdout: result, exitCode: 0 } }];\n} catch (e) {\n  return [{ json: { stderr: e.stderr || e.message, exitCode: e.status || 1 } }];\n}"
+      },
+      "id": "1cf8e133-ef4f-4fff-97e5-db3ef3b5105d",
+      "name": "Final Completion Notice1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4896,
+        800
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "no-files-message",
+              "name": "message",
+              "type": "string",
+              "value": "⚠️ No files found to convert with the specified parameters"
+            },
+            {
+              "id": "no-files-details",
+              "name": "details",
+              "type": "string",
+              "value": "Please check: 1) Source folder path exists, 2) File extension is correct, 3) Files exist in the specified location"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b03af12a-3510-40da-aa77-578a2208f3c2",
+      "name": "No Files Found Response1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2464,
+        1008
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "## 🏁 GROUP 1: INITIALIZATION\n\n**Nodes in this group:**\n• Manual Trigger\n• Capture Pipeline Start Time\n• Set Configuration Parameters\n• Merge Pipeline Start with Config\n\n**What happens here:**\n1️⃣ Pipeline starts manually or on schedule\n2️⃣ Current timestamp is captured for metrics\n3️⃣ All settings are loaded (paths, folders, etc.)\n4️⃣ Configuration merged with timing data\n\n💡 **Key:** This sets up everything needed for the conversion process",
+        "height": 844,
+        "width": 756,
+        "color": 6
+      },
+      "id": "52b3b41a-f9cf-4861-9727-b64fe6f8309a",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🔍 GROUP 2: FILE DISCOVERY\n\n**Nodes in this group:**\n• Find CAD Files\n• Merge Config with Search Results\n• Process File List\n• Check if Files Exist\n\n**What happens here:**\n1️⃣ PowerShell scans the source folder\n2️⃣ Filters files by extension (.rvt, .ifc, etc.)\n3️⃣ Creates a list with full paths\n4️⃣ Validates that files were found\n\n📁 **Output:** Array of file objects with paths\n❌ **If no files:** Pipeline stops gracefully",
+        "height": 840,
+        "width": 1024,
+        "color": 5
+      },
+      "id": "83df283f-061f-447d-94e3-bc68823a63c6",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1568,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🔄 GROUP 3: BATCH PREPARATION\n\n**Nodes in this group:**\n• Split Files for Processing\n• Create Output Directory\n• Merge File Data\n\n**What happens here:**\n1️⃣ File list is split into individual items\n2️⃣ Output directory is created (if needed)\n3️⃣ Each file gets conversion parameters\n\n🎯 **Purpose:** Enables parallel processing\n📊 **Data added:** Expected output paths for XLSX & DAE",
+        "height": 844,
+        "width": 316,
+        "color": 5
+      },
+      "id": "a632c0ce-84ca-4773-8adb-c508cdaefaf1",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2608,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## ⚡ GROUP 4: CONVERSION EXECUTION\n\n**Nodes in this group:**\n• Capture Start Time\n• Small Delay\n• Execute Conversion\n• Calculate Conversion Time\n\n**What happens here:**\n1️⃣ Timestamp captured for each file\n2️⃣ Small delay prevents overload\n3️⃣ RvtExporter.exe runs the conversion\n4️⃣ Processing time calculated\n\n🔧 **Command:** \n`RvtExporter.exe [input] [output.xlsx] [output.dae]`\n\n⏱️ **Conversion Time:** 1 Minute per 100Mb.",
+        "height": 840,
+        "width": 800,
+        "color": 5
+      },
+      "id": "5528c8d0-55aa-4cc8-a467-9dee9e966701",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2944,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## ✅ GROUP 5: VALIDATION\n\n**Nodes in this group:**\n• Merge Data Before Verification\n• Verify Output Files and Get Sizes\n• Complete File Verification\n\n**What happens here:**\n1️⃣ All conversion data is consolidated\n2️⃣ PowerShell checks if outputs exist\n3️⃣ File sizes are measured\n4️⃣ Success/failure status determined\n\n**Success criteria:**\n• Both XLSX and DAE files exist\n• File sizes > 0 bytes\n• No conversion errors",
+        "height": 836,
+        "width": 284,
+        "color": 6
+      },
+      "id": "d355acb6-21ac-4385-b5a5-a47b664bb7b5",
+      "name": "Sticky Note15",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3760,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📊 GROUP 6: REPORTING\n\n**Nodes in this group:**\n• Generate HTML Report\n• Prepare Binary Data\n• Save HTML File\n\n**What happens here:**\n1️⃣ All results compiled into statistics\n2️⃣ Professional HTML report generated\n3️⃣ Report saved to output folder\n\n**Report includes:**\n• Success rate & metrics\n• Processing times\n• File sizes & links\n• Detailed conversion log",
+        "height": 832,
+        "width": 456
+      },
+      "id": "38595871-7468-4a67-935f-ba3e255057b7",
+      "name": "Sticky Note16",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4064,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 GROUP 7: FINALIZATION\n\n**Nodes in this group:**\n• Verify and Prepare Path\n• Open HTML Report\n• Final Completion Notice\n\n**What happens here:**\n1️⃣ Report path normalized for Windows\n2️⃣ HTML report opens in browser\n3️⃣ Success message displayed\n\n**Final output:**\n• Report auto-opens\n• Summary in console\n• All files ready for use",
+        "height": 828,
+        "width": 484
+      },
+      "id": "0e3e111a-4fe8-45af-9988-c3906dc209e9",
+      "name": "Sticky Note17",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4544,
+        336
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📝 Configuration Example\n\n```\nconverter_path: \nC:\\DDC_Converter\\RvtExporter.exe\nsource_folder: \nC:\\Projects\\Building_A\noutput_folder: \nC:\\Projects\\Converted\nfile_extension: .rvt\ninclude_subfolders: false\n```",
+        "height": 308,
+        "width": 488,
+        "color": 4
+      },
+      "id": "8882adef-568f-4972-bd49-59989539c91e",
+      "name": "Sticky Note30",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        1200
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "4aa231c6-0fcb-4468-b920-b7840b71d9c8",
+      "name": "Schedule Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        864,
+        784
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "content": "## ⬇️ Only modify the variables here  \n— everything else works automatically",
+        "height": 384,
+        "width": 192,
+        "color": 4
+      },
+      "id": "3a01056a-23be-49b0-8fb9-ec504fd33ff4",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1312,
+        528
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Capture Pipeline Start Time1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Pipeline Start Time1": {
+      "main": [
+        [
+          {
+            "node": "Set Configuration Parameters1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Pipeline Start with Config1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Pipeline Start with Config1": {
+      "main": [
+        [
+          {
+            "node": "Merge Config with Search Results1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Configuration Parameters1": {
+      "main": [
+        [
+          {
+            "node": "Merge Pipeline Start with Config1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Config with Search Results1": {
+      "main": [
+        [
+          {
+            "node": "Process File List1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process File List1": {
+      "main": [
+        [
+          {
+            "node": "Check if Files Exist1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Files Exist1": {
+      "main": [
+        [
+          {
+            "node": "Split Files for Processing1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Files Found Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Files for Processing1": {
+      "main": [
+        [
+          {
+            "node": "Merge File Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge File Data1": {
+      "main": [
+        [
+          {
+            "node": "Capture Start Time1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Start Time1": {
+      "main": [
+        [
+          {
+            "node": "Small Delay",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Data Before Verification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Conversion Time1": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Before Verification1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Complete File Verification1": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Report1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Binary Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Binary Data1": {
+      "main": [
+        [
+          {
+            "node": "Save HTML File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save HTML File1": {
+      "main": [
+        [
+          {
+            "node": "Verify and Prepare Path1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "06264f9623e205074e9489830ccdc830bd45718f4ec7a306f423b0c7a104f1a6"
+  }
+}
