@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchCostEstimates, saveCostEstimate } from '../../services/supabase-api'
+import { classifyVOR } from '../../services/api'
 import {
   Search,
   Globe,
@@ -10,7 +11,6 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
-  Upload,
   Sparkles,
   ChevronDown,
   Trash2,
@@ -18,14 +18,13 @@ import {
   Minus,
   BarChart3,
   Check,
-  Loader2,
-  X,
 } from 'lucide-react'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import { Tabs } from '../ui/Tabs'
 import { Table } from '../ui/Table'
+import { FileUpload } from '../ui/FileUpload'
 import { useAppStore } from '../../store/appStore'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import { MotionPage } from '../MotionPage'
@@ -140,6 +139,7 @@ export default function CostEstimatePage() {
   const [costItems, setCostItems] = useState<CostLineItem[]>([])
 
   // Classification state
+  const [vorFile, setVorFile] = useState<File | null>(null)
   const [classificationResults, setClassificationResults] = useState<ClassificationResult[]>([])
   const [isClassifying, setIsClassifying] = useState(false)
 
@@ -239,21 +239,32 @@ export default function CostEstimatePage() {
   }
 
   const handleClassifyUpload = async () => {
+    if (!vorFile) {
+      addNotification('warning', 'Сначала загрузите Excel-файл с ВОР')
+      return
+    }
     setIsClassifying(true)
-
-    // Simulate API call to Gemini AI classification
-    await new Promise((r) => setTimeout(r, 2000))
-
-    // In real implementation:
-    // const formData = new FormData()
-    // formData.append('file', excelFile)
-    // formData.append('language', language)
-    // const res = await fetch('/api/cost/classify', { method: 'POST', body: formData })
-    // const data = await res.json()
-
-    setClassificationResults(MOCK_CLASSIFICATION_RESULTS)
-    setIsClassifying(false)
-    addNotification('success', `Classified ${MOCK_CLASSIFICATION_RESULTS.length} BIM elements using Gemini AI`)
+    try {
+      const formData = new FormData()
+      formData.append('file', vorFile)
+      formData.append('language', language.toLowerCase())
+      const result = await classifyVOR(formData)
+      const mapped: ClassificationResult[] = result.classifications.map((c) => ({
+        elementName: c.originalName,
+        matchedCode: c.cwicrCode,
+        matchedDescription: c.matchedDescription,
+        confidence: c.confidence,
+        unit: c.unit,
+        unitPrice: (c.unitCostMin + c.unitCostMax) / 2,
+        quantity: c.quantity,
+      }))
+      setClassificationResults(mapped)
+      addNotification('success', `Классифицировано ${mapped.length} из ${result.summary.totalRows} строк ВОР`)
+    } catch (err: any) {
+      addNotification('error', err.message || 'Ошибка классификации')
+    } finally {
+      setIsClassifying(false)
+    }
   }
 
   const addClassifiedToCost = () => {
@@ -310,7 +321,7 @@ export default function CostEstimatePage() {
   ]
 
   const classifyColumns = [
-    { key: 'elementName', header: 'BIM Element', render: (cr: ClassificationResult) => (
+    { key: 'elementName', header: 'Наименование', render: (cr: ClassificationResult) => (
       <span className="font-medium text-sm">{cr.elementName}</span>
     )},
     { key: 'matchedCode', header: 'Matched Code', render: (cr: ClassificationResult) => (
@@ -510,24 +521,18 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 <Card
-                  title="Классификация BIM-элементов"
-                  subtitle="Загрузите Excel-файл с BIM-элементами для авто-классификации через Gemini"
+                  title="Классификация ВОР (работы и материалы)"
+                  subtitle="Загрузите Excel-файл с ВОР для авто-классификации через Gemini AI + CWICR"
                   hover
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
-                      <motion.div
-                        whileHover={{ scale: 1.01, borderColor: 'var(--primary)' }}
-                        whileTap={{ scale: 0.99 }}
-                        className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors border-border hover:border-primary/50 hover:bg-muted"
-                        onClick={() => handleClassifyUpload()}
-                      >
-                        <Upload size={32} className="mx-auto text-muted-foreground mb-3" />
-                        <p className="font-medium text-foreground">Перетащите Excel-файл с BIM-элементами</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Поддержка .xlsx с колонками: имя элемента, тип, количество
-                        </p>
-                      </motion.div>
+                      <FileUpload
+                        accept=".xlsx,.xls"
+                        onFilesSelected={(files) => setVorFile(files[0] || null)}
+                        label="Перетащите Excel-файл с ВОР"
+                        description="Поддержка .xlsx и .xls — наименования работ, единицы, объёмы"
+                      />
                     </div>
                     <div className="text-center px-6">
                       <Sparkles size={24} className="mx-auto text-primary mb-2" />
@@ -540,9 +545,10 @@ export default function CostEstimatePage() {
                     <Button
                       onClick={handleClassifyUpload}
                       loading={isClassifying}
+                      disabled={!vorFile}
                       icon={<Sparkles size={16} />}
                     >
-                      {isClassifying ? 'Классификация ИИ...' : 'Классифицировать элементы'}
+                      {isClassifying ? 'Классификация ИИ...' : 'Классифицировать ВОР'}
                     </Button>
                   </div>
                 </Card>
@@ -558,7 +564,7 @@ export default function CostEstimatePage() {
                     >
                       <Card
                         title="Результаты классификации"
-                        subtitle={`Классифицировано элементов: ${classificationResults.length}`}
+                        subtitle={`Классифицировано строк ВОР: ${classificationResults.length}`}
                         hover
                         actions={
                           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>

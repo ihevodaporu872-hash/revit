@@ -98,20 +98,18 @@ export interface ValidationResult {
 }
 
 export interface AnalysisResult {
-  id: string
-  prompt: string
-  response: string
-  charts?: Array<{
-    type: 'bar' | 'pie' | 'line'
-    title: string
-    data: Record<string, unknown>[]
-  }>
-  tables?: Array<{
-    title: string
-    headers: string[]
-    rows: string[][]
-  }>
-  createdAt: string
+  explanation: string
+  code: string | null
+  results: {
+    type: 'table' | 'chart' | 'stats' | 'mixed'
+    tableData?: { headers: string[]; rows: string[][] } | null
+    stats?: { label: string; value: string; change?: number }[] | null
+    chartBars?: { label: string; value: number; color: string }[] | null
+    summary?: string | null
+  } | null
+  hasFileContext: boolean
+  fileName: string | null
+  analyzedAt: string
 }
 
 export interface Task {
@@ -217,6 +215,30 @@ export interface QTOReportRecord {
   createdAt: string
 }
 
+export interface VORRow {
+  originalName: string
+  unit: string
+  quantity: number
+  code: string
+}
+
+export interface VORClassification {
+  originalName: string
+  cwicrCode: string
+  matchedDescription: string
+  unit: string
+  unitCostMin: number
+  unitCostMax: number
+  confidence: number
+  quantity: number
+}
+
+export interface VORClassificationResponse {
+  rows: VORRow[]
+  classifications: VORClassification[]
+  summary: { totalRows: number; classifiedRows: number }
+}
+
 // ─── Error Helper ─────────────────────────────────────────────────────────────
 
 class ApiError extends Error {
@@ -264,6 +286,14 @@ export async function classifyElements(formData: FormData): Promise<ClassifiedEl
     body: formData,
   })
   return handleResponse<ClassifiedElement[]>(response)
+}
+
+export async function classifyVOR(formData: FormData): Promise<VORClassificationResponse> {
+  const response = await fetch(`${API_BASE}/cost/classify-vor`, {
+    method: 'POST',
+    body: formData,
+  })
+  return handleResponse<VORClassificationResponse>(response)
 }
 
 export async function calculateCost(items: CostItem[]): Promise<CostReport> {
@@ -388,13 +418,13 @@ export async function getQTOHistory(): Promise<QTOReportRecord[]> {
 // ─── Gemini AI ────────────────────────────────────────────────────────────────
 
 export async function askGemini(prompt: string, context?: string): Promise<string> {
-  const response = await fetch(`${API_BASE}/ai/gemini`, {
+  const response = await fetch(`${API_BASE}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, context }),
+    body: JSON.stringify({ message: prompt, context }),
   })
-  const data = await handleResponse<{ response: string }>(response)
-  return data.response
+  const data = await handleResponse<{ reply: string }>(response)
+  return data.reply
 }
 
 // ─── n8n Integration ─────────────────────────────────────────────────────────
