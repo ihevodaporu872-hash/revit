@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCostEstimates, fetchN8nCostEstimates } from '../../services/supabase-api'
-import { classifyVOR, triggerN8nWorkflow } from '../../services/api'
+import { fetchCostEstimates } from '../../services/supabase-api'
+import { classifyVOR } from '../../services/api'
 import {
   Search,
   Globe,
@@ -17,18 +17,13 @@ import {
   BarChart3,
   Check,
   GitCompare,
-  Zap,
-  Image,
-  FileText as FileTextIcon,
-  MessageSquare,
-  ChevronRight,
+  Brain,
 } from 'lucide-react'
-import N8nWorkflowStatus from '../shared/N8nWorkflowStatus'
-import N8nModuleStatus from '../shared/N8nModuleStatus'
 import { VORExportButtons, EstimateExportButtons } from './VORExport'
 import VORValidation from './VORValidation'
 import VORAnalytics from './VORAnalytics'
 import VORCompare from './VORCompare'
+import SmartEstimator from './SmartEstimator'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -101,6 +96,8 @@ const LANGUAGES: { code: LanguageCode; name: string; flag: string }[] = [
   { code: 'HI', name: '\u0939\u093F\u0928\u094D\u0926\u0940', flag: '\uD83C\uDDEE\uD83C\uDDF3' },
 ]
 
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
+
 // ── Mock Data ──────────────────────────────────────────────────────────
 
 const MOCK_SEARCH_RESULTS: WorkItem[] = [
@@ -114,14 +111,6 @@ const MOCK_SEARCH_RESULTS: WorkItem[] = [
   { id: 'w8', code: '07.21.13.10', description: 'Thermal insulation, rigid board, 50mm thick', unit: 'm\u00B2', unitPrice: 28.40, category: 'Insulation', subcategory: 'Board' },
   { id: 'w9', code: '09.29.10.10', description: 'Gypsum board partition, 12.5mm, single layer each side', unit: 'm\u00B2', unitPrice: 42.60, category: 'Finishes', subcategory: 'Drywall' },
   { id: 'w10', code: '22.11.13.10', description: 'Water supply piping, copper, 15mm to 25mm diameter', unit: 'm', unitPrice: 38.90, category: 'Plumbing', subcategory: 'Piping' },
-]
-
-const MOCK_CLASSIFICATION_RESULTS: ClassificationResult[] = [
-  { elementName: 'Basic Wall: Interior - 135mm', matchedCode: '09.29.10.10', matchedDescription: 'Gypsum board partition, 12.5mm', confidence: 0.92, unit: 'm\u00B2', unitPrice: 42.60, quantity: 156 },
-  { elementName: 'Basic Wall: Exterior - 300mm', matchedCode: '03.31.13.10', matchedDescription: 'Structural concrete, cast-in-place, walls', confidence: 0.88, unit: 'm\u00B3', unitPrice: 285.50, quantity: 48 },
-  { elementName: 'Floor: 250mm Concrete', matchedCode: '03.31.13.20', matchedDescription: 'Structural concrete, cast-in-place, slabs', confidence: 0.95, unit: 'm\u00B3', unitPrice: 312.00, quantity: 124 },
-  { elementName: 'Column: 400x400 Concrete', matchedCode: '03.31.13.30', matchedDescription: 'Structural concrete, cast-in-place, columns', confidence: 0.97, unit: 'm\u00B3', unitPrice: 445.00, quantity: 36 },
-  { elementName: 'Curtain Wall Panel', matchedCode: '08.44.13.10', matchedDescription: 'Aluminum curtain wall system', confidence: 0.78, unit: 'm\u00B2', unitPrice: 380.00, quantity: 220 },
 ]
 
 const MOCK_RECENT_ESTIMATES: RecentEstimate[] = [
@@ -155,21 +144,9 @@ export default function CostEstimatePage() {
   // Recent estimates
   const [recentEstimates, setRecentEstimates] = useState<RecentEstimate[]>(MOCK_RECENT_ESTIMATES)
 
-  // n8n cost estimates
-  const [n8nEstimates, setN8nEstimates] = useState<Array<{
-    id: string; source: string; queryText: string | null; photoUrl: string | null
-    language: string; items: unknown[]; totalCost: number; currency: string
-    region: string | null; confidence: number | null; createdAt: string
-  }>>([])
-  const [expandedN8nRow, setExpandedN8nRow] = useState<string | null>(null)
-  const [n8nPipelineExecId, setN8nPipelineExecId] = useState<string | null>(null)
-
   useEffect(() => {
     fetchCostEstimates()
       .then((rows) => { if (rows.length > 0) setRecentEstimates(rows as RecentEstimate[]) })
-      .catch(() => {})
-    fetchN8nCostEstimates()
-      .then((rows) => setN8nEstimates(rows))
       .catch(() => {})
   }, [])
 
@@ -189,18 +166,33 @@ export default function CostEstimatePage() {
 
     setIsSearching(true)
 
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 800))
+    try {
+      const res = await fetch(`${API_BASE}/cwicr/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery, language, topK: 10 }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.results && data.results.length > 0) {
+          const mapped: WorkItem[] = data.results.map((r: Record<string, unknown>, i: number) => ({
+            id: `cwicr-${i}`,
+            code: String(r.rate_code || r.code || ''),
+            description: String(r.rate_name || r.name || r.description || ''),
+            unit: String(r.rate_unit || r.unit || ''),
+            unitPrice: Number(r.unit_cost || r.unitPrice || 0),
+            category: String(r.category || 'CWICR'),
+          }))
+          setSearchResults(mapped)
+          setIsSearching(false)
+          return
+        }
+      }
+    } catch {
+      // Fallback to mock
+    }
 
-    // In real implementation:
-    // const res = await fetch('/api/cost/search', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ query: searchQuery, language }),
-    // })
-    // const data = await res.json()
-
-    // Filter mock data based on query
+    // Fallback: filter mock data based on query
     const filtered = MOCK_SEARCH_RESULTS.filter(
       (item) =>
         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -261,7 +253,7 @@ export default function CostEstimatePage() {
 
   const handleClassifyUpload = async () => {
     if (!vorFile) {
-      addNotification('warning', 'Сначала загрузите Excel-файл с ВОР')
+      addNotification('warning', '\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 Excel-\u0444\u0430\u0439\u043B \u0441 \u0412\u041E\u0420')
       return
     }
     setIsClassifying(true)
@@ -280,9 +272,9 @@ export default function CostEstimatePage() {
         quantity: c.quantity,
       }))
       setClassificationResults(mapped)
-      addNotification('success', `Классифицировано ${mapped.length} из ${result.summary.totalRows} строк ВОР`)
+      addNotification('success', `\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u043D\u043E ${mapped.length} \u0438\u0437 ${result.summary.totalRows} \u0441\u0442\u0440\u043E\u043A \u0412\u041E\u0420`)
     } catch (err: any) {
-      addNotification('error', err.message || 'Ошибка классификации')
+      addNotification('error', err.message || '\u041E\u0448\u0438\u0431\u043A\u0430 \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438')
     } finally {
       setIsClassifying(false)
     }
@@ -332,7 +324,7 @@ export default function CostEstimatePage() {
   ]
 
   const classifyColumns = [
-    { key: 'elementName', header: 'Наименование', render: (cr: ClassificationResult) => (
+    { key: 'elementName', header: '\u041D\u0430\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u0438\u0435', render: (cr: ClassificationResult) => (
       <span className="font-medium text-sm">{cr.elementName}</span>
     )},
     { key: 'matchedCode', header: 'Matched Code', render: (cr: ClassificationResult) => (
@@ -372,12 +364,12 @@ export default function CostEstimatePage() {
   // ── Tabs ──────────────────────────────────────────────
 
   const tabs = [
-    { id: 'search', label: 'Семантический поиск', icon: <Search size={16} /> },
-    { id: 'classify', label: 'Классификация ИИ', icon: <Sparkles size={16} /> },
-    { id: 'estimate', label: 'Расчёт сметы', icon: <Calculator size={16} /> },
-    { id: 'compare', label: 'Сравнение ВОР', icon: <GitCompare size={16} /> },
-    { id: 'n8n', label: 'n8n Оценки', icon: <Zap size={16} /> },
-    { id: 'history', label: 'История', icon: <Clock size={16} /> },
+    { id: 'search', label: '\u0421\u0435\u043C\u0430\u043D\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u043F\u043E\u0438\u0441\u043A', icon: <Search size={16} /> },
+    { id: 'classify', label: '\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0418\u0418', icon: <Sparkles size={16} /> },
+    { id: 'smart', label: '\u0423\u043C\u043D\u0430\u044F \u0441\u043C\u0435\u0442\u0430', icon: <Brain size={16} /> },
+    { id: 'estimate', label: '\u0420\u0430\u0441\u0447\u0451\u0442 \u0441\u043C\u0435\u0442\u044B', icon: <Calculator size={16} /> },
+    { id: 'compare', label: '\u0421\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u0435 \u0412\u041E\u0420', icon: <GitCompare size={16} /> },
+    { id: 'history', label: '\u0418\u0441\u0442\u043E\u0440\u0438\u044F', icon: <Clock size={16} /> },
   ]
 
   // ── Render ──────────────────────────────────────────────
@@ -388,11 +380,10 @@ export default function CostEstimatePage() {
         {/* Header */}
         <motion.div variants={fadeInUp} initial="hidden" animate="visible">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-foreground">Смета стоимости CWICR</h1>
-            <N8nModuleStatus module="costEstimate" />
+            <h1 className="text-2xl font-bold text-foreground">\u0421\u043C\u0435\u0442\u0430 \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u0438 CWICR</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Поиск по 55 719 строительным позициям на 9 языках с BIM-классификацией на базе ИИ
+            \u0421\u0435\u043C\u0430\u043D\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u043F\u043E\u0438\u0441\u043A \u043F\u043E \u0441\u0442\u0440\u043E\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u043C \u043F\u043E\u0437\u0438\u0446\u0438\u044F\u043C \u043D\u0430 9 \u044F\u0437\u044B\u043A\u0430\u0445 \u0441 BIM-\u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0435\u0439 \u043D\u0430 \u0431\u0430\u0437\u0435 \u0418\u0418
           </p>
         </motion.div>
 
@@ -404,16 +395,16 @@ export default function CostEstimatePage() {
         animate="visible"
       >
         <motion.div variants={fadeInUp}>
-          <StatCard label="Всего позиций" value="55,719" icon={Database} color="primary" />
+          <StatCard label="\u0421\u0442\u0430\u0442\u0443\u0441 \u0431\u0430\u0437\u044B" value="\u0410\u043A\u0442\u0438\u0432\u043D\u0430" icon={Database} color="primary" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Языки" value={LANGUAGES.length} icon={Globe} color="success" />
+          <StatCard label="\u042F\u0437\u044B\u043A\u0438" value={LANGUAGES.length} icon={Globe} color="success" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Среднее время ответа" value="0.3s" icon={Clock} color="warning" />
+          <StatCard label="\u0421\u0440\u0435\u0434\u043D\u0435\u0435 \u0432\u0440\u0435\u043C\u044F \u043E\u0442\u0432\u0435\u0442\u0430" value="0.3s" icon={Clock} color="warning" />
         </motion.div>
         <motion.div variants={fadeInUp}>
-          <StatCard label="Смет сегодня" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: 'к вчера' }} />
+          <StatCard label="\u0421\u043C\u0435\u0442 \u0441\u0435\u0433\u043E\u0434\u043D\u044F" value={7} icon={BarChart3} color="primary" trend={{ value: 15, label: '\u043A \u0432\u0447\u0435\u0440\u0430' }} />
         </motion.div>
       </motion.div>
 
@@ -476,13 +467,13 @@ export default function CostEstimatePage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        placeholder="Поиск позиций... например: 'бетонная стена', 'балка', '03.31'"
+                        placeholder="\u041F\u043E\u0438\u0441\u043A \u043F\u043E\u0437\u0438\u0446\u0438\u0439... \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: '\u0431\u0435\u0442\u043E\u043D\u043D\u0430\u044F \u0441\u0442\u0435\u043D\u0430', '\u0431\u0430\u043B\u043A\u0430', '03.31'"
                         className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
                       />
                     </div>
 
                     <Button onClick={handleSearch} loading={isSearching} icon={<Search size={16} />}>
-                      Найти
+                      \u041D\u0430\u0439\u0442\u0438
                     </Button>
                   </div>
                 </Card>
@@ -497,8 +488,8 @@ export default function CostEstimatePage() {
                       exit="exit"
                     >
                       <Card
-                        title="Результаты поиска"
-                        subtitle={`${searchResults.length} найдено по запросу "${searchQuery}" на языке ${currentLang.name}`}
+                        title="\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u044B \u043F\u043E\u0438\u0441\u043A\u0430"
+                        subtitle={`${searchResults.length} \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u0443 "${searchQuery}" \u043D\u0430 \u044F\u0437\u044B\u043A\u0435 ${currentLang.name}`}
                         hover
                       >
                         <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -506,7 +497,7 @@ export default function CostEstimatePage() {
                             columns={searchColumns as any}
                             data={searchResults as any}
                             keyField="id"
-                            emptyMessage="Ничего не найдено. Попробуйте другой запрос."
+                            emptyMessage="\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0434\u0440\u0443\u0433\u043E\u0439 \u0437\u0430\u043F\u0440\u043E\u0441."
                           />
                         </motion.div>
                       </Card>
@@ -520,9 +511,9 @@ export default function CostEstimatePage() {
                     <Card>
                       <div className="text-center py-16">
                         <Search size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">Выполните поиск строительных позиций</p>
+                        <p className="text-muted-foreground">\u0412\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u043F\u043E\u0438\u0441\u043A \u0441\u0442\u0440\u043E\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0445 \u043F\u043E\u0437\u0438\u0446\u0438\u0439</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
-                          Пример: "бетон", "балка", "утепление" или код позиции
+                          \u041F\u0440\u0438\u043C\u0435\u0440: "\u0431\u0435\u0442\u043E\u043D", "\u0431\u0430\u043B\u043A\u0430", "\u0443\u0442\u0435\u043F\u043B\u0435\u043D\u0438\u0435" \u0438\u043B\u0438 \u043A\u043E\u0434 \u043F\u043E\u0437\u0438\u0446\u0438\u0438
                         </p>
                       </div>
                     </Card>
@@ -537,8 +528,8 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 <Card
-                  title="Классификация ВОР (работы и материалы)"
-                  subtitle="Загрузите Excel-файл с ВОР для авто-классификации через Gemini AI + CWICR"
+                  title="\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0412\u041E\u0420 (\u0440\u0430\u0431\u043E\u0442\u044B \u0438 \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u044B)"
+                  subtitle="\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 Excel-\u0444\u0430\u0439\u043B \u0441 \u0412\u041E\u0420 \u0434\u043B\u044F \u0430\u0432\u0442\u043E-\u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438 \u0447\u0435\u0440\u0435\u0437 Gemini AI + CWICR"
                   hover
                 >
                   <div className="flex items-center gap-4">
@@ -546,52 +537,27 @@ export default function CostEstimatePage() {
                       <FileUpload
                         accept=".xlsx,.xls"
                         onFilesSelected={(files) => setVorFile(files[0] || null)}
-                        label="Перетащите Excel-файл с ВОР"
-                        description="Поддержка .xlsx и .xls — наименования работ, единицы, объёмы"
+                        label="\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 Excel-\u0444\u0430\u0439\u043B \u0441 \u0412\u041E\u0420"
+                        description="\u041F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0430 .xlsx \u0438 .xls \u2014 \u043D\u0430\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u0438\u044F \u0440\u0430\u0431\u043E\u0442, \u0435\u0434\u0438\u043D\u0438\u0446\u044B, \u043E\u0431\u044A\u0451\u043C\u044B"
                       />
                     </div>
                     <div className="text-center px-6">
                       <Sparkles size={24} className="mx-auto text-primary mb-2" />
-                      <p className="text-xs text-muted-foreground">Работает на</p>
+                      <p className="text-xs text-muted-foreground">\u0420\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043D\u0430</p>
                       <p className="text-sm font-semibold text-foreground">Gemini AI</p>
                     </div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-end gap-3">
                     <Button
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          const result = await triggerN8nWorkflow('/webhook/cost-text', { query: searchQuery || 'cost estimate', language }) as Record<string, unknown>
-                          const execId = (result?.executionId || result?.id || '') as string
-                          if (execId) setN8nPipelineExecId(execId)
-                          addNotification('info', 'n8n пайплайн запущен')
-                        } catch { addNotification('error', 'Не удалось запустить n8n пайплайн') }
-                      }}
-                      icon={<Zap size={16} />}
-                    >
-                      Запустить n8n Pipeline
-                    </Button>
-                    <Button
                       onClick={handleClassifyUpload}
                       loading={isClassifying}
                       disabled={!vorFile}
                       icon={<Sparkles size={16} />}
                     >
-                      {isClassifying ? 'Классификация ИИ...' : 'Классифицировать ВОР'}
+                      {isClassifying ? '\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0418\u0418...' : '\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0412\u041E\u0420'}
                     </Button>
                   </div>
-                  {n8nPipelineExecId && (
-                    <div className="mt-3">
-                      <N8nWorkflowStatus
-                        executionId={n8nPipelineExecId}
-                        onComplete={() => {
-                          addNotification('success', 'n8n пайплайн завершён')
-                          fetchN8nCostEstimates().then(setN8nEstimates).catch(() => {})
-                        }}
-                      />
-                    </div>
-                  )}
                 </Card>
 
                 {/* VOR Validation */}
@@ -609,14 +575,14 @@ export default function CostEstimatePage() {
                       exit="exit"
                     >
                       <Card
-                        title="Результаты классификации"
-                        subtitle={`Классифицировано строк ВОР: ${classificationResults.length}`}
+                        title="\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u044B \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"
+                        subtitle={`\u041A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0441\u0442\u0440\u043E\u043A \u0412\u041E\u0420: ${classificationResults.length}`}
                         hover
                         actions={
                           <div className="flex items-center gap-2">
                             <VORExportButtons results={classificationResults} />
                             <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addClassifiedToCost}>
-                              Добавить всё в смету
+                              \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u0441\u0451 \u0432 \u0441\u043C\u0435\u0442\u0443
                             </Button>
                           </div>
                         }
@@ -626,12 +592,12 @@ export default function CostEstimatePage() {
                             columns={classifyColumns as any}
                             data={classificationResults as any}
                             keyField="elementName"
-                            emptyMessage="Пока нет результатов классификации"
+                            emptyMessage="\u041F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u043E\u0432 \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438"
                           />
                         </motion.div>
                         <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                           <p className="text-sm text-muted-foreground">
-                            Общая стоимость по классификации:
+                            \u041E\u0431\u0449\u0430\u044F \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u043F\u043E \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438:
                           </p>
                           <motion.p
                             key={classificationResults.reduce((sum, cr) => sum + cr.quantity * cr.unitPrice, 0)}
@@ -658,6 +624,11 @@ export default function CostEstimatePage() {
             )
           }
 
+          // ── Smart Estimator Tab ──────────────────────────
+          if (activeTab === 'smart') {
+            return <SmartEstimator language={language} />
+          }
+
           // ── Compare Tab ─────────────────────────────────
           if (activeTab === 'compare') {
             return <VORCompare />
@@ -668,8 +639,8 @@ export default function CostEstimatePage() {
             return (
               <div className="space-y-6">
                 <Card
-                  title="Расчёт сметы"
-                  subtitle={`Позиции в расчёте: ${costItems.length}`}
+                  title="\u0420\u0430\u0441\u0447\u0451\u0442 \u0441\u043C\u0435\u0442\u044B"
+                  subtitle={`\u041F\u043E\u0437\u0438\u0446\u0438\u0438 \u0432 \u0440\u0430\u0441\u0447\u0451\u0442\u0435: ${costItems.length}`}
                   hover
                   actions={<EstimateExportButtons costItems={costItems} grandTotal={grandTotal} />}
                 >
@@ -677,9 +648,9 @@ export default function CostEstimatePage() {
                     <motion.div variants={scaleIn} initial="hidden" animate="visible">
                       <div className="text-center py-16">
                         <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">Позиции пока не добавлены</p>
+                        <p className="text-muted-foreground">\u041F\u043E\u0437\u0438\u0446\u0438\u0438 \u043F\u043E\u043A\u0430 \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
-                          Найдите позиции или классифицируйте BIM-элементы, чтобы добавить их
+                          \u041D\u0430\u0439\u0434\u0438\u0442\u0435 \u043F\u043E\u0437\u0438\u0446\u0438\u0438 \u0438\u043B\u0438 \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u0446\u0438\u0440\u0443\u0439\u0442\u0435 BIM-\u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0438\u0445
                         </p>
                       </div>
                     </motion.div>
@@ -690,12 +661,12 @@ export default function CostEstimatePage() {
                         <table className="w-full">
                           <thead>
                             <tr className="border-b border-border">
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Код</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Описание</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Ед.</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Цена за ед.</th>
-                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Кол-во</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Итого</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041A\u043E\u0434</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0415\u0434.</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0426\u0435\u043D\u0430 \u0437\u0430 \u0435\u0434.</th>
+                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041A\u043E\u043B-\u0432\u043E</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0418\u0442\u043E\u0433\u043E</th>
                               <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-16"></th>
                             </tr>
                           </thead>
@@ -766,7 +737,7 @@ export default function CostEstimatePage() {
                             <p className="text-sm text-muted-foreground">{costItems.length} line items</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Общий итог</p>
+                            <p className="text-sm text-muted-foreground">\u041E\u0431\u0449\u0438\u0439 \u0438\u0442\u043E\u0433</p>
                             <motion.p
                               key={grandTotal}
                               initial={{ opacity: 0, scale: 0.85, y: 4 }}
@@ -786,125 +757,16 @@ export default function CostEstimatePage() {
             )
           }
 
-          // ── n8n Estimates Tab ─────────────────────────────
-          if (activeTab === 'n8n') {
-            return (
-              <div className="space-y-6">
-                <Card
-                  title="Оценки стоимости из n8n"
-                  subtitle={`${n8nEstimates.length} оценок из Telegram-ботов и n8n пайплайнов`}
-                  hover
-                  actions={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon={<Zap size={14} />}
-                      onClick={() => fetchN8nCostEstimates().then(setN8nEstimates).catch(() => {})}
-                    >
-                      Обновить
-                    </Button>
-                  }
-                >
-                  {n8nEstimates.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Zap size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-muted-foreground">Оценки из n8n пока отсутствуют</p>
-                      <p className="text-muted-foreground/60 text-xs mt-1">
-                        Результаты появятся автоматически после запуска n8n-воркфлоу
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {n8nEstimates.map((est) => (
-                        <motion.div key={est.id} variants={listItem}>
-                          <div
-                            className="p-4 bg-muted rounded-lg border border-border hover:border-primary/30 cursor-pointer transition-colors"
-                            onClick={() => setExpandedN8nRow(expandedN8nRow === est.id ? null : est.id)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {est.source === 'telegram' && <MessageSquare size={16} className="text-blue-500" />}
-                                {est.source === 'photo' && <Image size={16} className="text-purple-500" />}
-                                {est.source === 'pdf' && <FileTextIcon size={16} className="text-orange-500" />}
-                                {!['telegram', 'photo', 'pdf'].includes(est.source) && <Zap size={16} className="text-primary" />}
-                                <div>
-                                  <span className="text-sm font-medium text-foreground">
-                                    {est.queryText ? est.queryText.slice(0, 80) + (est.queryText.length > 80 ? '...' : '') : `Оценка от ${est.source}`}
-                                  </span>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-xs text-muted-foreground">{est.source}</span>
-                                    <span className="text-xs text-muted-foreground">{est.language}</span>
-                                    {est.region && <span className="text-xs text-muted-foreground">{est.region}</span>}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <span className="text-sm font-bold text-foreground">
-                                  {est.totalCost.toLocaleString()} {est.currency}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(est.createdAt).toLocaleDateString()}
-                                </span>
-                                <ChevronRight size={14} className={`text-muted-foreground transition-transform ${expandedN8nRow === est.id ? 'rotate-90' : ''}`} />
-                              </div>
-                            </div>
-
-                            <AnimatePresence>
-                              {expandedN8nRow === est.id && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="mt-4 pt-4 border-t border-border space-y-3">
-                                    {est.photoUrl && (
-                                      <div>
-                                        <p className="text-xs text-muted-foreground mb-1">Фото</p>
-                                        <img src={est.photoUrl} alt="Query" className="max-h-40 rounded-lg border border-border" />
-                                      </div>
-                                    )}
-                                    {Array.isArray(est.items) && est.items.length > 0 && (
-                                      <div>
-                                        <p className="text-xs text-muted-foreground mb-2">Позиции ({est.items.length})</p>
-                                        <div className="space-y-1">
-                                          {(est.items as Array<Record<string, unknown>>).map((item, idx) => (
-                                            <div key={idx} className="flex items-center justify-between text-xs p-2 bg-background rounded border border-border">
-                                              <span className="text-foreground">{String(item.description || item.name || `#${idx + 1}`)}</span>
-                                              <span className="font-medium text-foreground">{Number(item.cost || item.totalPrice || 0).toLocaleString()} {est.currency}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {est.confidence != null && (
-                                      <p className="text-xs text-muted-foreground">Уверенность: {est.confidence}%</p>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
-            )
-          }
-
           // ── History Tab ─────────────────────────────────
           if (activeTab === 'history') {
             return (
               <Card
-                title="Последние сметы"
-                subtitle={`Смет за последние 7 дней: ${recentEstimates.length}`}
+                title="\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0441\u043C\u0435\u0442\u044B"
+                subtitle={`\u0421\u043C\u0435\u0442 \u0437\u0430 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 7 \u0434\u043D\u0435\u0439: ${recentEstimates.length}`}
                 hover
                 actions={
                   <Button variant="outline" size="sm" icon={<Download size={14} />}>
-                    Экспорт всего
+                    \u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432\u0441\u0435\u0433\u043E
                   </Button>
                 }
               >
@@ -913,7 +775,7 @@ export default function CostEstimatePage() {
                     columns={historyColumns as any}
                     data={recentEstimates as any}
                     keyField="id"
-                    emptyMessage="История смет пока пуста"
+                    emptyMessage="\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0441\u043C\u0435\u0442 \u043F\u043E\u043A\u0430 \u043F\u0443\u0441\u0442\u0430"
                   />
                 </motion.div>
               </Card>

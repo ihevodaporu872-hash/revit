@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchTasks, createTask as sbCreateTask, updateTask as sbUpdateTask, addTaskComment as sbAddComment } from '../../services/supabase-api'
-import { triggerN8nWorkflow } from '../../services/api'
 import {
   LayoutDashboard,
   Plus,
@@ -33,7 +32,6 @@ import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
 import FieldReportsPanel from './FieldReportsPanel'
 import WorkerMapView from './WorkerMapView'
-import N8nModuleStatus from '../shared/N8nModuleStatus'
 import {
   staggerContainer,
   fadeInUp,
@@ -338,7 +336,6 @@ export default function ProjectMgmtPage() {
                 <LayoutDashboard size={28} className="text-primary" />
                 Управление проектом
               </h1>
-              <N8nModuleStatus module="projectMgmt" />
             </div>
             <p className="text-muted-foreground mt-1">
               Контролируйте задачи, команду и сроки проекта
@@ -726,14 +723,20 @@ export default function ProjectMgmtPage() {
                     onClick={async () => {
                       await addTask()
                       try {
-                        await triggerN8nWorkflow('/webhook/task-notification', {
-                          title: newTitle,
-                          description: newDescription,
-                          assignee: newAssignee,
-                          priority: newPriority,
+                        const apiBase = (import.meta.env.VITE_API_URL || '') + '/api'
+                        await fetch(`${apiBase}/telegram/webhook`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            type: 'task_notification',
+                            title: newTitle,
+                            description: newDescription,
+                            assignee: newAssignee,
+                            priority: newPriority,
+                          }),
                         })
-                        addNotification('info', 'Уведомление отправлено в Telegram')
-                      } catch { addNotification('warning', 'Задача создана, но Telegram-уведомление не отправлено') }
+                        addNotification('info', '\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0432 Telegram')
+                      } catch { addNotification('warning', '\u0417\u0430\u0434\u0430\u0447\u0430 \u0441\u043E\u0437\u0434\u0430\u043D\u0430, \u043D\u043E Telegram-\u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435 \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E') }
                     }}
                     icon={<BotMessageSquare size={16} />}
                   >

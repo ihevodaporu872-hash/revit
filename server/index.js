@@ -27,6 +27,10 @@ import {
   getUnmappedColumns,
 } from './revit-xlsx.js'
 import { buildMatchReport } from './revit-matcher.js'
+import { createCWICREngine } from './cwicr-engine.js'
+import { createCostEngine } from './cost-engine.js'
+import { createCADPipeline } from './cad-pipeline.js'
+import { createSheetsSync } from './sheets-sync.js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -67,6 +71,21 @@ if (process.env.GOOGLE_API_KEY) {
   console.log('[Jens] Gemini AI initialized (gemini-2.0-flash)')
 } else {
   console.warn('[Jens] WARNING: GOOGLE_API_KEY not set - AI features will be unavailable')
+}
+
+// ---------------------------------------------------------------------------
+// Native Engine Initialization (replaces n8n workflows)
+// ---------------------------------------------------------------------------
+
+let cwicr = null, costEngine = null, cadPipeline = null, sheetsSync = null
+if (supabaseServer && genAI) {
+  cwicr = createCWICREngine({ supabase: supabaseServer, genAI, geminiModel })
+  costEngine = createCostEngine({ supabase: supabaseServer, geminiModel, cwicr })
+  cadPipeline = createCADPipeline({ geminiModel, uploadsDir: UPLOADS_DIR, converterPaths: CONVERTER_PATHS })
+  sheetsSync = createSheetsSync({ supabase: supabaseServer })
+  console.log('[Jens] Native engines initialized (CWICR, Cost, CAD, Sheets)')
+} else {
+  console.warn('[Jens] WARNING: Engines require Supabase + Gemini — native pipelines disabled')
 }
 
 // ---------------------------------------------------------------------------
@@ -3692,6 +3711,291 @@ app.post('/api/cost/compare-vor', upload.array('files', 2), async (req, res) => 
 })
 
 // ---------------------------------------------------------------------------
+// 22. Native CWICR Search Endpoints
+// ---------------------------------------------------------------------------
+
+app.post('/api/cwicr/search', async (req, res) => {
+  if (!cwicr) return res.status(503).json({ error: 'CWICR engine not initialized' })
+  try {
+    const { query, language = 'EN', topK = 10 } = req.body
+    if (!query) return res.status(400).json({ error: 'query is required' })
+    const results = await cwicr.fullSearch(query, language, topK)
+    res.json(results)
+  } catch (err) {
+    console.error('[CWICR] search error:', err.message)
+    res.status(500).json({ error: 'Search failed', message: err.message })
+  }
+})
+
+app.post('/api/cwicr/estimate', async (req, res) => {
+  if (!cwicr) return res.status(503).json({ error: 'CWICR engine not initialized' })
+  try {
+    const { works, language = 'EN' } = req.body
+    if (!works || !Array.isArray(works)) return res.status(400).json({ error: 'works array is required' })
+    const results = await cwicr.calculateCosts(works, language)
+    res.json(results)
+  } catch (err) {
+    console.error('[CWICR] estimate error:', err.message)
+    res.status(500).json({ error: 'Estimate failed', message: err.message })
+  }
+})
+
+app.post('/api/cwicr/parse-text', async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    const { text, language = 'EN' } = req.body
+    if (!text) return res.status(400).json({ error: 'text is required' })
+    const works = await costEngine.parseTextToWorks(text, language)
+    res.json({ works })
+  } catch (err) {
+    console.error('[CWICR] parse-text error:', err.message)
+    res.status(500).json({ error: 'Parse failed', message: err.message })
+  }
+})
+
+app.post('/api/cwicr/parse-photo', upload.single('photo'), async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    if (!req.file) return res.status(400).json({ error: 'photo file is required' })
+    const imageBuffer = await fs.readFile(req.file.path)
+    const imageBase64 = imageBuffer.toString('base64')
+    const language = req.body.language || 'EN'
+    const works = await costEngine.parsePhotoToWorks(imageBase64, language)
+    res.json({ works })
+  } catch (err) {
+    console.error('[CWICR] parse-photo error:', err.message)
+    res.status(500).json({ error: 'Photo parse failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 23. Native Cost Estimation Endpoints
+// ---------------------------------------------------------------------------
+
+app.post('/api/cost/estimate-text', async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    const { text, language = 'EN' } = req.body
+    if (!text) return res.status(400).json({ error: 'text is required' })
+    const result = await costEngine.estimateFromText(text, language)
+    res.json(result)
+  } catch (err) {
+    console.error('[Cost] estimate-text error:', err.message)
+    res.status(500).json({ error: 'Text estimation failed', message: err.message })
+  }
+})
+
+app.post('/api/cost/estimate-photo', upload.single('photo'), async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    if (!req.file) return res.status(400).json({ error: 'photo file is required' })
+    const imageBuffer = await fs.readFile(req.file.path)
+    const imageBase64 = imageBuffer.toString('base64')
+    const language = req.body.language || 'EN'
+    const result = await costEngine.estimateFromPhoto(imageBase64, language)
+    res.json(result)
+  } catch (err) {
+    console.error('[Cost] estimate-photo error:', err.message)
+    res.status(500).json({ error: 'Photo estimation failed', message: err.message })
+  }
+})
+
+app.post('/api/cost/estimate-works', async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    const { works, language = 'EN' } = req.body
+    if (!works || !Array.isArray(works)) return res.status(400).json({ error: 'works array is required' })
+    const items = await costEngine.estimateWorks(works, language)
+    const summary = costEngine.aggregateResults(items)
+    res.json({ items, summary })
+  } catch (err) {
+    console.error('[Cost] estimate-works error:', err.message)
+    res.status(500).json({ error: 'Works estimation failed', message: err.message })
+  }
+})
+
+app.get('/api/cost/estimate/:id', async (req, res) => {
+  if (!supabaseServer) return res.status(503).json({ error: 'Database not available' })
+  try {
+    const { data, error } = await supabaseServer
+      .from('cost_estimates')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    console.error('[Cost] get estimate error:', err.message)
+    res.status(500).json({ error: 'Failed to fetch estimate', message: err.message })
+  }
+})
+
+app.post('/api/cost/export/:id', async (req, res) => {
+  if (!costEngine) return res.status(503).json({ error: 'Cost engine not initialized' })
+  try {
+    const { format = 'csv' } = req.body
+    const { data, error } = await supabaseServer
+      .from('cost_estimates')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+    if (error) throw error
+    if (format === 'html') {
+      const html = costEngine.exportHTML(data.items || [], data)
+      res.setHeader('Content-Type', 'text/html')
+      res.send(html)
+    } else {
+      const csv = costEngine.exportCSV(data.items || [])
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename="estimate-${req.params.id}.csv"`)
+      res.send(csv)
+    }
+  } catch (err) {
+    console.error('[Cost] export error:', err.message)
+    res.status(500).json({ error: 'Export failed', message: err.message })
+  }
+})
+
+app.get('/api/cost/estimates', async (_req, res) => {
+  if (!supabaseServer) return res.status(503).json({ error: 'Database not available' })
+  try {
+    const { data, error } = await supabaseServer
+      .from('cost_estimates')
+      .select('id, source, query_text, language, total_cost, currency, region, confidence, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) throw error
+    res.json(data || [])
+  } catch (err) {
+    console.error('[Cost] list estimates error:', err.message)
+    res.status(500).json({ error: 'Failed to list estimates', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 24. Telegram Webhook Endpoint (native, replaces n8n bot)
+// ---------------------------------------------------------------------------
+
+app.post('/api/telegram/webhook', async (req, res) => {
+  try {
+    const { type, ...payload } = req.body
+    if (!type) return res.status(400).json({ error: 'type is required' })
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    const chatId = process.env.TELEGRAM_CHAT_ID
+    if (!botToken || !chatId) {
+      return res.status(503).json({ error: 'Telegram bot not configured (set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)' })
+    }
+
+    let message = ''
+    if (type === 'task_notification') {
+      message = `📋 *Новая задача*\n\n*${payload.title || 'Без названия'}*\n${payload.description || ''}\n\n👤 Ответственный: ${payload.assignee || '—'}\n⚡ Приоритет: ${payload.priority || 'medium'}`
+    } else if (type === 'cost_estimate') {
+      message = `💰 *Новая смета*\n\nОбъект: ${payload.projectName || '—'}\nСумма: ${payload.totalCost || '—'}\nЯзык: ${payload.language || 'EN'}`
+    } else if (type === 'field_report') {
+      message = `📸 *Полевой отчёт*\n\n${payload.description || ''}\n📍 ${payload.location || '—'}`
+    } else {
+      message = `🔔 *Уведомление*\n\n${JSON.stringify(payload, null, 2)}`
+    }
+
+    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
+    const telegramRes = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' }),
+    })
+    const result = await telegramRes.json()
+    res.json({ ok: result.ok, messageId: result.result?.message_id })
+  } catch (err) {
+    console.error('[Telegram] webhook error:', err.message)
+    res.status(500).json({ error: 'Telegram send failed', message: err.message })
+  }
+})
+
+app.get('/api/telegram/status', (_req, res) => {
+  const configured = !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID)
+  res.json({ configured, botToken: configured ? '***configured***' : null })
+})
+
+app.get('/api/telegram/setup', async (_req, res) => {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  if (!botToken) return res.status(503).json({ error: 'TELEGRAM_BOT_TOKEN not set' })
+  try {
+    const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL
+    if (webhookUrl) {
+      const setRes = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl }),
+      })
+      const result = await setRes.json()
+      return res.json({ ok: result.ok, description: result.description })
+    }
+    const infoRes = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`)
+    const info = await infoRes.json()
+    res.json(info.result || info)
+  } catch (err) {
+    console.error('[Telegram] setup error:', err.message)
+    res.status(500).json({ error: 'Telegram setup failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 25. Native CAD Pipeline Endpoints
+// ---------------------------------------------------------------------------
+
+app.post('/api/cad/batch-convert', async (req, res) => {
+  if (!cadPipeline) return res.status(503).json({ error: 'CAD pipeline not initialized' })
+  try {
+    const { folder, extension = 'rvt', outputFormat = 'xlsx' } = req.body
+    const results = await cadPipeline.batchConvert(folder || UPLOADS_DIR, extension, { outputFormat })
+    res.json(results)
+  } catch (err) {
+    console.error('[CAD] batch-convert error:', err.message)
+    res.status(500).json({ error: 'Batch conversion failed', message: err.message })
+  }
+})
+
+app.post('/api/cad/validate', async (req, res) => {
+  if (!cadPipeline) return res.status(503).json({ error: 'CAD pipeline not initialized' })
+  try {
+    const { elements, rules } = req.body
+    if (!elements || !Array.isArray(elements)) return res.status(400).json({ error: 'elements array is required' })
+    const results = await cadPipeline.validateBIM(elements, rules)
+    res.json(results)
+  } catch (err) {
+    console.error('[CAD] validate error:', err.message)
+    res.status(500).json({ error: 'BIM validation failed', message: err.message })
+  }
+})
+
+app.post('/api/cad/classify', async (req, res) => {
+  if (!cadPipeline) return res.status(503).json({ error: 'CAD pipeline not initialized' })
+  try {
+    const { elements, system = 'omniclass', language = 'EN' } = req.body
+    if (!elements || !Array.isArray(elements)) return res.status(400).json({ error: 'elements array is required' })
+    const results = await cadPipeline.classifyElements(elements, system, language)
+    res.json(results)
+  } catch (err) {
+    console.error('[CAD] classify error:', err.message)
+    res.status(500).json({ error: 'Classification failed', message: err.message })
+  }
+})
+
+app.post('/api/cad/qto-report', async (req, res) => {
+  if (!cadPipeline) return res.status(503).json({ error: 'CAD pipeline not initialized' })
+  try {
+    const { elements, projectName, language = 'EN' } = req.body
+    if (!elements || !Array.isArray(elements)) return res.status(400).json({ error: 'elements array is required' })
+    const report = await cadPipeline.generateQTOReport(elements, projectName, language)
+    res.json(report)
+  } catch (err) {
+    console.error('[CAD] qto-report error:', err.message)
+    res.status(500).json({ error: 'QTO report failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Static file serving for uploaded outputs
 // ---------------------------------------------------------------------------
 app.use('/uploads', express.static(UPLOADS_DIR))
@@ -3728,6 +4032,23 @@ app.use((_req, res) => {
       'POST   /api/revit/match-report',
       'GET    /api/revit/properties/:globalId',
       'POST   /api/revit/properties/bulk',
+      'POST   /api/cwicr/search',
+      'POST   /api/cwicr/estimate',
+      'POST   /api/cwicr/parse-text',
+      'POST   /api/cwicr/parse-photo',
+      'POST   /api/cost/estimate-text',
+      'POST   /api/cost/estimate-photo',
+      'POST   /api/cost/estimate-works',
+      'GET    /api/cost/estimate/:id',
+      'POST   /api/cost/export/:id',
+      'GET    /api/cost/estimates',
+      'POST   /api/telegram/webhook',
+      'GET    /api/telegram/status',
+      'GET    /api/telegram/setup',
+      'POST   /api/cad/batch-convert',
+      'POST   /api/cad/validate',
+      'POST   /api/cad/classify',
+      'POST   /api/cad/qto-report',
       'GET    /api/n8n/health',
       'GET    /api/n8n/workflows',
       'GET    /api/n8n/workflow-triggers',
