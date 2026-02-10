@@ -32,7 +32,29 @@ export default defineConfig({
     },
   },
   assetsInclude: ['**/*.wasm'],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          pdfjs: ['pdfjs-dist'],
+          xlsx: ['xlsx'],
+          univerjs: [
+            '@univerjs/core',
+            '@univerjs/design',
+            '@univerjs/engine-formula',
+            '@univerjs/engine-render',
+            '@univerjs/presets',
+            '@univerjs/sheets',
+            '@univerjs/sheets-ui',
+            '@univerjs/ui',
+          ],
+        },
+      },
+    },
+  },
   optimizeDeps: {
     exclude: ['web-ifc', '@mlightcad/cad-simple-viewer'],
+    include: ['rxjs', '@wendellhu/redi', 'dayjs'],
   },
 })

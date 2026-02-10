@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout/Layout'
 import ConverterPage from './components/Converter/ConverterPage'
@@ -11,6 +12,17 @@ import QTOReportsPage from './components/QTOReports/QTOReportsPage'
 import CadViewerPage from './components/CadViewer/CadViewerPage'
 import N8nStatusPanel from './components/N8nPanel/N8nStatusPanel'
 
+const PdfViewerPage = lazy(() => import('./components/PdfViewer/PdfViewerPage'))
+const ExcelViewerPage = lazy(() => import('./components/ExcelViewer/ExcelViewerPage'))
+
+function LoadingFallback() {
+  return (
+    <div className="flex h-64 items-center justify-center text-muted-foreground">
+      <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-muted border-t-primary" />
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <Routes>
@@ -19,6 +31,8 @@ export default function App() {
         <Route path="/converter" element={<ConverterPage />} />
         <Route path="/cad-viewer" element={<CadViewerPage />} />
         <Route path="/viewer" element={<ViewerPage />} />
+        <Route path="/pdf" element={<Suspense fallback={<LoadingFallback />}><PdfViewerPage /></Suspense>} />
+        <Route path="/excel" element={<Suspense fallback={<LoadingFallback />}><ExcelViewerPage /></Suspense>} />
         <Route path="/cost" element={<CostEstimatePage />} />
         <Route path="/validation" element={<ValidationPage />} />
         <Route path="/ai-analysis" element={<AIAnalysisPage />} />

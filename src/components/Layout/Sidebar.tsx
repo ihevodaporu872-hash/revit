@@ -6,12 +6,15 @@ import {
   ArrowLeftRight, FileType, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
   ChevronLeft, ChevronRight, Workflow, PanelLeftClose,
+  FileImage, Table,
 } from 'lucide-react'
 
 const modules = [
   { id: 'converter', path: '/converter', label: 'CAD-преобразователь', icon: ArrowLeftRight },
   { id: 'cad-viewer', path: '/cad-viewer', label: 'CAD-просмотрщик', icon: FileType },
   { id: 'viewer', path: '/viewer', label: '3D-просмотрщик', icon: Box },
+  { id: 'pdf', path: '/pdf', label: 'PDF-просмотрщик', icon: FileImage },
+  { id: 'excel', path: '/excel', label: 'Excel-просмотрщик', icon: Table },
   { id: 'cost', path: '/cost', label: 'Смета стоимости', icon: DollarSign },
   { id: 'validation', path: '/validation', label: 'Валидация BIM', icon: ShieldCheck },
   { id: 'ai-analysis', path: '/ai-analysis', label: 'Анализ ИИ', icon: BrainCircuit },
