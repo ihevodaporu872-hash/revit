@@ -26,6 +26,14 @@
   text-shadow: 0 3px 14px rgba(6, 13, 28, 0.36);
 }
 
+.converter-stat-card .statcard-top-row {
+  gap: 1rem;
+}
+
+.converter-stat-card .statcard-main {
+  padding-right: 0.35rem;
+}
+
 .converter-stat-card .statcard-label {
   color: rgba(184, 205, 234, 0.66);
   font-size: 11px;
@@ -35,6 +43,7 @@
 
 .converter-stat-card .statcard-value {
   margin-top: 0.3rem;
+  padding-right: 0.55rem;
   color: #f8fbff;
   font-size: clamp(2.35rem, 3.2vw, 3.25rem);
   line-height: 0.9;
@@ -43,8 +52,13 @@
 }
 
 .converter-stat-card .statcard-icon-shell {
+  margin-top: 0.1rem;
   border-color: rgba(140, 186, 252, 0.44);
   background: linear-gradient(180deg, rgba(20, 40, 74, 0.78), rgba(13, 28, 54, 0.78));
+  flex-shrink: 0;
+  box-shadow:
+    0 10px 18px rgba(16, 58, 129, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .converter-stat-card .statcard-trend {

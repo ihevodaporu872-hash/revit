@@ -28,14 +28,14 @@ export default function Sidebar() {
 
   return (
     <motion.aside
-      animate={{ width: sidebarOpen ? 262 : 72 }}
+      animate={{ width: sidebarOpen ? 332 : 74 }}
       transition={defaultTransition}
-      className="sidebar-sheen relative h-full shrink-0 overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="sidebar-shell relative h-full shrink-0 overflow-hidden border-r border-sidebar-border/70 text-sidebar-foreground"
     >
-      <div className="absolute right-2 top-3 z-20">
+      <div className="absolute right-2 top-3 z-30">
         <button
           onClick={toggleSidebar}
-          className="rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-1.5 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
+          className="rounded-full border border-sidebar-border/70 bg-sidebar-accent/50 p-1.5 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
           title={sidebarOpen ? 'Свернуть меню' : 'Развернуть меню'}
         >
           {sidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
@@ -43,7 +43,7 @@ export default function Sidebar() {
       </div>
 
       <div className="flex h-full flex-col">
-        <div className="border-b border-sidebar-border/90 px-4 pb-3 pt-4">
+        <div className="border-b border-sidebar-border/70 px-5 pb-4 pt-5">
           <AnimatePresence mode="wait">
             {sidebarOpen ? (
               <motion.div
@@ -52,14 +52,14 @@ export default function Sidebar() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center gap-3"
+                className="flex items-center gap-3.5"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-b from-primary to-primary/70 text-base font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-primary to-primary/70 text-3xl font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
                   J
                 </div>
                 <div className="min-w-0">
-                  <span className="block truncate text-[17px] font-semibold leading-none tracking-tight">Йенс</span>
-                  <p className="mt-0.5 truncate text-[11px] text-sidebar-foreground/70">Строительная платформа</p>
+                  <span className="block truncate text-[19px] font-semibold leading-none tracking-tight">Йенс</span>
+                  <p className="mt-1 truncate text-[13px] text-sidebar-foreground/74">Строительная платформа</p>
                 </div>
               </motion.div>
             ) : (
@@ -70,7 +70,7 @@ export default function Sidebar() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => navigate('/converter')}
-                className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]"
+                className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground shadow-[var(--shadow-glow)]"
               >
                 J
               </motion.button>
@@ -78,30 +78,30 @@ export default function Sidebar() {
           </AnimatePresence>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-3.5">
+        <nav className="sidebar-nav flex-1 overflow-y-auto py-3">
           {modules.map((mod) => {
             const Icon = mod.icon
             const active = location.pathname === mod.path
             return (
-              <div key={mod.id} className="group relative mb-1.5">
+              <div key={mod.id} className="group relative">
                 <button
                   onClick={() => navigate(mod.path)}
-                  className={`relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-all ${
+                  className={`sidebar-nav-item relative flex w-full items-center gap-3 text-left transition-all ${
                     active
-                      ? 'bg-gradient-to-r from-primary/30 to-primary/10 text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground/78 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground'
-                  }`}
+                      ? 'sidebar-nav-item-active text-sidebar-primary-foreground'
+                      : 'sidebar-nav-item-idle text-sidebar-foreground/82 hover:text-sidebar-accent-foreground'
+                  } ${sidebarOpen ? 'px-5 py-2.5' : 'justify-center px-0 py-2.5'}`}
                   title={!sidebarOpen ? mod.label : undefined}
                 >
                   {active && (
                     <motion.div
                       layoutId="sidebar-active"
-                      className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary shadow-[var(--shadow-glow)]"
+                      className="sidebar-active-rail absolute left-0 top-1 bottom-1 w-1 rounded-r-full bg-primary shadow-[var(--shadow-glow)]"
                       transition={layoutIndicator}
                     />
                   )}
-                  <span className={`ml-1 rounded-md p-1.5 ${active ? 'bg-primary/20 text-primary' : 'bg-sidebar-accent/35'}`}>
-                    <Icon size={16} className="shrink-0" />
+                  <span className={`rounded-lg p-1.5 ${active ? 'bg-primary/20 text-primary shadow-[0_0_22px_oklch(0.66_0.2_251/0.42)]' : 'bg-sidebar-accent/45 text-sidebar-foreground/80'}`}>
+                    <Icon size={20} className="shrink-0" />
                   </span>
                   <AnimatePresence>
                     {sidebarOpen && (
@@ -110,7 +110,7 @@ export default function Sidebar() {
                         initial="collapsed"
                         animate="expanded"
                         exit="collapsed"
-                        className="truncate text-[14px] font-semibold leading-none tracking-tight"
+                        className="truncate text-[16px] font-medium leading-none tracking-tight"
                       >
                         {mod.label}
                       </motion.span>
@@ -135,9 +135,9 @@ export default function Sidebar() {
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 4 }}
-              className="border-t border-sidebar-border px-4 py-3"
+              className="border-t border-sidebar-border/70 px-5 py-3"
             >
-              <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/55">
+              <div className="flex items-center gap-2 text-xs text-sidebar-foreground/58">
                 <PanelLeftClose size={14} />
                 <span>Jens v1.0</span>
               </div>
@@ -148,11 +148,11 @@ export default function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="border-t border-sidebar-border p-3"
+              className="border-t border-sidebar-border/70 p-3"
             >
               <button
                 onClick={toggleSidebar}
-                className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground/70"
+                className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl border border-sidebar-border/70 bg-sidebar-accent/50 text-sidebar-foreground/70"
                 title="Развернуть меню"
               >
                 <ChevronRight size={16} />

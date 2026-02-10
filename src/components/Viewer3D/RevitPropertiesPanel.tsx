@@ -81,6 +81,116 @@ function DimensionCard({ label, value, unit }: { label: string; value: number | 
   )
 }
 
+interface IfcPropertyItem {
+  section: string
+  key: string
+  value: string
+  rawName: string
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase())
+}
+
+function parseIfcPropertyName(rawName: string): { section: string; key: string } {
+  const name = String(rawName || '').trim()
+  if (!name) return { section: 'General', key: 'Value' }
+
+  const slash = name.includes('/') ? name.split('/') : null
+  if (slash && slash.length >= 2) {
+    return {
+      section: toTitleCase(slash[0]),
+      key: toTitleCase(slash.slice(1).join('/')),
+    }
+  }
+
+  const dot = name.includes('.') ? name.split('.') : null
+  if (dot && dot.length >= 2 && /^pset|^qto/i.test(dot[0])) {
+    return {
+      section: toTitleCase(dot[0]),
+      key: toTitleCase(dot.slice(1).join('.')),
+    }
+  }
+
+  if (/^pset_|^qto_/i.test(name)) {
+    const normalized = name.replace(/^pset_/i, 'Pset ').replace(/^qto_/i, 'Qto ')
+    return { section: 'Property Set', key: toTitleCase(normalized) }
+  }
+
+  return { section: 'General', key: toTitleCase(name) }
+}
+
+function formatIfcValue(raw: string): string {
+  const value = String(raw ?? '').trim()
+  if (!value) return '—'
+
+  if (/^(true|false)$/i.test(value)) {
+    return value.toLowerCase() === 'true' ? 'Yes' : 'No'
+  }
+
+  if (/^-?\d+([.,]\d+)?$/.test(value)) {
+    const n = Number.parseFloat(value.replace(',', '.'))
+    if (Number.isFinite(n)) {
+      if (Number.isInteger(n)) return n.toLocaleString()
+      return n.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    }
+  }
+
+  return value
+}
+
+function buildIfcPropertyGroups(ifcProperties: { name: string; value: string }[]): Map<string, IfcPropertyItem[]> {
+  const groups = new Map<string, IfcPropertyItem[]>()
+
+  for (const prop of ifcProperties) {
+    const parsed = parseIfcPropertyName(prop.name)
+    const item: IfcPropertyItem = {
+      section: parsed.section,
+      key: parsed.key,
+      value: formatIfcValue(prop.value),
+      rawName: prop.name,
+    }
+    const bucket = groups.get(item.section) || []
+    bucket.push(item)
+    groups.set(item.section, bucket)
+  }
+
+  return new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])))
+}
+
+function IfcPropertiesView({ ifcProperties }: { ifcProperties: { name: string; value: string }[] }) {
+  if (!ifcProperties.length) return null
+  const grouped = buildIfcPropertyGroups(ifcProperties)
+
+  return (
+    <div className="space-y-2.5">
+      {Array.from(grouped.entries()).map(([section, items]) => (
+        <div key={section} className="rounded-lg border border-border/60 overflow-hidden">
+          <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/5 border-b border-border/60">
+            {section}
+          </div>
+          <div className="divide-y divide-border/40">
+            {items.map((item, i) => (
+              <div key={`${section}-${item.rawName}-${i}`} className="px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wide break-words" title={item.rawName}>
+                  {item.key}
+                </div>
+                <div className="text-xs text-foreground font-medium break-all leading-snug mt-0.5">
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, matchSource, tag }: Props) {
   if (!revitProps) {
     return (
@@ -92,19 +202,7 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, 
         </div>
         {/* IFC Properties fallback */}
         <PropertyGroup title="IFC Properties" icon={<Hash size={11} />} defaultOpen>
-          <div className="space-y-0">
-            {ifcProperties.map((prop, i) => (
-              <div
-                key={i}
-                className={`flex justify-between items-start py-2 px-2 rounded text-xs ${
-                  i % 2 === 0 ? 'bg-muted/30' : ''
-                }`}
-              >
-                <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
-                <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
-              </div>
-            ))}
-          </div>
+          <IfcPropertiesView ifcProperties={ifcProperties} />
         </PropertyGroup>
 
         {/* Banner to upload */}
@@ -219,19 +317,7 @@ export function RevitPropertiesPanel({ revitProps, ifcProperties, onUploadXlsx, 
       {/* IFC Properties (original from web-ifc) */}
       {ifcProperties.length > 0 && (
         <PropertyGroup title="IFC Properties" icon={<Hash size={11} />}>
-          <div className="space-y-0">
-            {ifcProperties.map((prop, i) => (
-              <div
-                key={i}
-                className={`flex justify-between items-start py-1.5 px-2 rounded text-xs ${
-                  i % 2 === 0 ? 'bg-muted/30' : ''
-                }`}
-              >
-                <span className="text-muted-foreground shrink-0 mr-3">{prop.name}</span>
-                <span className="text-foreground font-medium text-right break-all">{prop.value}</span>
-              </div>
-            ))}
-          </div>
+          <IfcPropertiesView ifcProperties={ifcProperties} />
         </PropertyGroup>
       )}
 

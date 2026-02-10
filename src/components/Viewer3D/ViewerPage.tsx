@@ -66,7 +66,7 @@ import { useElementMatcher } from './useElementMatcher'
 import { MatchingReport } from './MatchingReport'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
-import { uploadRevitXlsx } from '../../services/revit-api'
+import { uploadRevitXlsx, processRevitModel } from '../../services/revit-api'
 import {
   fadeInUp,
   fadeInLeft,
@@ -202,6 +202,11 @@ export default function ViewerPage() {
   const matchOverlayRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map())
   const [revitScope, setRevitScopeState] = useState<{ projectId: string; modelVersion?: string }>({ projectId: 'default' })
   const [xlsxCoverage, setXlsxCoverage] = useState<CoverageSummary | null>(null)
+
+  const setRvtProgress = useCallback((percent: number, message: string, stage: LoadingProgress['stage'] = 'parsing') => {
+    const bounded = Math.max(0, Math.min(100, Math.round(percent)))
+    setLoadingProgress({ stage, percent: bounded, message })
+  }, [])
 
   const clearAllSelections = useCallback(() => {
     selectedMeshesRef.current.forEach(({ mesh, originalMaterial }) => {
@@ -590,7 +595,7 @@ export default function ViewerPage() {
   // ── Handle real IFC file upload ─────────────────────────
 
   const handleFileUpload = useCallback(
-    async (files: File[]) => {
+    async (files: File[], scopeOverride?: { projectId: string; modelVersion?: string }) => {
       const file = files[0]
       if (!file) return
 
@@ -658,8 +663,9 @@ export default function ViewerPage() {
           }
           // Run in background — don't block UI
           extractIds(result.tree).then(async () => {
-            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds, revitScope)
-            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds, revitScope)
+            const scope = scopeOverride || revitScope
+            if (allGlobalIds.length > 0) await revitEnrichment.prefetchBulk(allGlobalIds, scope)
+            if (allElementIds.length > 0) await revitEnrichment.prefetchByElementIds(allElementIds, scope)
             // Auto-run matching if we have Revit data
             const cachedProps = revitEnrichment.getAllCachedProps()
             if (cachedProps.length > 0 && allIfcElements.length > 0) {
@@ -675,6 +681,104 @@ export default function ViewerPage() {
     },
     [addNotification, fitToModel, sectionPlanes, revitEnrichment, revitScope, elementMatcher],
   )
+
+  // ── RVT Upload (auto-convert RVT -> IFC/XLSX/DAE) ───────────────────────
+
+  const handleRvtUpload = useCallback(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.rvt'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      let convertTicker: ReturnType<typeof setInterval> | null = null
+      const stopTicker = () => {
+        if (convertTicker) {
+          clearInterval(convertTicker)
+          convertTicker = null
+        }
+      }
+
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('projectId', revitScope.projectId)
+      if (revitScope.modelVersion) formData.append('modelVersion', revitScope.modelVersion)
+      formData.append('ifcSchema', 'IFC4X3')
+
+      try {
+        setRvtProgress(8, 'Шаг 1/4: загрузка Revit модели (.rvt)...', 'init')
+        setRvtProgress(14, 'Шаг 2/4: конвертация RVT -> IFC4X3 + Excel + DAE...', 'parsing')
+
+        convertTicker = setInterval(() => {
+          setLoadingProgress((prev) => {
+            const current = prev?.percent ?? 14
+            const next = current < 72
+              ? Math.min(72, current + (current < 40 ? 3 : 1))
+              : current
+            return {
+              stage: 'parsing',
+              percent: next,
+              message: 'Шаг 2/4: конвертация RVT -> IFC4X3 + Excel + DAE...',
+            }
+          })
+        }, 700)
+
+        const result = await processRevitModel(formData)
+        stopTicker()
+
+        const nextScope = {
+          projectId: result.projectId || revitScope.projectId,
+          modelVersion: result.modelVersion || revitScope.modelVersion,
+        }
+        setRevitScope(nextScope.projectId, nextScope.modelVersion)
+
+        if (result.status === 'fallback') {
+          setRvtProgress(100, 'Конвертер недоступен. Используйте режим IFC + Revit XLSX.', 'done')
+          setTimeout(() => setLoadingProgress(null), 900)
+          addNotification('warning', 'RVT converter unavailable. Use IFC + Revit XLSX upload mode.')
+          return
+        }
+
+        setRvtProgress(78, 'Шаг 3/4: импорт параметров Revit из сгенерированного Excel...', 'parsing')
+        if (result.xlsxImport?.coverage) {
+          setXlsxCoverage(result.xlsxImport.coverage)
+        }
+
+        if (!result.outputs?.ifcPath) {
+          setLoadingProgress(null)
+          addNotification('error', 'RVT processed, but IFC output is missing.')
+          return
+        }
+
+        setRvtProgress(90, 'Шаг 4/4: загрузка конвертированной IFC модели в viewer...', 'geometry')
+        const backendBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+        const ifcUrl = /^https?:\/\//i.test(result.outputs.ifcPath)
+          ? result.outputs.ifcPath
+          : `${backendBase}${result.outputs.ifcPath}`
+        const ifcResponse = await fetch(ifcUrl)
+        if (!ifcResponse.ok) {
+          throw new Error(`Failed to load converted IFC (${ifcResponse.status})`)
+        }
+        const ifcBlob = await ifcResponse.blob()
+        const ifcFileName = result.outputs.ifcPath.split('/').pop() || `${file.name.replace(/\.rvt$/i, '')}.ifc`
+        const ifcFile = new File([ifcBlob], ifcFileName, { type: 'application/octet-stream' })
+        await handleFileUpload([ifcFile], nextScope)
+        setRvtProgress(100, 'Готово: связка IFC + Revit Excel построена.', 'done')
+        setTimeout(() => setLoadingProgress(null), 800)
+
+        const extras: string[] = []
+        if (result.outputs.xlsxPath) extras.push('XLSX')
+        if (result.outputs.daePath) extras.push('DAE')
+        addNotification('success', `RVT converted to IFC4X3${extras.length ? ` + ${extras.join(' + ')}` : ''}`)
+      } catch (err) {
+        stopTicker()
+        setLoadingProgress(null)
+        addNotification('error', `RVT processing failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+    input.click()
+  }, [addNotification, handleFileUpload, revitScope, setRevitScope, setRvtProgress])
 
   // ── XLSX Upload handler ─────────────────────────────────
 
@@ -1155,6 +1259,9 @@ export default function ViewerPage() {
             input.click()
           }}>
             Upload IFC
+          </Button>
+          <Button data-testid="upload-revit-rvt-btn" variant="secondary" icon={<Upload size={16} />} onClick={handleRvtUpload}>
+            Upload Revit (.rvt auto)
           </Button>
           <Button data-testid="upload-revit-xlsx-btn" variant="secondary" icon={<FileSpreadsheet size={16} />} onClick={handleXlsxUpload}>
             Upload Revit (.xlsx)

@@ -18,6 +18,15 @@ import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
+import {
+  deriveModelIdentity,
+  resolveRevitColumns,
+  mapRevitRowsToRecords,
+  buildUploadCoverage,
+  summarizeMappedColumns,
+  getUnmappedColumns,
+} from './revit-xlsx.js'
+import { buildMatchReport } from './revit-matcher.js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -147,6 +156,12 @@ const CONVERTER_PATHS = {
     label: 'DGN',
   },
 }
+
+const ENABLE_RVT_CONVERTER = ['1', 'true', 'yes', 'on']
+  .includes(String(process.env.ENABLE_RVT_CONVERTER || '').trim().toLowerCase())
+
+const REQUIRED_SUPABASE_TABLES = ['ifc_element_properties']
+const OPTIONAL_SUPABASE_TABLES = ['model_runs', 'match_reports', 'match_overrides']
 
 // ---------------------------------------------------------------------------
 // CWICR Data (Cost Work Items, Costs, Resources)
@@ -421,6 +436,483 @@ function requireGemini(res) {
     return false
   }
   return true
+}
+
+function errorPayload(code, message, details = {}) {
+  return {
+    error: message,
+    code,
+    ...details,
+  }
+}
+
+function tableMissingError(err) {
+  const msg = String(err?.message || '').toLowerCase()
+  return msg.includes('relation') && msg.includes('does not exist')
+    || msg.includes('could not find the table')
+    || msg.includes('schema cache')
+}
+
+function infrastructureDbError(err) {
+  if (!err) return false
+  if (tableMissingError(err)) return true
+  const msg = String(err?.message || err?.reason || '').toLowerCase()
+  return msg.includes('failed to fetch')
+    || msg.includes('network')
+    || msg.includes('timeout')
+    || msg.includes('connection')
+    || msg.includes('permission denied')
+}
+
+async function safeUnlink(filePath) {
+  if (!filePath) return
+  try {
+    await fs.unlink(filePath)
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+async function safeRmDir(dirPath) {
+  if (!dirPath) return
+  try {
+    await fs.rm(dirPath, { recursive: true, force: true })
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+function normalizeStringArray(values, max = 1000) {
+  if (!Array.isArray(values)) return []
+  return [...new Set(
+    values
+      .map((v) => String(v || '').trim())
+      .filter(Boolean),
+  )].slice(0, max)
+}
+
+function normalizeNumberArray(values, max = 1000) {
+  if (!Array.isArray(values)) return []
+  return [...new Set(
+    values
+      .map((v) => Number.parseInt(String(v), 10))
+      .filter((v) => Number.isFinite(v)),
+  )].slice(0, max)
+}
+
+function resolveScope(input = {}, defaults = {}) {
+  const projectIdRaw = input?.projectId !== undefined && input?.projectId !== null
+    ? String(input.projectId).trim()
+    : ''
+  const modelVersionRaw = input?.modelVersion !== undefined && input?.modelVersion !== null
+    ? String(input.modelVersion).trim()
+    : ''
+
+  return {
+    projectId: projectIdRaw || defaults.projectId || 'default',
+    modelVersion: modelVersionRaw || defaults.modelVersion || null,
+  }
+}
+
+function converterAvailability() {
+  const result = {}
+  for (const [key, config] of Object.entries(CONVERTER_PATHS)) {
+    const exePath = path.join(config.dir, config.exe)
+    result[key] = {
+      label: config.label,
+      available: existsSync(exePath),
+      enabled: key === 'rvt' ? ENABLE_RVT_CONVERTER : true,
+      path: config.dir,
+      exe: config.exe,
+    }
+  }
+  return result
+}
+
+async function checkSupabaseTable(table) {
+  if (!supabaseServer) {
+    return { table, available: false, required: REQUIRED_SUPABASE_TABLES.includes(table), reason: 'supabase_not_configured' }
+  }
+  const { error } = await supabaseServer.from(table).select('id', { head: true, count: 'exact' }).limit(1)
+  if (error) {
+    return {
+      table,
+      available: false,
+      required: REQUIRED_SUPABASE_TABLES.includes(table),
+      reason: tableMissingError(error) ? 'missing_table' : 'query_error',
+      message: error.message,
+    }
+  }
+  return { table, available: true, required: REQUIRED_SUPABASE_TABLES.includes(table) }
+}
+
+async function dbPreflight() {
+  const tables = [...REQUIRED_SUPABASE_TABLES, ...OPTIONAL_SUPABASE_TABLES]
+  const checks = await Promise.all(tables.map((t) => checkSupabaseTable(t)))
+  return {
+    available: checks.every((c) => !c.required || c.available),
+    tables: checks,
+    requiredMissing: checks.filter((c) => c.required && !c.available).map((c) => c.table),
+  }
+}
+
+function normalizeModelScope(body = {}, file = null) {
+  const identity = deriveModelIdentity(
+    file || { originalname: body.sourceFile || 'model', size: body.fileSize || 0 },
+    body.projectId,
+    body.modelVersion,
+  )
+  return {
+    projectId: identity.projectId,
+    modelVersion: identity.modelVersion,
+    sourceFile: body.sourceFile || identity.sourceFile,
+  }
+}
+
+const RUNTIME_REVISIONS_LIMIT = 40
+const runtimeRevitStore = new Map()
+
+function runtimeModelKey(projectId, modelVersion) {
+  return `${projectId}::${modelVersion || 'latest'}`
+}
+
+function rowIdentityKey(row) {
+  return `${row.global_id || ''}|${row.revit_element_id ?? ''}|${row.revit_unique_id || ''}`
+}
+
+function dedupeRows(rows) {
+  const map = new Map()
+  for (const row of rows || []) {
+    map.set(rowIdentityKey(row), row)
+  }
+  return Array.from(map.values())
+}
+
+function buildRuntimeIndexes(rows) {
+  const byGlobalId = new Map()
+  const byElementId = new Map()
+
+  for (const row of rows) {
+    if (row.global_id) {
+      const bucket = byGlobalId.get(row.global_id) || []
+      bucket.push(row)
+      byGlobalId.set(row.global_id, bucket)
+    }
+    if (Number.isFinite(row.revit_element_id)) {
+      const bucket = byElementId.get(row.revit_element_id) || []
+      bucket.push(row)
+      byElementId.set(row.revit_element_id, bucket)
+    }
+  }
+  return { byGlobalId, byElementId }
+}
+
+function touchRuntimeRecord(projectId, modelVersion, rows, meta = {}) {
+  const key = runtimeModelKey(projectId, modelVersion)
+  const current = runtimeRevitStore.get(key)
+  const merged = dedupeRows([
+    ...(current?.rows || []),
+    ...rows,
+  ])
+
+  const sourceFiles = new Set(current?.sourceFiles || [])
+  if (meta?.sourceFile) sourceFiles.add(meta.sourceFile)
+  if (Array.isArray(meta?.sourceFiles)) {
+    for (const fileName of meta.sourceFiles) {
+      if (fileName) sourceFiles.add(fileName)
+    }
+  }
+
+  const sourceModes = new Set(current?.sourceModes || [])
+  if (meta?.sourceMode) sourceModes.add(meta.sourceMode)
+
+  runtimeRevitStore.set(key, {
+    key,
+    projectId,
+    modelVersion,
+    rows: merged,
+    ...buildRuntimeIndexes(merged),
+    sourceFiles: Array.from(sourceFiles),
+    sourceModes: Array.from(sourceModes),
+    updatedAt: Date.now(),
+  })
+
+  if (runtimeRevitStore.size > RUNTIME_REVISIONS_LIMIT) {
+    const entries = Array.from(runtimeRevitStore.entries())
+      .sort((a, b) => (a[1].updatedAt || 0) - (b[1].updatedAt || 0))
+    while (entries.length > RUNTIME_REVISIONS_LIMIT) {
+      const [oldestKey] = entries.shift()
+      runtimeRevitStore.delete(oldestKey)
+    }
+  }
+
+  return runtimeRevitStore.get(key)
+}
+
+function pickRuntimeRevision(projectId, modelVersion) {
+  if (modelVersion) {
+    return runtimeRevitStore.get(runtimeModelKey(projectId, modelVersion)) || null
+  }
+
+  const candidates = Array.from(runtimeRevitStore.values())
+    .filter((entry) => entry.projectId === projectId)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  return candidates[0] || null
+}
+
+function queryRuntimeRows({ projectId, modelVersion, globalIds = [], elementIds = [], limit = 1000 }) {
+  const revision = pickRuntimeRevision(projectId, modelVersion)
+  const unresolved = {
+    globalIds: [...globalIds],
+    elementIds: [...elementIds],
+  }
+  if (!revision) return { rows: [], unresolved, source: 'none', revision: null }
+
+  const collected = []
+  if (globalIds.length > 0) {
+    for (const gid of globalIds) {
+      const rows = revision.byGlobalId.get(gid) || []
+      if (rows.length > 0) unresolved.globalIds = unresolved.globalIds.filter((x) => x !== gid)
+      collected.push(...rows)
+    }
+  }
+  if (elementIds.length > 0) {
+    for (const eid of elementIds) {
+      const rows = revision.byElementId.get(eid) || []
+      if (rows.length > 0) unresolved.elementIds = unresolved.elementIds.filter((x) => x !== eid)
+      collected.push(...rows)
+    }
+  }
+  if (globalIds.length === 0 && elementIds.length === 0) {
+    collected.push(...revision.rows)
+  }
+
+  return {
+    rows: dedupeRows(collected).slice(0, limit),
+    unresolved,
+    source: 'runtime',
+    revision: {
+      projectId: revision.projectId,
+      modelVersion: revision.modelVersion,
+      updatedAt: revision.updatedAt,
+      sourceFiles: revision.sourceFiles || [],
+      sourceModes: revision.sourceModes || [],
+      totalRows: revision.rows.length,
+    },
+  }
+}
+
+async function fetchSupabaseRows({ projectId, modelVersion, globalIds = [], elementIds = [], limit = 1000 }) {
+  if (!supabaseServer) {
+    return {
+      rows: [],
+      unresolved: { globalIds: [...globalIds], elementIds: [...elementIds] },
+      source: 'none',
+      error: null,
+    }
+  }
+
+  const unresolved = {
+    globalIds: [...globalIds],
+    elementIds: [...elementIds],
+  }
+  const rows = []
+  let errorPayloadValue = null
+
+  if (globalIds.length > 0) {
+    let query = supabaseServer
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('global_id', globalIds.slice(0, limit))
+    if (modelVersion) query = query.eq('model_version', modelVersion)
+
+    const { data, error } = await query
+    if (error) {
+      errorPayloadValue = error
+    } else if (data?.length) {
+      rows.push(...data)
+      const found = new Set(data.map((row) => row.global_id))
+      unresolved.globalIds = unresolved.globalIds.filter((id) => !found.has(id))
+    }
+  }
+
+  if (elementIds.length > 0) {
+    let query = supabaseServer
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .in('revit_element_id', elementIds.slice(0, limit))
+    if (modelVersion) query = query.eq('model_version', modelVersion)
+
+    const { data, error } = await query
+    if (error) {
+      errorPayloadValue = errorPayloadValue || error
+    } else if (data?.length) {
+      rows.push(...data)
+      const found = new Set(data.map((row) => row.revit_element_id))
+      unresolved.elementIds = unresolved.elementIds.filter((id) => !found.has(id))
+    }
+  }
+
+  if (globalIds.length === 0 && elementIds.length === 0) {
+    let query = supabaseServer
+      .from('ifc_element_properties')
+      .select('*')
+      .eq('project_id', projectId)
+      .limit(limit)
+    if (modelVersion) query = query.eq('model_version', modelVersion)
+
+    const { data, error } = await query
+    if (error) {
+      errorPayloadValue = errorPayloadValue || error
+    } else if (data?.length) {
+      rows.push(...data)
+    }
+  }
+
+  return {
+    rows: dedupeRows(rows).slice(0, limit),
+    unresolved,
+    source: rows.length > 0 ? 'supabase' : 'none',
+    error: errorPayloadValue,
+  }
+}
+
+async function fetchMergedRevitRows({
+  projectId,
+  modelVersion,
+  globalIds = [],
+  elementIds = [],
+  limit = 1000,
+}) {
+  const supabaseResult = await fetchSupabaseRows({
+    projectId,
+    modelVersion,
+    globalIds,
+    elementIds,
+    limit,
+  })
+
+  const filteredLookup = globalIds.length > 0 || elementIds.length > 0
+  const runtimeResult = queryRuntimeRows({
+    projectId,
+    modelVersion,
+    globalIds: filteredLookup ? supabaseResult.unresolved.globalIds : [],
+    elementIds: filteredLookup ? supabaseResult.unresolved.elementIds : [],
+    limit,
+  })
+
+  const rows = dedupeRows([
+    ...(runtimeResult.rows || []),
+    ...(supabaseResult.rows || []),
+  ]).slice(0, limit)
+
+  const unresolved = filteredLookup
+    ? runtimeResult.unresolved
+    : { globalIds: [], elementIds: [] }
+
+  let source = 'none'
+  if (supabaseResult.rows.length > 0 && runtimeResult.rows.length > 0) source = 'hybrid'
+  else if (supabaseResult.rows.length > 0) source = 'supabase'
+  else if (runtimeResult.rows.length > 0) source = 'runtime'
+
+  return {
+    rows,
+    unresolved,
+    source,
+    runtimeRevision: runtimeResult.revision || null,
+    supabaseError: supabaseResult.error
+      ? {
+        message: supabaseResult.error.message,
+      }
+      : null,
+  }
+}
+
+async function upsertRevitRecords(records, scope, meta = {}) {
+  const runtimeRevision = touchRuntimeRecord(scope.projectId, scope.modelVersion, records, meta)
+
+  let onConflict = 'project_id,model_version,global_id'
+  const errors = []
+  let insertedCount = records.length
+  let dbInsertedCount = 0
+  const batchSize = 500
+
+  if (supabaseServer && meta?.allowSupabase !== false) {
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize)
+      let { error } = await supabaseServer
+        .from('ifc_element_properties')
+        .upsert(batch, { onConflict })
+
+      if (error && /no unique|constraint matching the on conflict specification|there is no unique/i.test(String(error.message || '')) && onConflict === 'project_id,model_version,global_id') {
+        onConflict = 'project_id,global_id'
+        const retry = await supabaseServer
+          .from('ifc_element_properties')
+          .upsert(batch, { onConflict })
+        error = retry.error
+      }
+
+      if (error) {
+        errors.push({
+          batch: Math.floor(i / batchSize) + 1,
+          reason: error.message,
+        })
+        continue
+      }
+      dbInsertedCount += batch.length
+    }
+  }
+
+  const persistence = dbInsertedCount > 0 ? 'hybrid' : 'runtime'
+  return {
+    insertedCount,
+    dbInsertedCount,
+    runtimeStoredCount: runtimeRevision?.rows?.length || 0,
+    errors,
+    onConflict: dbInsertedCount > 0 ? onConflict : null,
+    persistence,
+    runtimeRevision: runtimeRevision
+      ? {
+        projectId: runtimeRevision.projectId,
+        modelVersion: runtimeRevision.modelVersion,
+        updatedAt: runtimeRevision.updatedAt,
+        sourceFiles: runtimeRevision.sourceFiles || [],
+        sourceModes: runtimeRevision.sourceModes || [],
+      }
+      : null,
+  }
+}
+
+async function insertModelRun(entry) {
+  if (!supabaseServer) return
+  const { error } = await supabaseServer.from('model_runs').insert(entry)
+  if (error && !tableMissingError(error)) {
+    console.warn('[Revit] model_runs insert failed:', error.message)
+  }
+}
+
+async function saveMatchReport(entry) {
+  if (!supabaseServer) return
+  const { error } = await supabaseServer.from('match_reports').insert(entry)
+  if (error && !tableMissingError(error)) {
+    console.warn('[Revit] match_reports insert failed:', error.message)
+  }
+}
+
+function manualRvtFallback(projectId, modelVersion) {
+  return {
+    status: 'fallback',
+    mode: 'manual_ifc_xlsx',
+    projectId,
+    modelVersion,
+    instructions: [
+      'Upload IFC model in Viewer',
+      'Upload Revit XLSX via /api/revit/upload-xlsx with same projectId/modelVersion',
+      'Request /api/revit/match-report to validate matching coverage',
+    ],
+  }
 }
 
 // ============================================================================
@@ -1373,16 +1865,9 @@ ${context ? `\nAdditional context: ${context}` : ''}`
 // ---------------------------------------------------------------------------
 // 17. GET /api/health
 // ---------------------------------------------------------------------------
-app.get('/api/health', (_req, res) => {
-  const converterStatus = {}
-  for (const [key, config] of Object.entries(CONVERTER_PATHS)) {
-    const exePath = path.join(config.dir, config.exe)
-    converterStatus[key] = {
-      label: config.label,
-      available: existsSync(exePath),
-      path: config.dir,
-    }
-  }
+app.get('/api/health', async (_req, res) => {
+  const converterStatus = converterAvailability()
+  const dbStatus = await dbPreflight()
 
   const cwicrStatus = {}
   for (const [lang, config] of Object.entries(CWICR_LANGUAGE_MAP)) {
@@ -1395,18 +1880,34 @@ app.get('/api/health', (_req, res) => {
     }
   }
 
+  const rvtConverter = converterStatus.rvt
+  const status = (dbStatus.available || !supabaseServer) ? 'ok' : 'degraded'
+
   res.json({
-    status: 'ok',
+    status,
     platform: 'Jens Construction Platform',
-    version: '1.0.0',
+    version: '1.1.0',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: {
       nodeVersion: process.version,
       port: PORT,
       geminiAvailable: !!geminiModel,
+      rvtConverterFeatureFlag: ENABLE_RVT_CONVERTER,
     },
     converters: converterStatus,
+    preflight: {
+      database: dbStatus,
+      runtimeRevitStore: {
+        enabled: true,
+        revisions: runtimeRevitStore.size,
+      },
+      rvtConverter: {
+        enabled: rvtConverter?.enabled,
+        available: rvtConverter?.available,
+        executable: path.join(CONVERTER_PATHS.rvt.dir, CONVERTER_PATHS.rvt.exe),
+      },
+    },
     cwicr: cwicrStatus,
     stores: {
       conversionHistory: conversionHistory.length,
@@ -1422,6 +1923,7 @@ app.get('/api/health', (_req, res) => {
 // 18. POST /api/revit/upload-xlsx — Parse Revit XLSX and upsert to Supabase
 // ---------------------------------------------------------------------------
 app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
+  const cleanupPath = req.file?.path
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' })
@@ -1431,6 +1933,8 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
     if (!['.xlsx', '.xls'].includes(ext)) {
       return res.status(400).json({ error: 'Only .xlsx/.xls files are accepted' })
     }
+    const preflight = supabaseServer ? await dbPreflight() : null
+    const allowSupabase = !!supabaseServer && !!preflight?.available
 
     const XLSX = (await import('xlsx')).default
     const workbook = XLSX.readFile(req.file.path)
@@ -1439,175 +1943,95 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
     if (rows.length === 0) {
-      return res.status(400).json({ error: 'No data rows found in the spreadsheet' })
+      return res.status(422).json({
+        status: 'empty_payload',
+        insertedCount: 0,
+        parsedRows: 0,
+        validRows: 0,
+        errorCount: 1,
+        coverage: {
+          parsedRows: 0,
+          validRows: 0,
+          validRatio: 0,
+          withGlobalId: 0,
+          withElementId: 0,
+          withTypeIfcGuid: 0,
+        },
+        mappedColumns: [],
+        unmappedColumns: [],
+        errors: [{ row: 1, reason: 'No data rows found in the spreadsheet' }],
+      })
     }
 
-    const projectId = req.body.projectId || 'default'
-
-    // Column mapping: detect common Revit export column names
-    // DDC export appends type suffixes like ": String", ": Integer" to column names
-    const columnMap = {
-      globalId:         ['GlobalId', 'Global Id', 'GUID', 'guid', 'GlobalID', 'Element GUID', 'IfcGUID : String', 'IfcGUID'],
-      revitElementId:   ['ID', 'ElementId', 'Element Id', 'Revit Id', 'ID : Integer'],
-      revitUniqueId:    ['UniqueId : String', 'UniqueId', 'Unique Id'],
-      typeIfcGuid:      ['Type IfcGUID : String', 'Type IfcGUID'],
-      elementName:      ['Name', 'Element Name', 'ElementName', 'name', 'Name : String'],
-      elementType:      ['Type', 'Element Type', 'ElementType', 'type', 'Type Name', 'Type : String'],
-      category:         ['Category', 'category', 'Revit Category', 'Category : String'],
-      family:           ['Family', 'family', 'Family Name', 'Family : String'],
-      familyType:       ['Family and Type', 'FamilyType', 'Family Type', 'Type Name', 'Family and Type : String'],
-      level:            ['Level', 'level', 'Base Level', 'Reference Level', 'Level : String'],
-      phaseCreated:     ['Phase Created', 'PhaseCreated', 'Phase', 'phase', 'Phase Created : String'],
-      phaseDemolished:  ['Phase Demolished', 'PhaseDemolished', 'Phase Demolished : String'],
-      area:             ['Area', 'area', 'Surface Area', 'Area : Double'],
-      volume:           ['Volume', 'volume', 'Volume : Double'],
-      length:           ['Length', 'length', 'Length : Double'],
-      width:            ['Width', 'width', 'Width : Double'],
-      height:           ['Height', 'height', 'Unconnected Height', 'Height : Double'],
-      perimeter:        ['Perimeter', 'perimeter', 'Perimeter : Double'],
-      material:         ['Material', 'material', 'Structural Material', 'Material: Name', 'Structural Material : String'],
-      materialArea:     ['Material Area', 'MaterialArea', 'Material: Area'],
-      materialVolume:   ['Material Volume', 'MaterialVolume', 'Material: Volume'],
-      structuralUsage:  ['Structural Usage', 'StructuralUsage', 'Structural Usage : String'],
-      classification:   ['Classification', 'OmniClass Number', 'Classification Code'],
-      assemblyCode:     ['Assembly Code', 'AssemblyCode', 'Assembly Description'],
-      mark:             ['Mark', 'mark', 'Type Mark', 'Mark : String'],
-      comments:         ['Comments', 'comments', 'Comments : String'],
-    }
-
-    // Detect which columns are present (case-insensitive + suffix-stripped matching)
-    const sampleRow = rows[0]
-    const availableCols = Object.keys(sampleRow)
-    const resolvedMap = {}
-    const mappedCols = new Set()
-
-    // Build lowercase lookup: normalizedName → actualColumnName
-    const colLookup = new Map()
-    for (const col of availableCols) {
-      colLookup.set(col.toLowerCase().trim(), col)
-      // Also index without type suffix (e.g., "IfcGUID : String" → "ifcguid")
-      const stripped = col.replace(/\s*:\s*(String|Integer|Double|Boolean|ElementId)$/i, '').toLowerCase().trim()
-      if (!colLookup.has(stripped)) colLookup.set(stripped, col)
-    }
-
-    for (const [field, candidates] of Object.entries(columnMap)) {
-      for (const candidate of candidates) {
-        // Try exact match first
-        if (availableCols.includes(candidate)) {
-          resolvedMap[field] = candidate
-          mappedCols.add(candidate)
-          break
-        }
-        // Try case-insensitive match
-        const found = colLookup.get(candidate.toLowerCase().trim())
-        if (found) {
-          resolvedMap[field] = found
-          mappedCols.add(found)
-          break
-        }
-      }
-    }
+    const availableColumns = Object.keys(rows[0] || {})
+    const { resolvedMap, mappedColumns } = resolveRevitColumns(availableColumns)
 
     if (!resolvedMap.globalId && !resolvedMap.revitElementId) {
-      return res.status(400).json({
-        error: 'No GlobalId or ElementId column found in the spreadsheet',
-        availableColumns: availableCols,
-        hint: 'Ensure your Revit export includes a GlobalId (IfcGUID) or ID (ElementId) column',
+      return res.status(422).json({
+        status: 'unmapped_identity_columns',
+        insertedCount: 0,
+        parsedRows: rows.length,
+        validRows: 0,
+        errorCount: 1,
+        coverage: {
+          parsedRows: rows.length,
+          validRows: 0,
+          validRatio: 0,
+          withGlobalId: 0,
+          withElementId: 0,
+          withTypeIfcGuid: 0,
+        },
+        mappedColumns: summarizeMappedColumns(resolvedMap),
+        unmappedColumns: getUnmappedColumns(availableColumns, mappedColumns),
+        errors: [{
+          row: 1,
+          reason: 'No GlobalId (IfcGUID) or ElementId (ID) column found',
+          availableColumns,
+        }],
       })
     }
 
-    // Parse rows
-    const records = []
-    const errors = []
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]
-      // Try GlobalId first, fall back to generating a synthetic one from ElementId
-      let globalId = resolvedMap.globalId ? String(row[resolvedMap.globalId] || '').trim() : ''
-      const revitElementId = resolvedMap.revitElementId ? parseInt(row[resolvedMap.revitElementId], 10) : null
-      if (!globalId && revitElementId) {
-        // Use ElementId as synthetic GlobalId to allow matching
-        globalId = `REVIT_EID_${revitElementId}`
-      }
-      if (!globalId) {
-        errors.push({ row: i + 2, reason: 'Missing GlobalId and ElementId' })
-        continue
-      }
-
-      // Collect unmapped columns into custom_params
-      const customParams = {}
-      for (const col of availableCols) {
-        if (!mappedCols.has(col) && col !== resolvedMap.globalId && row[col] !== '' && row[col] !== undefined) {
-          customParams[col] = row[col]
-        }
-      }
-
-      const parseNum = (field) => {
-        if (!resolvedMap[field]) return null
-        const v = parseFloat(row[resolvedMap[field]])
-        return isNaN(v) ? null : v
-      }
-      const parseStr = (field) => {
-        if (!resolvedMap[field]) return null
-        const v = String(row[resolvedMap[field]] || '').trim()
-        return v || null
-      }
-
-      records.push({
-        project_id:       projectId,
-        global_id:        globalId,
-        revit_element_id: isNaN(revitElementId) ? null : revitElementId,
-        revit_unique_id:  parseStr('revitUniqueId'),
-        type_ifc_guid:    parseStr('typeIfcGuid'),
-        element_name:     parseStr('elementName'),
-        element_type:     parseStr('elementType'),
-        category:         parseStr('category'),
-        family:           parseStr('family'),
-        family_type:      parseStr('familyType'),
-        level:            parseStr('level'),
-        phase_created:    parseStr('phaseCreated'),
-        phase_demolished: parseStr('phaseDemolished'),
-        area:             parseNum('area'),
-        volume:           parseNum('volume'),
-        length:           parseNum('length'),
-        width:            parseNum('width'),
-        height:           parseNum('height'),
-        perimeter:        parseNum('perimeter'),
-        material:         parseStr('material'),
-        material_area:    parseNum('materialArea'),
-        material_volume:  parseNum('materialVolume'),
-        structural_usage: parseStr('structuralUsage'),
-        classification:   parseStr('classification'),
-        assembly_code:    parseStr('assemblyCode'),
-        mark:             parseStr('mark'),
-        comments:         parseStr('comments'),
-        custom_params:    Object.keys(customParams).length > 0 ? customParams : {},
-      })
-    }
+    const modelScope = normalizeModelScope(req.body, req.file)
+    const { records, errors: rowErrors } = mapRevitRowsToRecords(
+      rows,
+      availableColumns,
+      resolvedMap,
+      mappedColumns,
+      modelScope,
+    )
 
     if (records.length === 0) {
-      return res.status(400).json({ error: 'No valid records with GlobalId found', errors })
+      return res.status(422).json({
+        status: 'no_valid_rows',
+        insertedCount: 0,
+        parsedRows: rows.length,
+        validRows: 0,
+        errorCount: rowErrors.length,
+        coverage: buildUploadCoverage(records, rows.length),
+        mappedColumns: summarizeMappedColumns(resolvedMap),
+        unmappedColumns: getUnmappedColumns(availableColumns, mappedColumns),
+        errors: rowErrors,
+        projectId: modelScope.projectId,
+        modelVersion: modelScope.modelVersion,
+      })
     }
 
-    // Upsert to Supabase in batches
-    let insertedCount = 0
-    if (supabaseServer) {
-      const batchSize = 500
-      for (let i = 0; i < records.length; i += batchSize) {
-        const batch = records.slice(i, i + batchSize)
-        const { error: upsertError } = await supabaseServer
-          .from('ifc_element_properties')
-          .upsert(batch, { onConflict: 'project_id,global_id' })
-        if (upsertError) {
-          console.error('[Revit XLSX] Upsert error:', upsertError.message)
-          errors.push({ batch: Math.floor(i / batchSize), reason: upsertError.message })
-        } else {
-          insertedCount += batch.length
-        }
-      }
-    } else {
-      return res.status(503).json({ error: 'Supabase not configured — cannot store Revit properties' })
-    }
+    const upsertResult = await upsertRevitRecords(records, modelScope, {
+      sourceFile: modelScope.sourceFile,
+      sourceMode: 'manual_ifc_xlsx',
+      allowSupabase,
+    })
+    const dbErrors = upsertResult.errors || []
+    const allErrors = [...rowErrors, ...dbErrors]
+
+    await insertModelRun({
+      project_id: modelScope.projectId,
+      model_version: modelScope.modelVersion,
+      source_mode: 'manual_ifc_xlsx',
+      source_files: {
+        xlsx: modelScope.sourceFile,
+      },
+    })
 
     // Optionally forward to n8n for extra processing
     const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
@@ -1616,7 +2040,12 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
         const response = await fetch(n8nWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, recordCount: insertedCount, fileName: req.file.originalname }),
+          body: JSON.stringify({
+            projectId: modelScope.projectId,
+            modelVersion: modelScope.modelVersion,
+            recordCount: upsertResult.insertedCount,
+            fileName: req.file.originalname,
+          }),
         })
         console.log(`[Revit XLSX] n8n webhook responded: ${response.status}`)
       } catch (n8nErr) {
@@ -1624,21 +2053,41 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
       }
     }
 
-    // Cleanup uploaded file
-    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+    const statusCode = allErrors.length > 0 ? 207 : 200
+    const status = allErrors.length > 0 ? 'partial_success' : 'success'
 
-    console.log(`[Revit XLSX] Processed ${insertedCount} records from ${req.file.originalname}`)
+    console.log(`[Revit XLSX] ${status.toUpperCase()} ${upsertResult.insertedCount}/${rows.length} rows from ${req.file.originalname}`)
 
-    res.json({
-      count: insertedCount,
-      totalRows: rows.length,
-      errors: errors.length > 0 ? errors : undefined,
-      mappedColumns: Object.entries(resolvedMap).map(([field, col]) => `${field} ← "${col}"`),
-      unmappedColumns: availableCols.filter(c => !mappedCols.has(c) && c !== resolvedMap.globalId),
+    return res.status(statusCode).json({
+      status,
+      insertedCount: upsertResult.insertedCount,
+      parsedRows: rows.length,
+      validRows: records.length,
+      errorCount: allErrors.length,
+      coverage: buildUploadCoverage(records, rows.length),
+      mappedColumns: summarizeMappedColumns(resolvedMap),
+      unmappedColumns: getUnmappedColumns(availableColumns, mappedColumns),
+      errors: allErrors,
+      projectId: modelScope.projectId,
+      modelVersion: modelScope.modelVersion,
+      onConflict: upsertResult.onConflict,
+      persistence: upsertResult.persistence,
+      dbInsertedCount: upsertResult.dbInsertedCount,
+      runtimeStoredCount: upsertResult.runtimeStoredCount,
+      runtimeRevision: upsertResult.runtimeRevision,
+      supabaseEnabled: !!supabaseServer,
+      supabaseHealthy: !!allowSupabase,
+      preflight: preflight || undefined,
     })
   } catch (err) {
     console.error('[Revit XLSX] Error:', err)
-    res.status(500).json({ error: 'Failed to process Revit XLSX', message: err.message })
+    return res.status(500).json(errorPayload(
+      'UPLOAD_XLSX_FAILED',
+      'Failed to process Revit XLSX',
+      { message: err.message },
+    ))
+  } finally {
+    await safeUnlink(cleanupPath)
   }
 })
 
@@ -1647,24 +2096,27 @@ app.post('/api/revit/upload-xlsx', upload.single('file'), async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/revit/properties/:globalId', async (req, res) => {
   try {
-    if (!supabaseServer) {
-      return res.status(503).json({ error: 'Supabase not configured' })
-    }
     const { globalId } = req.params
-    const projectId = req.query.projectId || 'default'
+    const { projectId, modelVersion } = resolveScope(req.query, { projectId: 'default' })
 
-    const { data, error } = await supabaseServer
-      .from('ifc_element_properties')
-      .select('*')
-      .eq('global_id', globalId)
-      .eq('project_id', projectId)
-      .single()
+    const merged = await fetchMergedRevitRows({
+      projectId,
+      modelVersion,
+      globalIds: [globalId],
+      limit: 25,
+    })
 
-    if (error || !data) {
+    const hit = merged.rows.find((row) => row.global_id === globalId) || merged.rows[0]
+
+    if (!hit) {
       return res.status(404).json({ error: 'Element not found', globalId })
     }
 
-    res.json(data)
+    res.json({
+      ...hit,
+      source: merged.source,
+      runtimeRevision: merged.runtimeRevision,
+    })
   } catch (err) {
     console.error('[Revit Props] Error:', err)
     res.status(500).json({ error: 'Failed to fetch properties', message: err.message })
@@ -1676,47 +2128,38 @@ app.get('/api/revit/properties/:globalId', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.post('/api/revit/properties/bulk', async (req, res) => {
   try {
-    if (!supabaseServer) {
-      return res.status(503).json({ error: 'Supabase not configured' })
-    }
-    const { globalIds, elementIds, projectId = 'default' } = req.body
+    const { projectId, modelVersion } = resolveScope(req.body, { projectId: 'default' })
+    const requestedLimit = Number.parseInt(String(req.body?.limit || 1000), 10)
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 5000) : 1000
+    const globalIds = normalizeStringArray(req.body?.globalIds, limit)
+    const elementIds = normalizeNumberArray(req.body?.elementIds, limit)
 
-    const allResults = []
-
-    // Fetch by GlobalIds
-    if (Array.isArray(globalIds) && globalIds.length > 0) {
-      const { data, error } = await supabaseServer
-        .from('ifc_element_properties')
-        .select('*')
-        .eq('project_id', projectId)
-        .in('global_id', globalIds.slice(0, 1000))
-      if (!error && data) allResults.push(...data)
-    }
-
-    // Fetch by ElementIds (Revit ElementId / Tag)
-    if (Array.isArray(elementIds) && elementIds.length > 0) {
-      const { data, error } = await supabaseServer
-        .from('ifc_element_properties')
-        .select('*')
-        .eq('project_id', projectId)
-        .in('revit_element_id', elementIds.slice(0, 1000))
-      if (!error && data) {
-        // Deduplicate by id
-        const existingIds = new Set(allResults.map(r => r.id))
-        for (const row of data) {
-          if (!existingIds.has(row.id)) allResults.push(row)
-        }
-      }
-    }
-
-    if (allResults.length === 0 && !globalIds?.length && !elementIds?.length) {
+    if (globalIds.length === 0 && elementIds.length === 0) {
       return res.status(400).json({ error: 'globalIds or elementIds array is required' })
     }
 
+    const merged = await fetchMergedRevitRows({
+      projectId,
+      modelVersion,
+      globalIds,
+      elementIds,
+      limit,
+    })
+
     res.json({
-      results: allResults,
-      count: allResults.length,
-      requested: (globalIds?.length || 0) + (elementIds?.length || 0),
+      results: merged.rows,
+      count: merged.rows.length,
+      requested: {
+        globalIds: globalIds.length,
+        elementIds: elementIds.length,
+      },
+      unresolved: merged.unresolved,
+      projectId,
+      modelVersion,
+      limit,
+      source: merged.source,
+      runtimeRevision: merged.runtimeRevision,
+      warnings: merged.supabaseError ? [merged.supabaseError.message] : [],
     })
   } catch (err) {
     console.error('[Revit Props Bulk] Error:', err)
@@ -1725,75 +2168,303 @@ app.post('/api/revit/properties/bulk', async (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// 21. POST /api/revit/process-model — Unified .rvt upload (auto-convert + import)
+// 21. POST /api/revit/match-report — Multi-key match report (IFC + Revit rows)
+// ---------------------------------------------------------------------------
+app.post('/api/revit/match-report', async (req, res) => {
+  try {
+    const ifcElements = Array.isArray(req.body?.ifcElements) ? req.body.ifcElements : []
+    if (ifcElements.length === 0) {
+      return res.status(400).json(errorPayload(
+        'INVALID_PAYLOAD',
+        'ifcElements[] is required and must be non-empty',
+      ))
+    }
+
+    const { projectId, modelVersion } = resolveScope(req.body, { projectId: 'default' })
+    const merged = await fetchMergedRevitRows({
+      projectId,
+      modelVersion,
+      limit: 100000,
+    })
+
+    const report = buildMatchReport({
+      ifcElements,
+      revitRows: merged.rows,
+      matchThreshold: 0.85,
+      ambiguousThreshold: 0.65,
+    })
+
+    await saveMatchReport({
+      project_id: projectId,
+      model_version: modelVersion,
+      summary_json: {
+        totalIfcElements: report.totalIfcElements,
+        totalRevitRows: report.totalRevitRows,
+        totalMatched: report.totalMatched,
+        matchRate: report.matchRate,
+        matchedByKey: report.matchedByKey,
+        ambiguous: report.ambiguous.length,
+        missingInIfc: report.missingInIfc.length,
+        missingInRevit: report.missingInRevit.length,
+      },
+    })
+
+    return res.json({
+      projectId,
+      modelVersion,
+      source: merged.source,
+      matchRate: report.matchRate,
+      matchedByKey: report.matchedByKey,
+      ambiguous: report.ambiguous,
+      missingInIfc: report.missingInIfc,
+      missingInRevit: report.missingInRevit,
+      byCategory: report.byCategory,
+      diagnostics: report.diagnostics,
+      runtimeRevision: merged.runtimeRevision,
+      warnings: merged.supabaseError ? [merged.supabaseError.message] : [],
+      totals: {
+        totalIfcElements: report.totalIfcElements,
+        totalRevitRows: report.totalRevitRows,
+        totalMatched: report.totalMatched,
+      },
+    })
+  } catch (err) {
+    console.error('[Revit Match Report] Error:', err)
+    return res.status(500).json(errorPayload(
+      'MATCH_REPORT_FAILED',
+      'Failed to generate match report',
+      { message: err.message },
+    ))
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 22. POST /api/revit/process-model — Unified .rvt upload (auto-convert + import)
 // ---------------------------------------------------------------------------
 app.post('/api/revit/process-model', upload.single('file'), async (req, res) => {
+  const cleanupPath = req.file?.path
+  let outputDir = null
+
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' })
+      return res.status(400).json(errorPayload('NO_FILE', 'No file uploaded'))
     }
 
     const ext = path.extname(req.file.originalname).toLowerCase()
     if (ext !== '.rvt') {
-      return res.status(400).json({ error: 'Only .rvt files are accepted' })
+      return res.status(400).json(errorPayload('INVALID_FILE_TYPE', 'Only .rvt files are accepted'))
     }
 
-    const projectId = req.body.projectId || 'default'
-    const outputDir = path.join(UPLOADS_DIR, `rvt-${Date.now()}`)
-    await fs.mkdir(outputDir, { recursive: true })
-
-    // Run Revit converter (DDC converter produces .ifc + .xlsx + .dae)
+    const modelScope = normalizeModelScope(req.body, req.file)
     const converter = CONVERTER_PATHS.rvt
     const converterExe = path.join(converter.dir, converter.exe)
+    const converterAvailable = ENABLE_RVT_CONVERTER && existsSync(converterExe)
+    const requestedIfcSchema = String(req.body.ifcSchema || process.env.RVT_TARGET_IFC_SCHEMA || 'IFC4X3').trim().toUpperCase()
 
-    try {
-      await fs.access(converterExe)
-    } catch {
+    if (!converterAvailable) {
       return res.status(503).json({
-        error: 'Revit converter not available',
-        hint: 'RvtExporter.exe not found at expected path',
+        ...manualRvtFallback(modelScope.projectId, modelScope.modelVersion),
+        reason: !ENABLE_RVT_CONVERTER ? 'feature_flag_disabled' : 'converter_not_found',
+        converterPath: converterExe,
       })
     }
 
+    outputDir = path.join(UPLOADS_DIR, `rvt-${Date.now()}`)
+    await fs.mkdir(outputDir, { recursive: true })
+
     const { execSync } = await import('child_process')
-    const cmd = `"${converterExe}" "${req.file.path}" "${outputDir}"`
-    console.log(`[Revit Process] Running: ${cmd}`)
-    execSync(cmd, { timeout: 300000, stdio: 'pipe' })
+    const candidateCommands = [
+      {
+        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" --ifc-schema "${requestedIfcSchema}"`,
+        mode: 'flag',
+        ifcSchemaApplied: requestedIfcSchema,
+      },
+      {
+        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" "${requestedIfcSchema}"`,
+        mode: 'positional',
+        ifcSchemaApplied: requestedIfcSchema,
+      },
+      {
+        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}"`,
+        mode: 'default',
+        ifcSchemaApplied: 'converter-default',
+      },
+    ]
 
-    // Find generated files
-    const outputFiles = await fs.readdir(outputDir)
-    const ifcFile = outputFiles.find(f => f.endsWith('.ifc'))
-    const xlsxFile = outputFiles.find(f => f.endsWith('.xlsx'))
-
-    const result = {
-      ifcPath: ifcFile ? `/uploads/${path.basename(outputDir)}/${ifcFile}` : null,
-      xlsxResult: null,
-      outputFiles,
-    }
-
-    // Auto-process XLSX if found
-    if (xlsxFile && supabaseServer) {
+    let executed = null
+    let lastExecError = null
+    for (const candidate of candidateCommands) {
       try {
-        const XLSX = (await import('xlsx')).default
-        const xlsxPath = path.join(outputDir, xlsxFile)
-        const workbook = XLSX.readFile(xlsxPath)
-        const sheetName = workbook.SheetNames[0]
-        const sheet = workbook.Sheets[sheetName]
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-        result.xlsxResult = { rowCount: rows.length, fileName: xlsxFile }
-        console.log(`[Revit Process] Found ${rows.length} rows in ${xlsxFile}`)
-      } catch (xlsxErr) {
-        console.warn('[Revit Process] XLSX parsing failed:', xlsxErr.message)
+        console.log(`[Revit Process] Running: ${candidate.cmd}`)
+        execSync(candidate.cmd, { timeout: 300000, stdio: 'pipe' })
+        executed = candidate
+        break
+      } catch (execErr) {
+        lastExecError = execErr
+        console.warn(`[Revit Process] Command failed (${candidate.mode}), trying next fallback`)
       }
     }
 
-    // Cleanup source file
-    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+    if (!executed) {
+      throw lastExecError || new Error('Revit converter failed for all command variants')
+    }
 
-    res.json(result)
+    const outputFiles = await fs.readdir(outputDir)
+    const ifcFile = outputFiles.find((f) => f.toLowerCase().endsWith('.ifc'))
+    const xlsxFile = outputFiles.find((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
+    const daeFile = outputFiles.find((f) => f.toLowerCase().endsWith('.dae'))
+
+    const response = {
+      status: 'success',
+      projectId: modelScope.projectId,
+      modelVersion: modelScope.modelVersion,
+      mode: 'auto_rvt_converter',
+      outputs: {
+        ifcPath: ifcFile ? `/uploads/${path.basename(outputDir)}/${ifcFile}` : null,
+        xlsxPath: xlsxFile ? `/uploads/${path.basename(outputDir)}/${xlsxFile}` : null,
+        daePath: daeFile ? `/uploads/${path.basename(outputDir)}/${daeFile}` : null,
+        files: outputFiles,
+      },
+      xlsxImport: null,
+      matchSummary: null,
+      converter: {
+        ifcSchemaRequested: requestedIfcSchema,
+        ifcSchemaApplied: executed.ifcSchemaApplied,
+        mode: executed.mode,
+      },
+    }
+
+    const preflight = supabaseServer ? await dbPreflight() : null
+    const allowSupabase = !!supabaseServer && !!preflight?.available
+
+    if (xlsxFile) {
+      const xlsxPath = path.join(outputDir, xlsxFile)
+      const XLSX = (await import('xlsx')).default
+      const workbook = XLSX.readFile(xlsxPath)
+      const sheetName = workbook.SheetNames[0]
+      const sheet = workbook.Sheets[sheetName]
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      const availableColumns = Object.keys(rows[0] || {})
+      const { resolvedMap, mappedColumns } = resolveRevitColumns(availableColumns)
+
+      const { records, errors: rowErrors } = mapRevitRowsToRecords(
+        rows,
+        availableColumns,
+        resolvedMap,
+        mappedColumns,
+        {
+          projectId: modelScope.projectId,
+          modelVersion: modelScope.modelVersion,
+          sourceFile: xlsxFile,
+        },
+      )
+
+      const upsertResult = records.length > 0 ? await upsertRevitRecords(records, {
+        projectId: modelScope.projectId,
+        modelVersion: modelScope.modelVersion,
+        sourceFile: xlsxFile,
+      }, {
+        sourceFile: xlsxFile,
+        sourceMode: 'auto_rvt',
+        allowSupabase,
+      }) : {
+        insertedCount: 0,
+        errors: [{ reason: 'No valid rows in generated XLSX' }],
+        onConflict: null,
+        persistence: 'runtime',
+        dbInsertedCount: 0,
+        runtimeStoredCount: 0,
+        runtimeRevision: null,
+      }
+
+      const allErrors = [...rowErrors, ...(upsertResult.errors || [])]
+      response.xlsxImport = {
+        insertedCount: upsertResult.insertedCount,
+        parsedRows: rows.length,
+        validRows: records.length,
+        errorCount: allErrors.length,
+        coverage: buildUploadCoverage(records, rows.length),
+        mappedColumns: summarizeMappedColumns(resolvedMap),
+        unmappedColumns: getUnmappedColumns(availableColumns, mappedColumns),
+        errors: allErrors,
+        persistence: upsertResult.persistence,
+        dbInsertedCount: upsertResult.dbInsertedCount,
+        runtimeStoredCount: upsertResult.runtimeStoredCount,
+        runtimeRevision: upsertResult.runtimeRevision,
+        supabaseEnabled: !!supabaseServer,
+        supabaseHealthy: !!allowSupabase,
+        preflight: preflight || undefined,
+      }
+
+      await insertModelRun({
+        project_id: modelScope.projectId,
+        model_version: modelScope.modelVersion,
+        source_mode: 'auto_rvt',
+        source_files: {
+          rvt: req.file.originalname,
+          ifc: ifcFile || null,
+          xlsx: xlsxFile || null,
+          dae: daeFile || null,
+        },
+      })
+
+      // Lightweight IFC GlobalId extraction to provide match summary without IFC engine.
+      if (ifcFile && records.length > 0) {
+        try {
+          const ifcText = await fs.readFile(path.join(outputDir, ifcFile), 'utf8')
+          const regex = /#(\d+)\s*=\s*(IFC[A-Z0-9_]+)\s*\(\s*'([^']+)'/g
+          const ifcElements = []
+          let match
+          while ((match = regex.exec(ifcText)) !== null) {
+            ifcElements.push({
+              expressID: Number.parseInt(match[1], 10),
+              type: match[2],
+              globalId: match[3],
+              tag: null,
+              name: '',
+              properties: [],
+            })
+            if (ifcElements.length >= 50000) break
+          }
+
+          const report = buildMatchReport({
+            ifcElements,
+            revitRows: records,
+          })
+
+          response.matchSummary = {
+            totalIfcElements: report.totalIfcElements,
+            totalRevitRows: report.totalRevitRows,
+            totalMatched: report.totalMatched,
+            matchRate: report.matchRate,
+            matchedByKey: report.matchedByKey,
+            ambiguousCount: report.ambiguous.length,
+            missingInIfcCount: report.missingInIfc.length,
+            missingInRevitCount: report.missingInRevit.length,
+          }
+        } catch (ifcErr) {
+          response.matchSummary = {
+            status: 'unavailable',
+            reason: ifcErr.message,
+          }
+        }
+      }
+    }
+
+    return res.json(response)
   } catch (err) {
     console.error('[Revit Process] Error:', err)
-    res.status(500).json({ error: 'Failed to process Revit model', message: err.message })
+    return res.status(500).json(errorPayload(
+      'PROCESS_MODEL_FAILED',
+      'Failed to process Revit model',
+      { message: err.message },
+    ))
+  } finally {
+    await safeUnlink(cleanupPath)
+    // Keep output directory for downloadable artifacts in success flow.
+    if (!res.headersSent || res.statusCode >= 400) {
+      await safeRmDir(outputDir)
+    }
   }
 })
 
@@ -1945,6 +2616,7 @@ app.use((_req, res) => {
       'GET    /api/health',
       'POST   /api/revit/upload-xlsx',
       'POST   /api/revit/process-model',
+      'POST   /api/revit/match-report',
       'GET    /api/revit/properties/:globalId',
       'POST   /api/revit/properties/bulk',
       'GET    /api/n8n/health',

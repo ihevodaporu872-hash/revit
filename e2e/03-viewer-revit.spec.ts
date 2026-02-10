@@ -63,9 +63,18 @@ test.describe('Revit Integration - Layout Integrity', () => {
   })
 
   test('Upload IFC and Upload Revit buttons should be in same header row', async ({ page }) => {
-    const headerRow = page.locator('.flex.items-center.gap-4').first()
-    await expect(headerRow.getByText('Upload IFC')).toBeVisible()
-    await expect(headerRow.getByText('Upload Revit (.xlsx)')).toBeVisible()
+    const ifcBtn = page.getByTestId('upload-ifc-btn')
+    const xlsxBtn = page.getByTestId('upload-revit-xlsx-btn')
+    await expect(ifcBtn).toBeVisible()
+    await expect(xlsxBtn).toBeVisible()
+
+    const ifcBox = await ifcBtn.boundingBox()
+    const xlsxBox = await xlsxBtn.boundingBox()
+    expect(ifcBox).not.toBeNull()
+    expect(xlsxBox).not.toBeNull()
+    if (ifcBox && xlsxBox) {
+      expect(Math.abs(ifcBox.y - xlsxBox.y)).toBeLessThan(20)
+    }
   })
 
   test('Upload Revit button should be secondary variant', async ({ page }) => {

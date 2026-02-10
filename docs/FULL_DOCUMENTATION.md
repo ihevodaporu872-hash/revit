@@ -157,6 +157,7 @@ A Three.js-based 3D viewer for IFC building models. Renders models client-side u
 
 **Features:**
 - IFC file upload and client-side parsing
+- Revit `.rvt` upload with backend auto-conversion pipeline (`RVT -> IFC + XLSX + DAE`) when converter is available
 - Demo model loading (placeholder geometry)
 - Selection tree (project > site > building > storey > element hierarchy)
 - Element property panel with all IFC properties
@@ -448,6 +449,13 @@ All endpoints are served under the `/api` prefix. The Vite dev server proxies th
 | 15 | POST | `/api/qto/generate` | No | multipart/form-data: `file`, `format`, `groupBy` | Generate QTO report |
 | 16 | POST | `/api/ai/chat` | No | JSON: `message`, `context`, `history[]` | Conversational AI chat |
 | 17 | GET | `/api/health` | No | -- | System health and status |
+| 18 | POST | `/api/revit/upload-xlsx` | No | multipart/form-data: `file`, optional `projectId`, `modelVersion` | Parse Revit XLSX and upsert element properties |
+| 19 | GET | `/api/revit/properties/:globalId` | No | Query: `projectId`, `modelVersion` | Fetch single enriched element by GlobalId |
+| 20 | POST | `/api/revit/properties/bulk` | No | JSON: `globalIds[]`, `elementIds[]`, `projectId`, `modelVersion`, `limit` | Batch fetch enriched properties with unresolved list |
+| 21 | POST | `/api/revit/match-report` | No | JSON: `projectId`, `modelVersion`, `ifcElements[]` | Multi-key matching diagnostics and coverage summary |
+| 22 | POST | `/api/revit/process-model` | No | multipart/form-data: `.rvt`, optional `projectId`, `modelVersion` | RVT auto-convert (feature-flag) with structured fallback |
+
+`/api/revit/process-model` uses best-effort IFC schema request (`IFC4X3`) and falls back to converter defaults if specific schema flags are not supported by the installed converter executable.
 
 ### Response Formats
 
@@ -463,12 +471,14 @@ All endpoints are served under the `/api` prefix. The Vite dev server proxies th
 
 **HTTP Status Codes Used:**
 - `200` -- Success
+- `207` -- Partial success (imported with row-level errors)
 - `201` -- Created (task creation)
 - `400` -- Bad request (missing required fields, unsupported file type)
+- `422` -- Validation/parsing failed (no valid rows)
 - `404` -- Endpoint not found
 - `413` -- File too large (>500 MB)
 - `500` -- Internal server error
-- `503` -- AI features unavailable (no GOOGLE_API_KEY)
+- `503` -- Infrastructure unavailable (converter/DB/schema not ready)
 
 ### Health Endpoint Response
 
