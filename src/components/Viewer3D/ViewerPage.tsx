@@ -41,7 +41,7 @@ import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
 import { MotionPage } from '../MotionPage'
 import { IFCService } from './ifc/ifcService'
-import type { IFCSpatialNode, IFCModelStats, IFCElementInfo, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode, CoverageSummary } from './ifc/types'
+import type { IFCSpatialNode, IFCModelStats, IFCElementInfo, LoadingProgress, DrawingSettings, SavedViewpoint, ClipPlaneState, ClipBoxState, SectionMode, MeasureMode, CoverageSummary, SummaryGroupBy, SummaryData } from './ifc/types'
 import { useViewerHighlight } from './useViewerHighlight'
 import { useSearchSets } from './useSearchSets'
 import { SearchSetsPanel } from './SearchSetsPanel'
@@ -66,6 +66,9 @@ import { useElementMatcher } from './useElementMatcher'
 import { MatchingReport } from './MatchingReport'
 import { useWireframe } from './useWireframe'
 import { ColorPickerPopover } from './ColorPickerPopover'
+import { usePropertiesSummary } from './usePropertiesSummary'
+import { PropertiesSummaryPanel } from './PropertiesSummaryPanel'
+import { useOutlineHighlight } from './useOutlineHighlight'
 import { uploadRevitXlsx, processRevitModel } from '../../services/revit-api'
 import type { RevitProcessModelResponse } from '../../services/revit-api'
 import { RevitUploadModal } from './RevitUploadModal'
@@ -101,7 +104,7 @@ interface TreeNode {
 }
 
 type ToolMode = 'select' | 'pan' | 'rotate' | 'zoom' | 'measure' | 'section'
-type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler' | 'models'
+type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler' | 'models' | 'summary'
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -111,6 +114,7 @@ export default function ViewerPage() {
     savedSets, activeDisplay, selectedElementIds, setSelectedElementIds,
     setActiveDisplay, addToSelection, addViewpoint, activeProfile, setActiveProfile,
     customColors, setCustomColor, clearCustomColor,
+    highlightedSummaryGroup, setHighlightedSummaryGroup,
   } = useViewerStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -197,6 +201,12 @@ export default function ViewerPage() {
     setRevitScopeState(scope)
     revitEnrichment.setScope(scope)
   }, [revitEnrichment])
+
+  // Summary state
+  const [summaryGroupBy, setSummaryGroupBy] = useState<SummaryGroupBy>('type')
+  const [summaryData, setSummaryData] = useState<SummaryData | null>(null)
+  const propertiesSummary = usePropertiesSummary()
+  const outlineHighlight = useOutlineHighlight()
 
   // Matching state
   const [showMatchReport, setShowMatchReport] = useState(false)
@@ -362,6 +372,18 @@ export default function ViewerPage() {
       measureTool.clearAllMeasurements()
     }
   }, [initScene]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update outline resolution on resize
+  useEffect(() => {
+    const handleOutlineResize = () => {
+      const container = containerRef.current
+      if (container) {
+        outlineHighlight.updateResolution(container.clientWidth, container.clientHeight)
+      }
+    }
+    window.addEventListener('resize', handleOutlineResize)
+    return () => window.removeEventListener('resize', handleOutlineResize)
+  }, [outlineHighlight])
 
   useEffect(() => {
     revitEnrichment.setScope(revitScope)
@@ -644,6 +666,15 @@ export default function ViewerPage() {
 
         addNotification('success', `Model loaded: ${result.stats.totalElements} elements`)
 
+        // Auto-scan summary in background
+        const svc = ifcServiceRef.current
+        if (svc) {
+          propertiesSummary.scanElements(svc).then(() => {
+            const data = propertiesSummary.buildSummary(summaryGroupBy)
+            setSummaryData(data)
+          })
+        }
+
         // Prefetch Revit enrichment data for all GlobalIds + ElementIds in this model
         const service = ifcServiceRef.current
         if (service) {
@@ -682,7 +713,7 @@ export default function ViewerPage() {
         addNotification('error', `Failed to load IFC: ${err instanceof Error ? err.message : 'Unknown error'}`)
       }
     },
-    [addNotification, fitToModel, sectionPlanes, revitEnrichment, revitScope, elementMatcher],
+    [addNotification, fitToModel, sectionPlanes, revitEnrichment, revitScope, elementMatcher, propertiesSummary, summaryGroupBy],
   )
 
   // ── RVT Upload (auto-convert RVT -> IFC/XLSX/DAE) ───────────────────────
@@ -1036,6 +1067,44 @@ export default function ViewerPage() {
     }
   }, [elementMatcher.matchResult, addNotification])
 
+  // ── Summary handlers ────────────────────────────────────
+
+  const handleSummaryScan = useCallback(async () => {
+    const service = ifcServiceRef.current
+    if (!service) return
+    await propertiesSummary.scanElements(service)
+    const data = propertiesSummary.buildSummary(summaryGroupBy)
+    setSummaryData(data)
+  }, [propertiesSummary, summaryGroupBy])
+
+  const handleSummaryGroupByChange = useCallback((g: SummaryGroupBy) => {
+    setSummaryGroupBy(g)
+    if (propertiesSummary.hasData()) {
+      const data = propertiesSummary.buildSummary(g)
+      setSummaryData(data)
+    }
+  }, [propertiesSummary])
+
+  const handleSummaryHighlight = useCallback((expressIDs: number[]) => {
+    const service = ifcServiceRef.current
+    const scene = sceneRef.current
+    const renderer = rendererRef.current
+    if (!service || !scene || !renderer) return
+
+    // Find group key by matching expressIDs
+    const group = summaryData?.groups.find((g) =>
+      g.expressIDs.length === expressIDs.length && g.expressIDs[0] === expressIDs[0]
+    )
+    setHighlightedSummaryGroup(group?.key ?? null)
+    outlineHighlight.highlightGroup(expressIDs, service, scene, renderer)
+  }, [summaryData, setHighlightedSummaryGroup, outlineHighlight])
+
+  const handleSummaryClearHighlight = useCallback(() => {
+    const scene = sceneRef.current
+    if (scene) outlineHighlight.clearHighlight(scene)
+    setHighlightedSummaryGroup(null)
+  }, [outlineHighlight, setHighlightedSummaryGroup])
+
   // ── Tool handlers ───────────────────────────────────────
 
   const handleToolClick = (tool: ToolMode) => {
@@ -1277,6 +1346,7 @@ export default function ViewerPage() {
     { id: 'sets', icon: <Bookmark size={14} />, label: 'Sets' },
     { id: 'viewpoints', icon: <Camera size={14} />, label: 'Views' },
     { id: 'profiler', icon: <Palette size={14} />, label: 'Profiler' },
+    { id: 'summary', icon: <FileSpreadsheet size={14} />, label: 'Сводка' },
     { id: 'models', icon: <Box size={14} />, label: 'Models' },
   ]
 
@@ -1431,6 +1501,19 @@ export default function ViewerPage() {
                     onClear={handleClearProfile}
                     isProcessing={isProfilerProcessing}
                   />
+                ) : leftTab === 'summary' ? (
+                  <PropertiesSummaryPanel
+                    summary={summaryData}
+                    groupBy={summaryGroupBy}
+                    onGroupByChange={handleSummaryGroupByChange}
+                    onScan={handleSummaryScan}
+                    onHighlightGroup={handleSummaryHighlight}
+                    onClearHighlight={handleSummaryClearHighlight}
+                    activeGroupKey={highlightedSummaryGroup}
+                    scanProgress={propertiesSummary.scanProgress}
+                    isScanning={propertiesSummary.isScanning}
+                    scannedCount={propertiesSummary.scannedCount}
+                  />
                 ) : (
                   /* Models tab */
                   <div className="flex-1 overflow-y-auto py-2">
@@ -1466,6 +1549,10 @@ export default function ViewerPage() {
                                     setTreeData([])
                                     setModelFile(null)
                                     setModelStats(null)
+                                    setSummaryData(null)
+                                    propertiesSummary.clear()
+                                    outlineHighlight.clearHighlight(scene)
+                                    setHighlightedSummaryGroup(null)
                                     if (modelGroupRef.current) {
                                       scene.remove(modelGroupRef.current)
                                       modelGroupRef.current = null
