@@ -10,7 +10,7 @@ import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { exec } from 'child_process'
+import { exec, spawn } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs/promises'
@@ -181,6 +181,34 @@ const ENABLE_RVT_CONVERTER = ['0', 'false', 'no', 'off'].includes(rvConverterFla
 
 const REQUIRED_SUPABASE_TABLES = ['ifc_element_properties']
 const OPTIONAL_SUPABASE_TABLES = ['model_runs', 'match_reports', 'match_overrides']
+
+// ---------------------------------------------------------------------------
+// RVT Async Job Store (in-memory)
+// ---------------------------------------------------------------------------
+
+const rvtJobs = new Map()
+const MAX_CONCURRENT_RVT = 3
+let activeRvtCount = 0
+
+function purgeOldJobs() {
+  const TTL = 30 * 60 * 1000
+  const now = Date.now()
+  for (const [id, job] of rvtJobs.entries()) {
+    if (now - job.startTime > TTL && (job.status === 'complete' || job.status === 'error')) {
+      rvtJobs.delete(id)
+    }
+  }
+}
+setInterval(purgeOldJobs, 5 * 60 * 1000)
+
+function broadcastSSE(job, event, data) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+  for (const client of job.sseClients) {
+    try {
+      client.write(payload)
+    } catch { /* client disconnected */ }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // CWICR Data (Cost Work Items, Costs, Resources)
@@ -2605,6 +2633,347 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
       await safeRmDir(outputDir)
     }
   }
+})
+
+// ---------------------------------------------------------------------------
+// 22a. POST /api/revit/process-model-async — Async RVT conversion with SSE
+// ---------------------------------------------------------------------------
+app.post('/api/revit/process-model-async', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json(errorPayload('NO_FILE', 'No file uploaded'))
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase()
+    if (ext !== '.rvt') {
+      await safeUnlink(req.file.path)
+      return res.status(400).json(errorPayload('INVALID_FILE_TYPE', 'Only .rvt files are accepted'))
+    }
+
+    if (activeRvtCount >= MAX_CONCURRENT_RVT) {
+      await safeUnlink(req.file.path)
+      return res.status(429).json(errorPayload('TOO_MANY_JOBS', `Max ${MAX_CONCURRENT_RVT} concurrent conversions`))
+    }
+
+    const modelScope = normalizeModelScope(req.body, req.file)
+    const converter = CONVERTER_PATHS.rvt
+    const converterExe = path.join(converter.dir, converter.exe)
+    const converterAvailable = ENABLE_RVT_CONVERTER && existsSync(converterExe)
+
+    if (!converterAvailable) {
+      await safeUnlink(req.file.path)
+      return res.status(503).json({
+        ...manualRvtFallback(modelScope.projectId, modelScope.modelVersion),
+        reason: !ENABLE_RVT_CONVERTER ? 'feature_flag_disabled' : 'converter_not_found',
+        converterPath: converterExe,
+      })
+    }
+
+    const jobId = `rvt-${Date.now()}`
+    const outputDir = path.join(UPLOADS_DIR, jobId)
+    await fs.mkdir(outputDir, { recursive: true })
+
+    const requestedIfcSchema = String(req.body.ifcSchema || process.env.RVT_TARGET_IFC_SCHEMA || 'IFC4X3').trim().toUpperCase()
+
+    const job = {
+      status: 'converting',
+      outputDir,
+      result: null,
+      error: null,
+      startTime: Date.now(),
+      sseClients: [],
+      ifcReady: false,
+      xlsxReady: false,
+      daeReady: false,
+      modelScope,
+      requestedIfcSchema,
+      filePath: req.file.path,
+      originalName: req.file.originalname,
+    }
+    rvtJobs.set(jobId, job)
+    activeRvtCount++
+
+    // Return immediately with 202
+    res.status(202).json({ jobId, outputDir: path.basename(outputDir) })
+
+    // Start async conversion
+    const candidateCommands = [
+      {
+        args: [req.file.path, outputDir, '--ifc-schema', requestedIfcSchema],
+        mode: 'flag',
+        ifcSchemaApplied: requestedIfcSchema,
+      },
+      {
+        args: [req.file.path, outputDir, requestedIfcSchema],
+        mode: 'positional',
+        ifcSchemaApplied: requestedIfcSchema,
+      },
+      {
+        args: [req.file.path, outputDir],
+        mode: 'default',
+        ifcSchemaApplied: 'converter-default',
+      },
+    ]
+
+    // File watcher interval
+    const watcher = setInterval(() => {
+      try {
+        const files = require('fs').readdirSync(outputDir)
+        const newIfc = files.some((f) => f.toLowerCase().endsWith('.ifc'))
+        const newXlsx = files.some((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
+        const newDae = files.some((f) => f.toLowerCase().endsWith('.dae'))
+
+        if (newIfc !== job.ifcReady || newXlsx !== job.xlsxReady || newDae !== job.daeReady) {
+          job.ifcReady = newIfc
+          job.xlsxReady = newXlsx
+          job.daeReady = newDae
+          broadcastSSE(job, 'progress', {
+            ifc: job.ifcReady,
+            xlsx: job.xlsxReady,
+            dae: job.daeReady,
+            elapsedMs: Date.now() - job.startTime,
+          })
+        }
+      } catch { /* outputDir not ready yet */ }
+    }, 500)
+
+    // Try each command variant
+    async function runConversion() {
+      let executed = null
+      let lastError = null
+
+      for (const candidate of candidateCommands) {
+        try {
+          await new Promise((resolve, reject) => {
+            console.log(`[Revit Async] Running: "${converterExe}" ${candidate.args.join(' ')}`)
+            const proc = spawn(converterExe, candidate.args, { stdio: 'pipe', timeout: 300000 })
+            let stderr = ''
+            proc.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+            proc.on('close', (code) => {
+              if (code === 0) resolve(undefined)
+              else reject(new Error(`Exit code ${code}: ${stderr.slice(0, 500)}`))
+            })
+            proc.on('error', reject)
+          })
+          executed = candidate
+          break
+        } catch (err) {
+          lastError = err
+          console.warn(`[Revit Async] Command failed (${candidate.mode}), trying next`)
+        }
+      }
+
+      clearInterval(watcher)
+
+      if (!executed) {
+        job.status = 'error'
+        job.error = lastError?.message || 'All converter variants failed'
+        activeRvtCount--
+        broadcastSSE(job, 'error', { code: 'CONVERTER_FAILED', message: job.error })
+        await safeUnlink(req.file.path)
+        return
+      }
+
+      // Final file check
+      const outputFiles = await fs.readdir(outputDir)
+      const ifcFile = outputFiles.find((f) => f.toLowerCase().endsWith('.ifc'))
+      const xlsxFile = outputFiles.find((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
+      const daeFile = outputFiles.find((f) => f.toLowerCase().endsWith('.dae'))
+
+      job.ifcReady = !!ifcFile
+      job.xlsxReady = !!xlsxFile
+      job.daeReady = !!daeFile
+
+      broadcastSSE(job, 'progress', {
+        ifc: job.ifcReady,
+        xlsx: job.xlsxReady,
+        dae: job.daeReady,
+        elapsedMs: Date.now() - job.startTime,
+      })
+
+      const response = {
+        status: 'success',
+        projectId: modelScope.projectId,
+        modelVersion: modelScope.modelVersion,
+        mode: 'auto_rvt_converter',
+        outputs: {
+          ifcPath: ifcFile ? `/uploads/${jobId}/${ifcFile}` : null,
+          xlsxPath: xlsxFile ? `/uploads/${jobId}/${xlsxFile}` : null,
+          daePath: daeFile ? `/uploads/${jobId}/${daeFile}` : null,
+          files: outputFiles,
+        },
+        xlsxImport: null,
+        matchSummary: null,
+        converter: {
+          ifcSchemaRequested: requestedIfcSchema,
+          ifcSchemaApplied: executed.ifcSchemaApplied,
+          mode: executed.mode,
+        },
+      }
+
+      // Process XLSX if available
+      const preflight = supabaseServer ? await dbPreflight() : null
+      const allowSupabase = !!supabaseServer && !!preflight?.available
+
+      if (xlsxFile) {
+        try {
+          const xlsxPath = path.join(outputDir, xlsxFile)
+          const XLSX = (await import('xlsx')).default
+          const workbook = XLSX.readFile(xlsxPath)
+          const sheetName = workbook.SheetNames[0]
+          const sheet = workbook.Sheets[sheetName]
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+          const availableColumns = Object.keys(rows[0] || {})
+          const { resolvedMap, mappedColumns } = resolveRevitColumns(availableColumns)
+
+          const { records, errors: rowErrors } = mapRevitRowsToRecords(
+            rows, availableColumns, resolvedMap, mappedColumns,
+            { projectId: modelScope.projectId, modelVersion: modelScope.modelVersion, sourceFile: xlsxFile },
+          )
+
+          const upsertResult = records.length > 0 ? await upsertRevitRecords(records, {
+            projectId: modelScope.projectId,
+            modelVersion: modelScope.modelVersion,
+            sourceFile: xlsxFile,
+          }, { sourceFile: xlsxFile, sourceMode: 'auto_rvt', allowSupabase }) : {
+            insertedCount: 0, errors: [{ reason: 'No valid rows in generated XLSX' }],
+            onConflict: null, persistence: 'runtime', dbInsertedCount: 0, runtimeStoredCount: 0, runtimeRevision: null,
+          }
+
+          const allErrors = [...rowErrors, ...(upsertResult.errors || [])]
+          response.xlsxImport = {
+            insertedCount: upsertResult.insertedCount,
+            parsedRows: rows.length,
+            validRows: records.length,
+            errorCount: allErrors.length,
+            coverage: buildUploadCoverage(records, rows.length),
+          }
+
+          broadcastSSE(job, 'xlsx_import', {
+            insertedCount: upsertResult.insertedCount,
+            parsedRows: rows.length,
+            validRows: records.length,
+            coverage: buildUploadCoverage(records, rows.length),
+          })
+
+          await insertModelRun({
+            project_id: modelScope.projectId,
+            model_version: modelScope.modelVersion,
+            source_mode: 'auto_rvt_async',
+            source_files: { rvt: job.originalName, ifc: ifcFile || null, xlsx: xlsxFile || null, dae: daeFile || null },
+          })
+
+          // IFC matching
+          if (ifcFile && records.length > 0) {
+            try {
+              const ifcText = await fs.readFile(path.join(outputDir, ifcFile), 'utf8')
+              const regex = /#(\d+)\s*=\s*(IFC[A-Z0-9_]+)\s*\(\s*'([^']+)'/g
+              const ifcElements = []
+              let m
+              while ((m = regex.exec(ifcText)) !== null) {
+                ifcElements.push({ expressID: Number.parseInt(m[1], 10), type: m[2], globalId: m[3], tag: null, name: '', properties: [] })
+                if (ifcElements.length >= 50000) break
+              }
+
+              const report = buildMatchReport({ ifcElements, revitRows: records })
+              response.matchSummary = {
+                totalIfcElements: report.totalIfcElements,
+                totalRevitRows: report.totalRevitRows,
+                totalMatched: report.totalMatched,
+                matchRate: report.matchRate,
+                matchedByKey: report.matchedByKey,
+                ambiguousCount: report.ambiguous.length,
+                missingInIfcCount: report.missingInIfc.length,
+                missingInRevitCount: report.missingInRevit.length,
+              }
+
+              broadcastSSE(job, 'match_summary', {
+                totalMatched: report.totalMatched,
+                totalIfcElements: report.totalIfcElements,
+                matchRate: report.matchRate,
+              })
+            } catch (ifcErr) {
+              response.matchSummary = { status: 'unavailable', reason: ifcErr.message }
+            }
+          }
+        } catch (xlsxErr) {
+          console.error('[Revit Async] XLSX processing error:', xlsxErr)
+        }
+      }
+
+      job.status = 'complete'
+      job.result = response
+      activeRvtCount--
+      broadcastSSE(job, 'complete', response)
+      await safeUnlink(req.file.path)
+    }
+
+    runConversion().catch((err) => {
+      clearInterval(watcher)
+      job.status = 'error'
+      job.error = err.message
+      activeRvtCount--
+      broadcastSSE(job, 'error', { code: 'UNEXPECTED', message: err.message })
+      safeUnlink(req.file.path).catch(() => {})
+    })
+  } catch (err) {
+    console.error('[Revit Async] Error:', err)
+    return res.status(500).json(errorPayload('ASYNC_PROCESS_FAILED', 'Failed to start async processing', { message: err.message }))
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 22b. GET /api/revit/process-status-stream/:jobId — SSE progress stream
+// ---------------------------------------------------------------------------
+app.get('/api/revit/process-status-stream/:jobId', (req, res) => {
+  const { jobId } = req.params
+  const job = rvtJobs.get(jobId)
+
+  if (!job) {
+    return res.status(404).json(errorPayload('JOB_NOT_FOUND', `Job ${jobId} not found`))
+  }
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+
+  // Send current state immediately
+  res.write(`event: progress\ndata: ${JSON.stringify({
+    ifc: job.ifcReady,
+    xlsx: job.xlsxReady,
+    dae: job.daeReady,
+    elapsedMs: Date.now() - job.startTime,
+  })}\n\n`)
+
+  if (job.status === 'complete' && job.result) {
+    res.write(`event: complete\ndata: ${JSON.stringify(job.result)}\n\n`)
+    res.end()
+    return
+  }
+
+  if (job.status === 'error') {
+    res.write(`event: error\ndata: ${JSON.stringify({ code: 'JOB_FAILED', message: job.error })}\n\n`)
+    res.end()
+    return
+  }
+
+  // Register as SSE client
+  job.sseClients.push(res)
+
+  // Keep-alive
+  const keepAlive = setInterval(() => {
+    try { res.write(': keepalive\n\n') } catch { clearInterval(keepAlive) }
+  }, 15000)
+
+  req.on('close', () => {
+    clearInterval(keepAlive)
+    const idx = job.sseClients.indexOf(res)
+    if (idx !== -1) job.sseClients.splice(idx, 1)
+  })
 })
 
 // ---------------------------------------------------------------------------

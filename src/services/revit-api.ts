@@ -169,6 +169,116 @@ export async function processRevitModel(formData: FormData): Promise<RevitProces
   return json as RevitProcessModelResponse
 }
 
+// ── Async RVT Processing (SSE-based) ──────────────────────────────────
+
+export interface AsyncRevitStartResponse {
+  jobId: string
+  outputDir: string
+}
+
+export interface RevitSSEProgress {
+  ifc: boolean
+  xlsx: boolean
+  dae: boolean
+  elapsedMs: number
+}
+
+export interface RevitSSEXlsxImport {
+  insertedCount: number
+  parsedRows: number
+  validRows: number
+  coverage: CoverageSummary
+}
+
+export interface RevitSSEMatchSummary {
+  totalMatched: number
+  totalIfcElements: number
+  matchRate: number
+}
+
+export function startRevitProcessing(
+  formData: FormData,
+  onUploadProgress?: (percent: number) => void,
+): Promise<AsyncRevitStartResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE}/revit/process-model-async`)
+
+    if (onUploadProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onUploadProgress(Math.round((e.loaded / e.total) * 100))
+        }
+      }
+    }
+
+    xhr.onload = () => {
+      try {
+        const json = JSON.parse(xhr.responseText)
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(json as AsyncRevitStartResponse)
+        } else {
+          reject(new Error(json?.error || json?.message || `Request failed with status ${xhr.status}`))
+        }
+      } catch {
+        reject(new Error(`Failed to parse response (status ${xhr.status})`))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.ontimeout = () => reject(new Error('Upload timed out'))
+    xhr.timeout = 600000 // 10 min
+
+    xhr.send(formData)
+  })
+}
+
+export interface RevitSSECallbacks {
+  onProgress?: (data: RevitSSEProgress) => void
+  onXlsxImport?: (data: RevitSSEXlsxImport) => void
+  onMatchSummary?: (data: RevitSSEMatchSummary) => void
+  onComplete?: (data: RevitProcessModelResponse) => void
+  onError?: (data: { code: string; message: string }) => void
+}
+
+export function subscribeToProcessingProgress(
+  jobId: string,
+  callbacks: RevitSSECallbacks,
+): () => void {
+  const url = `${API_BASE}/revit/process-status-stream/${encodeURIComponent(jobId)}`
+  const es = new EventSource(url)
+
+  es.addEventListener('progress', (e) => {
+    callbacks.onProgress?.(JSON.parse((e as MessageEvent).data))
+  })
+
+  es.addEventListener('xlsx_import', (e) => {
+    callbacks.onXlsxImport?.(JSON.parse((e as MessageEvent).data))
+  })
+
+  es.addEventListener('match_summary', (e) => {
+    callbacks.onMatchSummary?.(JSON.parse((e as MessageEvent).data))
+  })
+
+  es.addEventListener('complete', (e) => {
+    callbacks.onComplete?.(JSON.parse((e as MessageEvent).data))
+    es.close()
+  })
+
+  es.addEventListener('error', (e) => {
+    if ((e as MessageEvent).data) {
+      try {
+        callbacks.onError?.(JSON.parse((e as MessageEvent).data))
+      } catch {
+        callbacks.onError?.({ code: 'SSE_ERROR', message: 'Connection lost' })
+      }
+    }
+    es.close()
+  })
+
+  return () => es.close()
+}
+
 export async function fetchRevitPropertiesBulk(params: {
   globalIds?: string[]
   elementIds?: number[]

@@ -191,6 +191,20 @@ export interface CoverageSummary {
   withTypeIfcGuid: number
 }
 
+// ── Revit Processing Job (async conversion) ─────────────
+
+export interface RevitProcessingJob {
+  jobId: string
+  phase: 'uploading' | 'converting' | 'importing' | 'loading' | 'complete' | 'error'
+  uploadPercent: number
+  ifcReady: boolean
+  xlsxReady: boolean
+  daeReady: boolean
+  elapsedMs: number
+  result: import('../../../services/revit-api').RevitProcessModelResponse | null
+  error: string | null
+}
+
 // ── Appearance Profiler ──────────────────────────────────────────────
 
 export interface ProfileLegendEntry {
