@@ -1229,6 +1229,133 @@ Respond in JSON format as an array of objects with fields: elementName, cwicrCod
 })
 
 // ---------------------------------------------------------------------------
+// 4b. POST /api/cost/classify-vor  — VOR (Bill of Quantities) Excel upload
+// ---------------------------------------------------------------------------
+app.post('/api/cost/classify-vor', upload.single('file'), async (req, res) => {
+  try {
+    if (!requireGemini(res)) return
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Excel file is required' })
+    }
+
+    const language = (req.body.language || 'en').toLowerCase()
+    const langConfig = CWICR_LANGUAGE_MAP[language]
+    const cityContext = langConfig ? langConfig.city : 'Toronto'
+
+    // 1. Parse uploaded Excel
+    const XLSX = (await import('xlsx')).default
+    const workbook = XLSX.readFile(req.file.path)
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rawRows.length === 0) {
+      return res.status(400).json({ error: 'Excel file is empty or has no data rows' })
+    }
+
+    // 2. Auto-detect columns from headers
+    const headers = Object.keys(rawRows[0])
+    const findCol = (patterns) => headers.find(h => {
+      const lower = h.toLowerCase()
+      return patterns.some(p => lower.includes(p))
+    })
+
+    const nameCol = findCol(['наименование', 'name', 'описание', 'description', 'работа', 'item', 'позиция', 'material'])
+    const unitCol = findCol(['ед', 'unit', 'единица', 'изм'])
+    const qtyCol = findCol(['кол', 'объём', 'объем', 'qty', 'quantity', 'volume', 'amount', 'количество'])
+    const codeCol = findCol(['код', 'code', 'номер', 'number', 'шифр', '#', 'п/п', 'no'])
+
+    if (!nameCol) {
+      return res.status(400).json({
+        error: 'Cannot detect name column in Excel. Expected header containing: наименование, name, описание, description',
+        detectedHeaders: headers,
+      })
+    }
+
+    // 3. Map rows
+    const vorRows = rawRows
+      .map(row => ({
+        originalName: String(row[nameCol] || '').trim(),
+        unit: unitCol ? String(row[unitCol] || '').trim() : '',
+        quantity: qtyCol ? (parseFloat(row[qtyCol]) || 0) : 0,
+        code: codeCol ? String(row[codeCol] || '').trim() : '',
+      }))
+      .filter(r => r.originalName.length > 0)
+
+    if (vorRows.length === 0) {
+      return res.status(400).json({ error: 'No valid rows found after parsing (all name fields empty)' })
+    }
+
+    console.log(`[VOR Classify] Parsed ${vorRows.length} rows from ${req.file.originalname}, nameCol="${nameCol}", unitCol="${unitCol}", qtyCol="${qtyCol}"`)
+
+    // 4. Send to Gemini in batches
+    const BATCH_SIZE = 25
+    const allClassifications = []
+
+    for (let i = 0; i < vorRows.length; i += BATCH_SIZE) {
+      const batch = vorRows.slice(i, i + BATCH_SIZE)
+      const batchItems = batch.map((r, idx) => ({
+        index: i + idx,
+        name: r.originalName,
+        unit: r.unit,
+        quantity: r.quantity,
+        code: r.code,
+      }))
+
+      const prompt = `You are a construction cost classification expert using the DDC CWICR (Construction Work Items, Costs and Resources) database.
+
+Classify the following construction work items from a Bill of Quantities (ВОР / BOQ) into CWICR categories.
+For each item provide a JSON object with fields:
+- originalName: the original item name (as given)
+- cwicrCode: the best matching CWICR code (e.g. "03 30 00", "09 29 10")
+- matchedDescription: a standard CWICR work item description in the same language as the input
+- unit: the unit of measurement (m2, m3, kg, m, each, etc.)
+- unitCostMin: minimum estimated unit cost in local currency for ${cityContext}
+- unitCostMax: maximum estimated unit cost in local currency for ${cityContext}
+- confidence: your confidence in the match from 0 to 1
+
+Items to classify:
+${JSON.stringify(batchItems, null, 2)}
+
+Respond ONLY with a JSON array of objects, no markdown formatting, no explanation.`
+
+      try {
+        const result = await geminiModel.generateContent(prompt)
+        const responseText = result.response.text()
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          // Merge quantity from original rows
+          const merged = parsed.map((item, idx) => ({
+            ...item,
+            quantity: batch[idx]?.quantity || item.quantity || 0,
+          }))
+          allClassifications.push(...merged)
+        }
+      } catch (batchErr) {
+        console.error(`[VOR Classify] Batch ${i}-${i + BATCH_SIZE} failed:`, batchErr.message)
+      }
+    }
+
+    // 5. Cleanup uploaded file
+    try { await fs.unlink(req.file.path) } catch { /* ignore */ }
+
+    res.json({
+      rows: vorRows,
+      classifications: allClassifications,
+      summary: {
+        totalRows: vorRows.length,
+        classifiedRows: allClassifications.length,
+      },
+    })
+  } catch (err) {
+    console.error('[VOR Classify] Error:', err)
+    res.status(500).json({ error: 'VOR classification failed', message: err.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // 5. POST /api/cost/calculate
 // ---------------------------------------------------------------------------
 app.post('/api/cost/calculate', (req, res) => {
@@ -1438,6 +1565,84 @@ app.post('/api/validation/run', async (req, res) => {
 // ---------------------------------------------------------------------------
 // 7. POST /api/ai/analyze
 // ---------------------------------------------------------------------------
+
+// -- Helpers: parse and validate structured Gemini response --
+
+function parseStructuredResponse(text, fileName) {
+  // Level 1: direct JSON parse
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === 'object') return validateAnalysisResponse(parsed, fileName)
+  } catch { /* not raw JSON */ }
+
+  // Level 2: extract JSON from ```json ... ``` code block
+  const jsonBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
+  if (jsonBlockMatch) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1].trim())
+      if (parsed && typeof parsed === 'object') return validateAnalysisResponse(parsed, fileName)
+    } catch { /* malformed JSON in block */ }
+  }
+
+  // Level 3: fallback — build structured response from plain text
+  return buildFallbackResponse(text, fileName)
+}
+
+function validateAnalysisResponse(parsed, fileName) {
+  const explanation = parsed.explanation || parsed.analysis || parsed.summary || 'Анализ завершён.'
+  const code = parsed.code || null
+
+  let results = null
+  if (parsed.results && typeof parsed.results === 'object') {
+    results = {
+      type: parsed.results.type || 'mixed',
+      tableData: parsed.results.tableData || null,
+      stats: Array.isArray(parsed.results.stats) ? parsed.results.stats : null,
+      chartBars: Array.isArray(parsed.results.chartBars) ? parsed.results.chartBars : null,
+      summary: parsed.results.summary || null,
+    }
+    // Ensure tableData has proper structure
+    if (results.tableData) {
+      if (!Array.isArray(results.tableData.headers)) results.tableData = null
+      else if (!Array.isArray(results.tableData.rows)) results.tableData.rows = []
+    }
+    // Ensure chartBars have color
+    if (results.chartBars) {
+      const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4']
+      results.chartBars = results.chartBars.map((bar, i) => ({
+        label: String(bar.label || `Item ${i + 1}`),
+        value: Number(bar.value) || 0,
+        color: bar.color || colors[i % colors.length],
+      }))
+    }
+    // Ensure stats have label/value strings
+    if (results.stats) {
+      results.stats = results.stats.map(s => ({
+        label: String(s.label || ''),
+        value: String(s.value || ''),
+        ...(s.change !== undefined ? { change: Number(s.change) } : {}),
+      }))
+    }
+  }
+
+  return { explanation, code, results }
+}
+
+function buildFallbackResponse(text, fileName) {
+  // Extract code block from plain text
+  let code = null
+  const codeMatch = text.match(/```(?:python|javascript|js|py)?\s*\n?([\s\S]*?)```/)
+  if (codeMatch) {
+    code = codeMatch[1].trim()
+  }
+
+  // Remove code blocks from explanation
+  let explanation = text.replace(/```[\s\S]*?```/g, '').trim()
+  if (!explanation) explanation = 'Анализ завершён.'
+
+  return { explanation, code, results: null }
+}
+
 app.post('/api/ai/analyze', upload.single('file'), async (req, res) => {
   try {
     if (!requireGemini(res)) return
@@ -1448,7 +1653,22 @@ app.post('/api/ai/analyze', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Analysis prompt is required' })
     }
 
+    // Parse conversation history from formData
+    let chatHistory = []
+    if (req.body.history) {
+      try {
+        const parsed = JSON.parse(req.body.history)
+        if (Array.isArray(parsed)) {
+          chatHistory = parsed.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }],
+          }))
+        }
+      } catch { /* ignore invalid history */ }
+    }
+
     let dataContext = ''
+    const fileName = req.file?.originalname || 'data'
 
     if (req.file) {
       const ext = path.extname(req.file.originalname).toLowerCase()
@@ -1461,9 +1681,8 @@ app.post('/api/ai/analyze', upload.single('file'), async (req, res) => {
           const sheet = workbook.Sheets[sheetName]
           const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-          // Send first 100 rows as context (to fit within token limits)
           const sampleRows = rows.slice(0, 100)
-          dataContext = `\n\nExcel Data (${rows.length} total rows, showing first ${sampleRows.length}):\nColumns: ${Object.keys(sampleRows[0] || {}).join(', ')}\n\nData:\n${JSON.stringify(sampleRows, null, 2)}`
+          dataContext = `\n\nExcel Data from "${fileName}" (${rows.length} total rows, showing first ${sampleRows.length}):\nColumns: ${Object.keys(sampleRows[0] || {}).join(', ')}\n\nData:\n${JSON.stringify(sampleRows, null, 2)}`
         } catch (xlsErr) {
           dataContext = `\n\n[Failed to parse Excel file: ${xlsErr.message}]`
         }
@@ -1475,15 +1694,46 @@ app.post('/api/ai/analyze', upload.single('file'), async (req, res) => {
 
     const systemPrompt = `You are Jens AI, an expert construction data analyst. You help construction professionals analyze BIM data, cost estimates, schedules, and project information.
 
-When asked to generate code, produce clean, well-commented JavaScript/Python that can process the provided data. Always explain your analysis approach before showing code.
+IMPORTANT: You MUST respond with valid JSON only. No text before or after the JSON. Use this exact structure:
+{
+  "explanation": "Your analysis explanation in Russian (2-4 sentences)",
+  "code": "Python code that performs the analysis (as a string, use \\n for newlines)",
+  "results": {
+    "type": "mixed",
+    "tableData": { "headers": ["Col1", "Col2"], "rows": [["val1", "val2"]] },
+    "stats": [{ "label": "Metric name", "value": "Metric value" }],
+    "chartBars": [{ "label": "Category", "value": 123, "color": "#3b82f6" }],
+    "summary": "Brief summary of findings in Russian"
+  }
+}
 
-User request: ${prompt}${dataContext}`
+Rules:
+- "explanation" is required, in Russian
+- "code" should be Python (pandas) that analyzes the data
+- "results.tableData" — include if the analysis produces tabular output
+- "results.stats" — include 3-6 key metrics
+- "results.chartBars" — include if data can be visualized as bars (max 8 bars)
+- "results.summary" — 1-2 sentence summary in Russian
+- All text output should be in Russian`
 
-    const result = await geminiModel.generateContent(systemPrompt)
+    const chat = geminiModel.startChat({
+      history: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'model', parts: [{ text: '{"explanation":"Понял. Я Jens AI, готов анализировать данные и возвращать структурированные результаты в формате JSON.","code":null,"results":null}' }] },
+        ...chatHistory,
+      ],
+    })
+
+    const userMessage = `${prompt}${dataContext}`
+    const result = await chat.sendMessage(userMessage)
     const responseText = result.response.text()
 
+    const structured = parseStructuredResponse(responseText, fileName)
+
     res.json({
-      analysis: responseText,
+      explanation: structured.explanation,
+      code: structured.code,
+      results: structured.results,
       hasFileContext: !!req.file,
       fileName: req.file?.originalname || null,
       analyzedAt: new Date().toISOString(),

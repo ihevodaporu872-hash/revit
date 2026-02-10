@@ -317,12 +317,62 @@ export default function AIAnalysisPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [analysesRun, setAnalysesRun] = useState(47)
-  const [avgResponse] = useState('2.3s')
-  const [filesProcessed] = useState(31)
-  const [chartsGenerated] = useState(18)
+  // Persistent stats backed by localStorage
+  const [analysesRun, setAnalysesRun] = useState(() => {
+    const saved = localStorage.getItem('jens_ai_analyses_run')
+    return saved ? parseInt(saved, 10) : 0
+  })
+  const [avgResponseMs, setAvgResponseMs] = useState(() => {
+    const saved = localStorage.getItem('jens_ai_avg_response_ms')
+    return saved ? parseFloat(saved) : 0
+  })
+  const [filesProcessed, setFilesProcessed] = useState(() => {
+    const saved = localStorage.getItem('jens_ai_files_processed')
+    return saved ? parseInt(saved, 10) : 0
+  })
+  const [chartsGenerated, setChartsGenerated] = useState(() => {
+    const saved = localStorage.getItem('jens_ai_charts_generated')
+    return saved ? parseInt(saved, 10) : 0
+  })
+  const [trackedFileNames, setTrackedFileNames] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('jens_ai_tracked_files')
+    return saved ? new Set(JSON.parse(saved)) : new Set()
+  })
 
   const [chatSessionId, setChatSessionId] = useState<string | null>(null)
+
+  // Persist stats to localStorage
+  const trackAnalysis = useCallback((responseTimeMs: number, fileName: string, hasChart: boolean, isDemo: boolean) => {
+    if (isDemo) return // Don't count demo responses in stats
+    setAnalysesRun(prev => {
+      const next = prev + 1
+      localStorage.setItem('jens_ai_analyses_run', String(next))
+      return next
+    })
+    setAvgResponseMs(prev => {
+      const count = analysesRun || 1
+      const next = Math.round((prev * count + responseTimeMs) / (count + 1))
+      localStorage.setItem('jens_ai_avg_response_ms', String(next))
+      return next
+    })
+    setTrackedFileNames(prev => {
+      if (!prev.has(fileName)) {
+        const next = new Set(prev).add(fileName)
+        localStorage.setItem('jens_ai_tracked_files', JSON.stringify([...next]))
+        setFilesProcessed(next.size)
+        localStorage.setItem('jens_ai_files_processed', String(next.size))
+        return next
+      }
+      return prev
+    })
+    if (hasChart) {
+      setChartsGenerated(prev => {
+        const next = prev + 1
+        localStorage.setItem('jens_ai_charts_generated', String(next))
+        return next
+      })
+    }
+  }, [analysesRun])
 
   // Auto-scroll chat
   useEffect(() => {
@@ -345,9 +395,13 @@ export default function AIAnalysisPage() {
     setMessages((prev) => [...prev, userMsg])
     setInputValue('')
     setLoading(true)
+    const startTime = Date.now()
 
     try {
-      // Real API call pattern
+      // Real API call
+      let usedMock = false
+      let aiMsg: ChatMessage | null = null
+
       try {
         const formData = new FormData()
         formData.append('file', files[0])
@@ -357,41 +411,38 @@ export default function AIAnalysisPage() {
         const res = await fetch('/api/ai/analyze', { method: 'POST', body: formData })
         if (res.ok) {
           const data = await res.json()
-          const aiMsg: ChatMessage = {
+          const elapsed = Date.now() - startTime
+          aiMsg = {
             id: `ai-${Date.now()}`,
             role: 'ai',
-            content: data.explanation || data.content,
+            content: data.explanation || data.analysis || 'Анализ завершён.',
             timestamp: Date.now(),
-            code: data.code,
-            results: data.results,
+            code: data.code || undefined,
+            results: data.results || undefined,
           }
-          setMessages((prev) => [...prev, aiMsg])
-          // Persist chat session to Supabase
-          saveChatSession({
-            id: chatSessionId || undefined,
-            title: files[0]?.name || 'AI Analysis',
-            fileName: files[0]?.name,
-            messages: [...messages, userMsg, aiMsg].map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
-          }).then((saved) => { if (saved?.id) setChatSessionId(saved.id) }).catch(() => {})
-          setAnalysesRun((prev) => prev + 1)
-          return
+          trackAnalysis(elapsed, files[0].name, !!(data.results?.chartBars), false)
         }
       } catch {
-        // API not available, use mock
+        // API not available, fall through to mock
       }
 
-      // Fallback: mock response
-      await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000))
-      const mock = generateMockResponse(text, files[0].name)
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        role: 'ai',
-        content: mock.results.summary || 'Анализ завершён. Ниже результаты:',
-        timestamp: Date.now(),
-        code: mock.code,
-        results: mock.results,
+      // Fallback: mock response with [Demo] indication
+      if (!aiMsg) {
+        usedMock = true
+        await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000))
+        const mock = generateMockResponse(text, files[0].name)
+        aiMsg = {
+          id: `ai-${Date.now()}`,
+          role: 'ai',
+          content: `[Demo] ${mock.results.summary || 'Анализ завершён. Ниже результаты:'}`,
+          timestamp: Date.now(),
+          code: mock.code,
+          results: mock.results,
+        }
+        addNotification('warning', 'Сервер AI недоступен — показаны демо-данные.')
       }
-      setMessages((prev) => [...prev, aiMsg])
+
+      setMessages((prev) => [...prev, aiMsg!])
       // Persist chat session to Supabase
       saveChatSession({
         id: chatSessionId || undefined,
@@ -399,13 +450,12 @@ export default function AIAnalysisPage() {
         fileName: files[0]?.name,
         messages: [...messages, userMsg, aiMsg].map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
       }).then((saved) => { if (saved?.id) setChatSessionId(saved.id) }).catch(() => {})
-      setAnalysesRun((prev) => prev + 1)
     } catch (err) {
       addNotification('error', `Ошибка анализа: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
     }
-  }, [files, messages, addNotification])
+  }, [files, messages, addNotification, chatSessionId, trackAnalysis])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
