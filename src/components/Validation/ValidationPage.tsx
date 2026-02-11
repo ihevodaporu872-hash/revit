@@ -25,7 +25,6 @@ import { useAppStore } from '../../store/appStore'
 import { MotionPage } from '../MotionPage'
 import { staggerContainer, fadeInUp, scaleIn, cardHover, listItem } from '../../lib/animations'
 import { saveValidationResult } from '../../services/supabase-api'
-import N8nModuleStatus from '../shared/N8nModuleStatus'
 
 // ---- Types ----
 
@@ -367,7 +366,6 @@ ${report.issues.map((i) => `<tr><td><span class="badge badge-${i.severity}">${i.
                 <ShieldCheck size={28} className="text-primary" />
                 Валидация BIM
               </h1>
-              <N8nModuleStatus module="validation" />
             </div>
             <p className="text-muted-foreground mt-1">
               Проверка IFC-моделей на соответствие отраслевым и проектным стандартам

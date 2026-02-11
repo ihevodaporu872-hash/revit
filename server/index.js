@@ -3873,6 +3873,58 @@ app.get('/api/cost/estimates', async (_req, res) => {
 })
 
 // ---------------------------------------------------------------------------
+// 23b. GET /api/engines/status — Native engines dashboard
+// ---------------------------------------------------------------------------
+
+app.get('/api/engines/status', (_req, res) => {
+  const converterStatus = converterAvailability()
+  const converterCount = Object.values(converterStatus).filter(c => c.available).length
+
+  let cwicrLanguageCount = 0
+  let cwicrCachedRows = 0
+  for (const [lang, config] of Object.entries(CWICR_LANGUAGE_MAP)) {
+    cwicrLanguageCount++
+    cwicrCachedRows += cwicrCache[lang]?.length || 0
+  }
+
+  const sheetsConfigured = !!(process.env.GOOGLE_SHEETS_ID)
+
+  res.json({
+    platform: 'Jens Construction Platform',
+    status: 'ok',
+    engines: {
+      cwicr: {
+        name: 'CWICR Vector Search',
+        status: cwicrLanguageCount > 0 ? 'online' : 'offline',
+        details: { languageCount: cwicrLanguageCount, cachedRows: cwicrCachedRows },
+      },
+      costEstimation: {
+        name: 'Cost Estimation',
+        status: geminiModel ? 'online' : 'degraded',
+        details: { geminiAvailable: !!geminiModel },
+      },
+      cadPipeline: {
+        name: 'CAD/BIM Pipeline',
+        status: converterCount > 0 ? 'online' : 'degraded',
+        details: { converterCount, converters: converterStatus },
+      },
+      sheetsSync: {
+        name: 'Google Sheets Sync',
+        status: sheetsConfigured && sheetsSync ? 'online' : 'offline',
+        details: { configured: sheetsConfigured },
+      },
+    },
+    telegram: {
+      configured: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+      botUsername: '@jenssssssssss_bot',
+    },
+    gemini: {
+      available: !!geminiModel,
+    },
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 24. Telegram Webhook Endpoint (native, replaces n8n bot)
 // ---------------------------------------------------------------------------
 
@@ -3894,6 +3946,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
       message = `💰 *Новая смета*\n\nОбъект: ${payload.projectName || '—'}\nСумма: ${payload.totalCost || '—'}\nЯзык: ${payload.language || 'EN'}`
     } else if (type === 'field_report') {
       message = `📸 *Полевой отчёт*\n\n${payload.description || ''}\n📍 ${payload.location || '—'}`
+    } else if (type === 'test') {
+      message = `🧪 *Тестовое сообщение*\n\n${payload.message || 'Проверка связи с Jens Platform'}`
     } else {
       message = `🔔 *Уведомление*\n\n${JSON.stringify(payload, null, 2)}`
     }

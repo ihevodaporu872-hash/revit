@@ -5,7 +5,7 @@ import { defaultTransition, layoutIndicator, sidebarLabelVariants } from '../../
 import {
   ArrowLeftRight, FileType, Box, DollarSign, ShieldCheck,
   BrainCircuit, FolderKanban, FileText, BarChart3,
-  ChevronLeft, ChevronRight, Workflow, PanelLeftClose,
+  ChevronLeft, ChevronRight, Cog, PanelLeftClose,
   FileImage, Table,
 } from 'lucide-react'
 
@@ -21,7 +21,7 @@ const modules = [
   { id: 'project', path: '/project', label: 'Управление проектом', icon: FolderKanban },
   { id: 'documents', path: '/documents', label: 'Документы', icon: FileText },
   { id: 'qto', path: '/qto', label: 'Отчёты QTO', icon: BarChart3 },
-  { id: 'n8n', path: '/n8n', label: 'Рабочие процессы n8n', icon: Workflow },
+  { id: 'engines', path: '/engines', label: 'Автоматизация', icon: Cog },
 ] as const
 
 export default function Sidebar() {

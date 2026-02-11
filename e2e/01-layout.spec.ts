@@ -27,7 +27,7 @@ test.describe('Layout & Navigation', () => {
         'Project Mgmt',
         'Documents',
         'QTO Reports',
-        'n8n Workflows',
+        'Automation',
       ]
       for (const mod of modules) {
         await expect(page.getByText(mod, { exact: true })).toBeVisible()
@@ -311,9 +311,9 @@ test.describe('Layout & Navigation', () => {
       await page.waitForURL(/\/qto/)
       await expect(page.locator('header h1')).toHaveText('QTO Reports')
 
-      await page.getByText('n8n Workflows', { exact: true }).click()
-      await page.waitForURL(/\/n8n/)
-      await expect(page.locator('header h1')).toHaveText('n8n Workflows')
+      await page.getByText('Automation', { exact: true }).click()
+      await page.waitForURL(/\/engines/)
+      await expect(page.locator('header h1')).toHaveText('Automation')
     })
 
     test('should redirect root path to /converter', async ({ page }) => {

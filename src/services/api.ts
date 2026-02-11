@@ -485,80 +485,37 @@ export async function askGemini(prompt: string, context?: string): Promise<strin
   return data.reply
 }
 
-// ─── n8n Integration ─────────────────────────────────────────────────────────
+// ─── Engines & Telegram ──────────────────────────────────────────────────────
 
-export interface N8nWorkflow {
-  id: string
+export interface EngineInfo {
   name: string
-  active: boolean
-  createdAt: string
-  updatedAt: string
-  tags: string[]
+  status: 'online' | 'degraded' | 'offline'
+  details: Record<string, unknown>
 }
 
-export interface N8nExecution {
-  id: string
-  workflowId: string
-  workflowName: string | null
+export interface EnginesStatusResponse {
+  platform: string
   status: string
-  startedAt: string
-  stoppedAt: string | null
-  mode: string
+  engines: {
+    cwicr: EngineInfo
+    costEstimation: EngineInfo
+    cadPipeline: EngineInfo
+    sheetsSync: EngineInfo
+  }
+  telegram: { configured: boolean; botUsername: string }
+  gemini: { available: boolean }
 }
 
-export interface N8nWorkflowTrigger {
-  nodeId: string | null
-  nodeName: string | null
-  nodeType: string | null
-  triggerType: 'webhook' | 'form' | 'telegram' | 'schedule' | 'manual' | 'chat'
-  method: string | null
-  path: string | null
-  endpointPath: string | null
-  webhookId: string | null
-  disabled: boolean
+export async function getEnginesStatus(): Promise<EnginesStatusResponse> {
+  const response = await fetch(`${API_BASE}/engines/status`)
+  return handleResponse<EnginesStatusResponse>(response)
 }
 
-export interface N8nWorkflowTriggerMap {
-  workflowId: string
-  workflowName: string
-  active: boolean
-  updatedAt: string
-  triggers: N8nWorkflowTrigger[]
-}
-
-export async function getN8nHealth(): Promise<{ online: boolean; url: string }> {
-  const response = await fetch(`${API_BASE}/n8n/health`)
-  return handleResponse<{ online: boolean; url: string }>(response)
-}
-
-export async function getN8nWorkflows(): Promise<N8nWorkflow[]> {
-  const response = await fetch(`${API_BASE}/n8n/workflows`)
-  return handleResponse<N8nWorkflow[]>(response)
-}
-
-export async function getN8nExecutions(workflowId?: string, limit = 20): Promise<N8nExecution[]> {
-  let url = `${API_BASE}/n8n/executions?limit=${limit}`
-  if (workflowId) url += `&workflowId=${workflowId}`
-  const response = await fetch(url)
-  return handleResponse<N8nExecution[]>(response)
-}
-
-export async function getN8nWorkflowTriggers(): Promise<N8nWorkflowTriggerMap[]> {
-  const response = await fetch(`${API_BASE}/n8n/workflow-triggers`)
-  return handleResponse<N8nWorkflowTriggerMap[]>(response)
-}
-
-export async function getN8nExecutionStatus(executionId: string): Promise<N8nExecution> {
-  const response = await fetch(`${API_BASE}/n8n/status/${encodeURIComponent(executionId)}`)
-  return handleResponse<N8nExecution>(response)
-}
-
-export async function triggerN8nWorkflow(webhookPath: string, data: Record<string, unknown> = {}): Promise<unknown> {
-  const payload = { ...data, webhookPath }
-  const response = await fetch(`${API_BASE}/n8n/trigger`, {
+export async function sendTelegramTest(message: string): Promise<{ ok: boolean }> {
+  const response = await fetch(`${API_BASE}/telegram/webhook`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ type: 'test', message }),
   })
-  return handleResponse<unknown>(response)
+  return handleResponse<{ ok: boolean }>(response)
 }
