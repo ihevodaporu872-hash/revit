@@ -9,6 +9,9 @@ import TelegramBot from 'node-telegram-bot-api'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs/promises'
+import { createClient } from '@supabase/supabase-js'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -24,6 +27,26 @@ const BACKEND_URL = `http://localhost:${process.env.PORT || 3001}`
 const N8N_URL = process.env.N8N_URL || 'http://localhost:5678'
 
 const bot = new TelegramBot(TOKEN, { polling: true })
+const PROJECT_ROOT = path.resolve(__dirname, '..')
+
+// ─── Supabase Client ──────────────────────────────────────────────────────
+let supabase = null
+if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+  console.log('[TgBot] Supabase client initialized')
+} else {
+  console.warn('[TgBot] WARNING: Supabase credentials not set — message storage disabled')
+}
+
+// ─── Gemini AI ────────────────────────────────────────────────────────────
+let geminiModel = null
+if (process.env.GOOGLE_API_KEY) {
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  console.log('[TgBot] Gemini AI initialized (gemini-2.0-flash)')
+} else {
+  console.warn('[TgBot] WARNING: GOOGLE_API_KEY not set — /tovbin disabled')
+}
 
 console.log('='.repeat(50))
 console.log('  Jens Platform — Telegram Bot')
@@ -51,6 +74,81 @@ function send(chatId, text) {
   return bot.sendMessage(chatId, text, { parse_mode: 'HTML' })
 }
 
+function escapeHtml(str) {
+  if (!str) return ''
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// ─── Message Storage ──────────────────────────────────────────────────────
+
+async function ensureChatExists(chat) {
+  if (!supabase) return
+  try {
+    await supabase.from('telegram_chats').upsert({
+      id: chat.id,
+      chat_type: chat.type,
+      title: chat.title || null,
+      username: chat.username || null,
+      first_name: chat.first_name || null,
+      last_name: chat.last_name || null,
+    }, { onConflict: 'id', ignoreDuplicates: false })
+  } catch (err) {
+    console.error('[TgBot] ensureChatExists error:', err.message)
+  }
+}
+
+async function saveMessage(msg, messageType, extra = {}) {
+  if (!supabase) return
+  try {
+    await ensureChatExists(msg.chat)
+
+    const row = {
+      telegram_message_id: msg.message_id,
+      chat_id: msg.chat.id,
+      from_user_id: msg.from?.id || null,
+      from_username: msg.from?.username || null,
+      from_first_name: msg.from?.first_name || null,
+      message_type: messageType,
+      text_content: extra.text_content || msg.text || msg.caption || null,
+      file_path: extra.file_path || null,
+      file_name: extra.file_name || null,
+      file_size: extra.file_size || null,
+      mime_type: extra.mime_type || null,
+      telegram_file_id: extra.telegram_file_id || null,
+      reply_to_message_id: msg.reply_to_message?.message_id || null,
+      forward_from: msg.forward_from ? (msg.forward_from.username || msg.forward_from.first_name) : null,
+      telegram_date: new Date(msg.date * 1000).toISOString(),
+    }
+
+    await supabase.from('telegram_messages').upsert(row, {
+      onConflict: 'chat_id,telegram_message_id',
+      ignoreDuplicates: false,
+    })
+
+    // Update chat last_message_at
+    await supabase.from('telegram_chats').update({
+      last_message_at: row.telegram_date,
+    }).eq('id', msg.chat.id)
+  } catch (err) {
+    console.error('[TgBot] saveMessage error:', err.message)
+  }
+}
+
+async function downloadAndSave(msg, fileId, subdir) {
+  try {
+    const chatDir = path.join(PROJECT_ROOT, 'uploads', 'telegram', String(msg.chat.id), subdir)
+    await fs.mkdir(chatDir, { recursive: true })
+
+    const filePath = await bot.downloadFile(fileId, chatDir)
+    // filePath is absolute path returned by the library
+    const relativePath = path.relative(PROJECT_ROOT, filePath)
+    return relativePath
+  } catch (err) {
+    console.error('[TgBot] downloadAndSave error:', err.message)
+    return null
+  }
+}
+
 // ─── /start ──────────────────────────────────────────────────────────────────
 
 bot.onText(/\/start/, (msg) => {
@@ -73,6 +171,9 @@ I'm your construction management assistant. Here's what I can do:
 \u{1F504} <b>CAD Conversion</b>
 /convert \u2014 CAD file conversion info
 
+\u{1F50D} <b>AI Search</b>
+/tovbin &lt;question&gt; \u2014 Search chat history with AI
+
 Type /help to see all commands.`)
 })
 
@@ -89,9 +190,11 @@ bot.onText(/\/help/, (msg) => {
 /tasks \u2014 View project tasks
 /convert \u2014 CAD conversion info
 /health \u2014 System health check
+/tovbin &lt;question&gt; \u2014 AI search in chat history
 
 <b>Examples:</b>
 \u2022 <code>/estimate reinforced concrete foundation</code>
+\u2022 <code>/tovbin what did we discuss about concrete?</code>
 \u2022 <code>/tasks</code>
 \u2022 <code>/workflows</code>
 
@@ -374,37 +477,254 @@ bot.onText(/\/health/, async (msg) => {
   send(chatId, text)
 })
 
-// ─── Free text (no command) ──────────────────────────────────────────────────
+// ─── /tovbin — AI search in chat history ─────────────────────────────────────
 
-bot.on('message', (msg) => {
-  if (msg.text && msg.text.startsWith('/')) return
+bot.onText(/\/tovbin(.*)/, async (msg, match) => {
   const chatId = msg.chat.id
+  const rawQuestion = (match[1] || '').trim()
 
-  if (msg.text) {
-    const short = msg.text.length > 30 ? msg.text.slice(0, 30) + '...' : msg.text
-    send(chatId, `I received your message. Here's what I can help with:
+  if (!rawQuestion) {
+    send(chatId, `<b>AI Chat Search</b> \u{1F50D}
 
-\u{1F4B0} Cost estimate: <code>/estimate ${short}</code>
-\u{1F4CA} Platform status: /status
-\u{1F4CB} Tasks: /tasks
-\u{1F4D6} All commands: /help`)
+Search through chat history using AI:
+
+<code>/tovbin what did we discuss about concrete?</code>
+<code>/tovbin who sent photos last week?</code>
+<code>/tovbin find messages about budget</code>
+
+In private chats you can search across all chats:
+<code>/tovbin in Project Chat: deadline info</code>`)
+    return
   }
 
-  if (msg.document) {
-    const fileName = msg.document.file_name || 'file'
-    const ext = fileName.split('.').pop().toLowerCase()
-    const cadExts = ['rvt', 'ifc', 'dwg', 'dgn', 'dxf']
+  if (!supabase || !geminiModel) {
+    send(chatId, '\u274C AI search is not configured (Supabase or Gemini missing).')
+    return
+  }
 
-    if (cadExts.includes(ext)) {
-      send(chatId, `\u{1F4C2} <b>CAD file detected:</b> <code>${fileName}</code>
+  bot.sendChatAction(chatId, 'typing')
 
-File conversion through Telegram is coming soon!
-For now, use the web interface:
+  try {
+    // Parse "in <chat_name>: <question>" for cross-chat search in private chats
+    let searchChatId = chatId
+    let question = rawQuestion
+    const isPrivate = msg.chat.type === 'private'
 
-\u{1F310} http://localhost:5173/converter
-
-Upload your .${ext} file there for conversion.`)
+    if (isPrivate) {
+      const inMatch = rawQuestion.match(/^in\s+(.+?):\s*(.+)$/i)
+      if (inMatch) {
+        const chatName = inMatch[1].trim()
+        question = inMatch[2].trim()
+        // Find chat by title or username
+        const { data: foundChats } = await supabase
+          .from('telegram_chats')
+          .select('id, title, username')
+          .or(`title.ilike.%${chatName}%,username.ilike.%${chatName}%`)
+          .limit(1)
+        if (foundChats && foundChats.length > 0) {
+          searchChatId = foundChats[0].id
+        } else {
+          send(chatId, `\u274C Chat "${escapeHtml(chatName)}" not found in history.`)
+          return
+        }
+      }
     }
+
+    // Extract keywords for search (words > 2 chars)
+    const keywords = question
+      .replace(/[^\w\u0400-\u04FF\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 2)
+
+    // Keyword search
+    let keywordMessages = []
+    if (keywords.length > 0) {
+      const orFilter = keywords.map(k => `text_content.ilike.%${k}%`).join(',')
+      const { data } = await supabase
+        .from('telegram_messages')
+        .select('*')
+        .eq('chat_id', searchChatId)
+        .or(orFilter)
+        .order('telegram_date', { ascending: false })
+        .limit(100)
+      keywordMessages = data || []
+    }
+
+    // Recent messages
+    const { data: recentMessages } = await supabase
+      .from('telegram_messages')
+      .select('*')
+      .eq('chat_id', searchChatId)
+      .order('telegram_date', { ascending: false })
+      .limit(200)
+
+    // Deduplicate and sort by date
+    const seen = new Set()
+    const allMessages = []
+    for (const m of [...keywordMessages, ...(recentMessages || [])]) {
+      const key = `${m.chat_id}_${m.telegram_message_id}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        allMessages.push(m)
+      }
+    }
+    allMessages.sort((a, b) => new Date(a.telegram_date) - new Date(b.telegram_date))
+
+    if (allMessages.length === 0) {
+      send(chatId, '\u{1F4ED} No messages found in this chat history yet.')
+      return
+    }
+
+    // Build context (limit to 80000 chars)
+    let context = ''
+    for (const m of allMessages) {
+      const date = new Date(m.telegram_date).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })
+      const sender = m.from_first_name || m.from_username || 'Unknown'
+      let line = `[${date}] ${sender}`
+      if (m.message_type !== 'text') line += ` [${m.message_type}]`
+      if (m.file_name) line += ` (${m.file_name})`
+      if (m.text_content) line += `: ${m.text_content}`
+      context += line + '\n'
+      if (context.length > 80000) break
+    }
+
+    // Send to Gemini
+    const prompt = `You are an assistant that answers questions based on Telegram chat history.
+Here is the chat history (${allMessages.length} messages):
+
+${context}
+
+User's question: ${question}
+
+Answer the question based ONLY on the chat history above. If the answer is not in the history, say so.
+Answer in the same language as the question. Be concise and specific, referencing dates and senders when relevant.`
+
+    const result = await geminiModel.generateContent(prompt)
+    const answer = result.response.text()
+
+    // Escape HTML in the answer
+    const safeAnswer = escapeHtml(answer)
+
+    send(chatId, `<b>AI Search Results</b> \u{1F50D}
+
+<b>Q:</b> ${escapeHtml(question)}
+
+${safeAnswer}
+
+<i>\u{1F4CA} Analyzed ${allMessages.length} messages</i>`)
+  } catch (err) {
+    console.error('[TgBot] /tovbin error:', err.message)
+    send(chatId, `\u274C Search error: ${escapeHtml(err.message)}`)
+  }
+})
+
+// ─── Message handler — save ALL messages ─────────────────────────────────────
+
+bot.on('message', async (msg) => {
+  // Skip commands (handled by onText)
+  if (msg.text && msg.text.startsWith('/')) return
+
+  const chatId = msg.chat.id
+  const isPrivate = msg.chat.type === 'private'
+
+  try {
+    // Determine message type and process accordingly
+    if (msg.photo && msg.photo.length > 0) {
+      const photo = msg.photo[msg.photo.length - 1] // largest size
+      const filePath = await downloadAndSave(msg, photo.file_id, 'photos')
+      await saveMessage(msg, 'photo', {
+        text_content: msg.caption || null,
+        telegram_file_id: photo.file_id,
+        file_size: photo.file_size,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, '\u{1F4F8} Photo saved.')
+
+    } else if (msg.document) {
+      const doc = msg.document
+      const filePath = await downloadAndSave(msg, doc.file_id, 'documents')
+      await saveMessage(msg, 'document', {
+        text_content: msg.caption || null,
+        telegram_file_id: doc.file_id,
+        file_name: doc.file_name,
+        file_size: doc.file_size,
+        mime_type: doc.mime_type,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, `\u{1F4C4} Document saved: ${escapeHtml(doc.file_name || 'file')}`)
+
+    } else if (msg.voice) {
+      const filePath = await downloadAndSave(msg, msg.voice.file_id, 'voice')
+      await saveMessage(msg, 'voice', {
+        telegram_file_id: msg.voice.file_id,
+        file_size: msg.voice.file_size,
+        mime_type: msg.voice.mime_type,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, '\u{1F3A4} Voice message saved.')
+
+    } else if (msg.video) {
+      const filePath = await downloadAndSave(msg, msg.video.file_id, 'videos')
+      await saveMessage(msg, 'video', {
+        text_content: msg.caption || null,
+        telegram_file_id: msg.video.file_id,
+        file_size: msg.video.file_size,
+        mime_type: msg.video.mime_type,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, '\u{1F4F9} Video saved.')
+
+    } else if (msg.video_note) {
+      const filePath = await downloadAndSave(msg, msg.video_note.file_id, 'video_notes')
+      await saveMessage(msg, 'video_note', {
+        telegram_file_id: msg.video_note.file_id,
+        file_size: msg.video_note.file_size,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, '\u{1F4F9} Video note saved.')
+
+    } else if (msg.audio) {
+      const filePath = await downloadAndSave(msg, msg.audio.file_id, 'audio')
+      await saveMessage(msg, 'audio', {
+        text_content: msg.audio.title || msg.caption || null,
+        telegram_file_id: msg.audio.file_id,
+        file_name: msg.audio.file_name,
+        file_size: msg.audio.file_size,
+        mime_type: msg.audio.mime_type,
+        file_path: filePath,
+      })
+      if (isPrivate) send(chatId, '\u{1F3B5} Audio saved.')
+
+    } else if (msg.sticker) {
+      await saveMessage(msg, 'sticker', {
+        text_content: msg.sticker.emoji || null,
+        telegram_file_id: msg.sticker.file_id,
+      })
+
+    } else if (msg.location) {
+      await saveMessage(msg, 'location', {
+        text_content: JSON.stringify({ lat: msg.location.latitude, lon: msg.location.longitude }),
+      })
+      if (isPrivate) send(chatId, '\u{1F4CD} Location saved.')
+
+    } else if (msg.contact) {
+      await saveMessage(msg, 'contact', {
+        text_content: JSON.stringify({
+          phone: msg.contact.phone_number,
+          name: [msg.contact.first_name, msg.contact.last_name].filter(Boolean).join(' '),
+        }),
+      })
+      if (isPrivate) send(chatId, '\u{1F4C7} Contact saved.')
+
+    } else if (msg.text) {
+      // Regular text message
+      await saveMessage(msg, 'text')
+      if (isPrivate) {
+        send(chatId, '\u2705 Message saved. Use /tovbin to search chat history.')
+      }
+    }
+  } catch (err) {
+    console.error('[TgBot] message handler error:', err.message)
   }
 })
 
