@@ -2,10 +2,19 @@ node_modules/
 dist/
 nul
 .mcp.json
-.env
-.env.local
-.env.*.local
 test-results/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Uploaded files (may contain user data)
+uploads/
+
+# IDE / tooling
+.claude/
+.playwright-mcp/
 
 # DDC source repositories (separate git repos)
 123/
