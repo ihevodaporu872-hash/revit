@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
 import { Button } from '../ui/Button'
 import { useAppStore } from '../../store/appStore'
 import { useViewerStore } from '../../store/viewerStore'
@@ -105,6 +106,18 @@ interface TreeNode {
 
 type ToolMode = 'select' | 'pan' | 'rotate' | 'zoom' | 'measure' | 'section'
 type LeftTab = 'tree' | 'sets' | 'viewpoints' | 'profiler' | 'models' | 'summary'
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let idx = 0
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024
+    idx += 1
+  }
+  return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`
+}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -619,6 +632,53 @@ export default function ViewerPage() {
 
   // ── Handle real IFC file upload ─────────────────────────
 
+  const loadDaeFromUrl = useCallback(
+    async (daeUrl: string, fileName: string, fileSize = 0) => {
+      const scene = sceneRef.current
+      if (!scene) return
+
+      // For multi-file: if no model loaded yet, create a parent group
+      if (!modelGroupRef.current) {
+        const parentGroup = new THREE.Group()
+        parentGroup.name = 'DAEModels'
+        scene.add(parentGroup)
+        modelGroupRef.current = parentGroup
+      }
+
+      setLoadingProgress({ stage: 'init', percent: 10, message: 'Загрузка DAE модели...' })
+
+      const response = await fetch(daeUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to load DAE (${response.status})`)
+      }
+      const daeText = await response.text()
+      setLoadingProgress({ stage: 'geometry', percent: 55, message: 'Парсинг DAE...' })
+
+      const loader = new ColladaLoader()
+      const collada = loader.parse(daeText, '')
+      modelGroupRef.current.add(collada.scene)
+
+      fitToModel(modelGroupRef.current)
+      sectionPlanes.initBounds(modelGroupRef.current)
+
+      setModelFile(fileName)
+      setIsModelLoaded(true)
+      setShowLeftPanel(true)
+      setModelStats({
+        totalElements: 0,
+        types: 0,
+        stories: 0,
+        materials: 0,
+        ifcVersion: 'DAE',
+        fileSize: formatBytes(fileSize),
+      })
+      setLoadingProgress(null)
+      setLoadedModels([])
+      addNotification('success', 'DAE модель загружена (без IFC свойств)')
+    },
+    [addNotification, fitToModel, sectionPlanes],
+  )
+
   const handleFileUpload = useCallback(
     async (files: File[], scopeOverride?: { projectId: string; modelVersion?: string }) => {
       const file = files[0]
@@ -779,25 +839,35 @@ export default function ViewerPage() {
           setXlsxCoverage(result.xlsxImport.coverage)
         }
 
-        if (!result.outputs?.ifcPath) {
+        const backendBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+        if (!result.outputs?.ifcPath && !result.outputs?.daePath) {
           setLoadingProgress(null)
-          addNotification('error', 'RVT processed, but IFC output is missing.')
+          addNotification('error', 'RVT processed, but IFC/DAE output is missing.')
           return
         }
 
-        setRvtProgress(90, 'Шаг 4/4: загрузка конвертированной IFC модели в viewer...', 'geometry')
-        const backendBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
-        const ifcUrl = /^https?:\/\//i.test(result.outputs.ifcPath)
-          ? result.outputs.ifcPath
-          : `${backendBase}${result.outputs.ifcPath}`
-        const ifcResponse = await fetch(ifcUrl)
-        if (!ifcResponse.ok) {
-          throw new Error(`Failed to load converted IFC (${ifcResponse.status})`)
+        if (result.outputs?.ifcPath) {
+          setRvtProgress(90, 'Шаг 4/4: загрузка конвертированной IFC модели в viewer...', 'geometry')
+          const ifcUrl = /^https?:\/\//i.test(result.outputs.ifcPath)
+            ? result.outputs.ifcPath
+            : `${backendBase}${result.outputs.ifcPath}`
+          const ifcResponse = await fetch(ifcUrl)
+          if (!ifcResponse.ok) {
+            throw new Error(`Failed to load converted IFC (${ifcResponse.status})`)
+          }
+          const ifcBlob = await ifcResponse.blob()
+          const ifcFileName = result.outputs.ifcPath.split('/').pop() || `${file.name.replace(/\.rvt$/i, '')}.ifc`
+          const ifcFile = new File([ifcBlob], ifcFileName, { type: 'application/octet-stream' })
+          await handleFileUpload([ifcFile], nextScope)
+        } else if (result.outputs?.daePath) {
+          setRvtProgress(90, 'Шаг 4/4: загрузка конвертированной DAE модели в viewer...', 'geometry')
+          const daeUrl = /^https?:\/\//i.test(result.outputs.daePath)
+            ? result.outputs.daePath
+            : `${backendBase}${result.outputs.daePath}`
+          const daeFileName = result.outputs.daePath.split('/').pop() || `${file.name.replace(/\.rvt$/i, '')}.dae`
+          await loadDaeFromUrl(daeUrl, daeFileName, file.size)
         }
-        const ifcBlob = await ifcResponse.blob()
-        const ifcFileName = result.outputs.ifcPath.split('/').pop() || `${file.name.replace(/\.rvt$/i, '')}.ifc`
-        const ifcFile = new File([ifcBlob], ifcFileName, { type: 'application/octet-stream' })
-        await handleFileUpload([ifcFile], nextScope)
         setRvtProgress(100, 'Готово: связка IFC + Revit Excel построена.', 'done')
         setTimeout(() => setLoadingProgress(null), 800)
 
@@ -812,7 +882,7 @@ export default function ViewerPage() {
       }
     }
     input.click()
-  }, [addNotification, handleFileUpload, revitScope, setRevitScope, setRvtProgress])
+  }, [addNotification, handleFileUpload, loadDaeFromUrl, revitScope, setRevitScope, setRvtProgress])
 
   // ── Revit Upload Modal completion handler ────────────────
 

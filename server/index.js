@@ -2585,59 +2585,71 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
       }
     }
 
-    const { execSync, execFileSync } = await import('child_process')
+    const { execSync, execFileSync, spawnSync } = await import('child_process')
+    const perAttemptTimeoutMs = Number.parseInt(String(process.env.RVT_CONVERTER_TIMEOUT_MS || '300000'), 10)
+    const baseName = path.parse(req.file.filename || req.file.originalname).name
+    const rvtDaePath = path.join(outputDir, `${baseName}.dae`)
+    const rvtXlsxPath = path.join(outputDir, `${baseName}.xlsx`)
     const candidateCommands = [
       {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" --ifc-schema "${requestedIfcSchema}"`,
-        mode: 'flag',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" "${requestedIfcSchema}"`,
-        mode: 'positional',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}"`,
-        mode: 'default',
-        ifcSchemaApplied: 'converter-default',
+        kind: 'rvt_exporter',
+        args: [req.file.path, rvtDaePath, rvtXlsxPath, 'complete'],
+        mode: 'rvt_exporter_complete',
+        ifcSchemaApplied: null,
       },
     ]
 
     let executed = null
     let lastExecError = null
     const converterAttempts = []
+    let noIfcDetected = false
     for (const candidate of candidateCommands) {
       try {
-        console.log(`[Revit Process] Running: ${candidate.cmd}`)
-        const stdout = execSync(candidate.cmd, { timeout: 300000, stdio: 'pipe', encoding: 'utf8' })
-        const outputDirFiles = await fs.readdir(outputDir)
-        const uploadsCurrent = await fs.readdir(UPLOADS_DIR)
-        const freshRootArtifacts = uploadsCurrent
-          .filter((name) => !uploadsSnapshotBefore.has(name))
-          .filter((name) => isArtifactFile(name))
-        for (const artifact of freshRootArtifacts) {
-          await moveToOutputDir(artifact)
+        if (candidate.kind === 'rvt_exporter') {
+          console.log(`[Revit Process] Running: "${converterExe}" ${candidate.args.map((a) => `"${a}"`).join(' ')}`)
+          const result = spawnSync(converterExe, candidate.args, {
+            timeout: Number.isFinite(perAttemptTimeoutMs) ? perAttemptTimeoutMs : 300000,
+            encoding: 'utf8',
+            input: '\n',
+            stdio: 'pipe',
+          })
+          if (result.error) throw result.error
+
+          const uploadsCurrent = await fs.readdir(UPLOADS_DIR)
+          const freshRootArtifacts = uploadsCurrent
+            .filter((name) => !uploadsSnapshotBefore.has(name))
+            .filter((name) => isArtifactFile(name))
+          for (const artifact of freshRootArtifacts) {
+            await moveToOutputDir(artifact)
+          }
+
+          const producedFiles = await fs.readdir(outputDir)
+          const hasAnyArtifacts = producedFiles.some((f) => isArtifactFile(f))
+          const hasIfcArtifact = producedFiles.some((f) => f.toLowerCase().endsWith('.ifc'))
+          const hasDaeArtifact = producedFiles.some((f) => f.toLowerCase().endsWith('.dae'))
+
+          converterAttempts.push({
+            mode: candidate.mode,
+            status: hasIfcArtifact ? 'ok_ifc' : (hasDaeArtifact ? 'ok_dae' : (hasAnyArtifacts ? 'no_ifc_or_dae' : 'no_output')),
+            producedFiles,
+            freshRootArtifacts,
+            stdoutTail: String(result.stdout || '').slice(-1200),
+            stderrTail: String(result.stderr || '').slice(-1200),
+          })
+
+          if (hasIfcArtifact || hasDaeArtifact) {
+            executed = candidate
+            break
+          }
+
+          if (hasAnyArtifacts && !hasIfcArtifact) {
+            noIfcDetected = true
+            console.warn(`[Revit Process] IFC artifact missing after ${candidate.mode}; switching to RVT2IFC fallback`)
+            break
+          }
+
+          console.warn(`[Revit Process] RvtExporter completed without IFC/DAE (${candidate.mode}), trying fallback`)
         }
-
-        const producedFiles = await fs.readdir(outputDir)
-        const hasAnyArtifacts = producedFiles.some((f) => isArtifactFile(f))
-        const hasIfcArtifact = producedFiles.some((f) => f.toLowerCase().endsWith('.ifc'))
-
-        converterAttempts.push({
-          mode: candidate.mode,
-          status: hasIfcArtifact ? 'ok' : (hasAnyArtifacts ? 'no_ifc' : 'no_output'),
-          producedFiles,
-          freshRootArtifacts,
-          stdoutTail: String(stdout || '').slice(-1200),
-        })
-
-        if (hasIfcArtifact) {
-          executed = candidate
-          break
-        }
-
-        console.warn(`[Revit Process] Command completed without IFC artifact (${candidate.mode}), trying next fallback`)
       } catch (execErr) {
         lastExecError = execErr
         converterAttempts.push({
@@ -2661,7 +2673,11 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
           const fallbackOut = execFileSync(
             rvt2IfcExe,
             [req.file.path, fallbackIfcPath, 'standard'],
-            { timeout: 300000, stdio: 'pipe', encoding: 'utf8' },
+            {
+              timeout: Number.isFinite(perAttemptTimeoutMs) ? perAttemptTimeoutMs : 300000,
+              stdio: 'pipe',
+              encoding: 'utf8',
+            },
           )
 
           const fallbackFiles = await fs.readdir(outputDir)
@@ -2709,7 +2725,10 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
           converterPath: converterExe,
           outputDir,
           attempts: converterAttempts,
-          hint: 'Check converter logs and ensure IFC export is enabled for this Revit model/version',
+          noIfcDetected,
+          hint: noIfcDetected
+            ? 'Primary converter produced XLSX/DAE but no IFC. Check IFC export settings/permissions in converter.'
+            : 'Check converter logs and ensure IFC export is enabled for this Revit model/version',
           details: lastExecError ? { message: lastExecError.message } : undefined,
         },
       ))
