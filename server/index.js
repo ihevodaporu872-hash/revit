@@ -174,6 +174,11 @@ const CONVERTER_PATHS = {
     exe: 'DgnExporter.exe',
     label: 'DGN',
   },
+  rvt2ifc: {
+    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_Revit2IFC', 'DDC_REVIT2IFC_CONVERTER'),
+    exe: 'RVT2IFCconverter.exe',
+    label: 'Revit→IFC',
+  },
 }
 
 const ENABLE_RVT_CONVERTER = ['1', 'true', 'yes', 'on']
@@ -1013,14 +1018,68 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
     await fs.mkdir(outputDir, { recursive: true })
 
     const startTime = Date.now()
-    const cmd = `"${exePath}" "${inputFile}" "${outputDir}"`
+
+    // Build correct arguments depending on converter type
+    const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname))
+    let converterArgs
+    let actualExePath = exePath
+    let converterCwd = converter.dir
+
+    if (converterKey === 'rvt' && outputFormat === 'ifc') {
+      // RVT→IFC: use RVT2IFCconverter.exe
+      const rvt2ifcConfig = CONVERTER_PATHS.rvt2ifc
+      const rvt2ifcExe = path.join(rvt2ifcConfig.dir, rvt2ifcConfig.exe)
+      if (!existsSync(rvt2ifcExe)) {
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: inputExt,
+          outputFormat: 'ifc',
+          status: 'error',
+          message: `RVT2IFC converter not found: ${rvt2ifcConfig.exe}. Ensure the DDC Revit2IFC converter package is installed.`,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          duration: 0,
+        }
+        conversionHistory.unshift(record)
+        return res.status(500).json(record)
+      }
+      const outIfc = path.join(outputDir, `${baseName}.ifc`)
+      converterArgs = [inputFile, outIfc]
+      actualExePath = rvt2ifcExe
+      converterCwd = rvt2ifcConfig.dir
+    } else if (converterKey === 'rvt') {
+      // RvtExporter: <input.rvt> [<output.dae>] [<output.xlsx>] [<export mode>]
+      const outDae = path.join(outputDir, `${baseName}.dae`)
+      const outXlsx = path.join(outputDir, `${baseName}.xlsx`)
+      converterArgs = [inputFile, outDae, outXlsx, outputFormat === 'excel' ? 'complete' : 'standard']
+    } else {
+      converterArgs = [inputFile, outputDir]
+    }
+    const cmd = `"${actualExePath}" ${converterArgs.map(a => `"${a}"`).join(' ')}`
 
     console.log(`[Converter] Running: ${cmd}`)
 
     try {
-      const { stdout, stderr } = await execAsync(cmd, {
-        cwd: converter.dir,
-        timeout: 300000, // 5 minutes
+      // Use spawn to handle "Press Enter to continue..." for RvtExporter / RVT2IFC
+      const { stdout, stderr } = await new Promise((resolve, reject) => {
+        const proc = spawn(actualExePath, converterArgs, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 300000,
+          cwd: converterCwd,
+        })
+        let stdoutStr = ''
+        let stderrStr = ''
+        proc.stdout.on('data', (chunk) => {
+          stdoutStr += chunk.toString()
+          if (stdoutStr.includes('Press Enter')) proc.stdin.write('\n')
+        })
+        proc.stderr.on('data', (chunk) => { stderrStr += chunk.toString() })
+        proc.on('close', (code) => {
+          if (code === 0) resolve({ stdout: stdoutStr, stderr: stderrStr })
+          else reject(new Error(`Converter exit code ${code}: ${stderrStr.slice(0, 500)}`))
+        })
+        proc.on('error', reject)
       })
 
       const duration = Date.now() - startTime
@@ -2556,7 +2615,7 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
     const converter = CONVERTER_PATHS.rvt
     const converterExe = path.join(converter.dir, converter.exe)
     const converterAvailable = ENABLE_RVT_CONVERTER && existsSync(converterExe)
-    const requestedIfcSchema = String(req.body.ifcSchema || process.env.RVT_TARGET_IFC_SCHEMA || 'IFC4X3').trim().toUpperCase()
+    const requestedExportMode = String(req.body.exportMode || process.env.RVT_EXPORT_MODE || 'complete').trim().toLowerCase()
 
     if (!converterAvailable) {
       return res.status(503).json({
@@ -2569,45 +2628,46 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
     outputDir = path.join(UPLOADS_DIR, `rvt-${Date.now()}`)
     await fs.mkdir(outputDir, { recursive: true })
 
-    const { execSync } = await import('child_process')
-    const candidateCommands = [
-      {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" --ifc-schema "${requestedIfcSchema}"`,
-        mode: 'flag',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}" "${requestedIfcSchema}"`,
-        mode: 'positional',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        cmd: `"${converterExe}" "${req.file.path}" "${outputDir}"`,
-        mode: 'default',
-        ifcSchemaApplied: 'converter-default',
-      },
-    ]
+    // RvtExporter expects: <input.rvt> [<output.dae>] [<output.xlsx>] [<export mode>] [bbox] [room] [schedule]
+    const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname))
+    const outDae = path.join(outputDir, `${baseName}.dae`)
+    const outXlsx = path.join(outputDir, `${baseName}.xlsx`)
+    const cmd = `"${converterExe}" "${req.file.path}" "${outDae}" "${outXlsx}" ${requestedExportMode} bbox room`
 
-    let executed = null
-    let lastExecError = null
-    for (const candidate of candidateCommands) {
-      try {
-        console.log(`[Revit Process] Running: ${candidate.cmd}`)
-        execSync(candidate.cmd, { timeout: 300000, stdio: 'pipe' })
-        executed = candidate
-        break
-      } catch (execErr) {
-        lastExecError = execErr
-        console.warn(`[Revit Process] Command failed (${candidate.mode}), trying next fallback`)
-      }
-    }
+    console.log(`[Revit Process] Running: ${cmd}`)
 
-    if (!executed) {
-      throw lastExecError || new Error('Revit converter failed for all command variants')
+    try {
+      // Use spawn instead of execSync to handle "Press Enter to continue..." prompt
+      await new Promise((resolve, reject) => {
+        const proc = spawn(converterExe, [req.file.path, outDae, outXlsx, requestedExportMode, 'bbox', 'room'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 300000,
+          cwd: converter.dir,
+        })
+        let stdout = ''
+        let stderr = ''
+        proc.stdout.on('data', (chunk) => {
+          stdout += chunk.toString()
+          // Send Enter when process asks for it ("Press Enter to continue...")
+          if (stdout.includes('Press Enter')) {
+            proc.stdin.write('\n')
+          }
+        })
+        proc.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+        proc.on('close', (code) => {
+          console.log(`[Revit Process] Exit code: ${code}`)
+          if (stdout) console.log(`[Revit Process] stdout: ${stdout.slice(0, 1000)}`)
+          if (stderr) console.warn(`[Revit Process] stderr: ${stderr.slice(0, 500)}`)
+          if (code === 0) resolve(undefined)
+          else reject(new Error(`RvtExporter exit code ${code}: ${stderr.slice(0, 500)}`))
+        })
+        proc.on('error', reject)
+      })
+    } catch (execErr) {
+      throw execErr
     }
 
     const outputFiles = await fs.readdir(outputDir)
-    const ifcFile = outputFiles.find((f) => f.toLowerCase().endsWith('.ifc'))
     const xlsxFile = outputFiles.find((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
     const daeFile = outputFiles.find((f) => f.toLowerCase().endsWith('.dae'))
 
@@ -2617,17 +2677,14 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
       modelVersion: modelScope.modelVersion,
       mode: 'auto_rvt_converter',
       outputs: {
-        ifcPath: ifcFile ? `/uploads/${path.basename(outputDir)}/${ifcFile}` : null,
-        xlsxPath: xlsxFile ? `/uploads/${path.basename(outputDir)}/${xlsxFile}` : null,
         daePath: daeFile ? `/uploads/${path.basename(outputDir)}/${daeFile}` : null,
+        xlsxPath: xlsxFile ? `/uploads/${path.basename(outputDir)}/${xlsxFile}` : null,
         files: outputFiles,
       },
       xlsxImport: null,
       matchSummary: null,
       converter: {
-        ifcSchemaRequested: requestedIfcSchema,
-        ifcSchemaApplied: executed.ifcSchemaApplied,
-        mode: executed.mode,
+        exportMode: requestedExportMode,
       },
     }
 
@@ -2699,53 +2756,10 @@ app.post('/api/revit/process-model', upload.single('file'), async (req, res) => 
         source_mode: 'auto_rvt',
         source_files: {
           rvt: req.file.originalname,
-          ifc: ifcFile || null,
           xlsx: xlsxFile || null,
           dae: daeFile || null,
         },
       })
-
-      // Lightweight IFC GlobalId extraction to provide match summary without IFC engine.
-      if (ifcFile && records.length > 0) {
-        try {
-          const ifcText = await fs.readFile(path.join(outputDir, ifcFile), 'utf8')
-          const regex = /#(\d+)\s*=\s*(IFC[A-Z0-9_]+)\s*\(\s*'([^']+)'/g
-          const ifcElements = []
-          let match
-          while ((match = regex.exec(ifcText)) !== null) {
-            ifcElements.push({
-              expressID: Number.parseInt(match[1], 10),
-              type: match[2],
-              globalId: match[3],
-              tag: null,
-              name: '',
-              properties: [],
-            })
-            if (ifcElements.length >= 50000) break
-          }
-
-          const report = buildMatchReport({
-            ifcElements,
-            revitRows: records,
-          })
-
-          response.matchSummary = {
-            totalIfcElements: report.totalIfcElements,
-            totalRevitRows: report.totalRevitRows,
-            totalMatched: report.totalMatched,
-            matchRate: report.matchRate,
-            matchedByKey: report.matchedByKey,
-            ambiguousCount: report.ambiguous.length,
-            missingInIfcCount: report.missingInIfc.length,
-            missingInRevitCount: report.missingInRevit.length,
-          }
-        } catch (ifcErr) {
-          response.matchSummary = {
-            status: 'unavailable',
-            reason: ifcErr.message,
-          }
-        }
-      }
     }
 
     return res.json(response)
@@ -2803,7 +2817,12 @@ app.post('/api/revit/process-model-async', upload.single('file'), async (req, re
     const outputDir = path.join(UPLOADS_DIR, jobId)
     await fs.mkdir(outputDir, { recursive: true })
 
-    const requestedIfcSchema = String(req.body.ifcSchema || process.env.RVT_TARGET_IFC_SCHEMA || 'IFC4X3').trim().toUpperCase()
+    const requestedExportMode = String(req.body.exportMode || process.env.RVT_EXPORT_MODE || 'complete').trim().toLowerCase()
+
+    // RvtExporter expects: <input.rvt> [<output.dae>] [<output.xlsx>] [<export mode>] [bbox] [room] [schedule]
+    const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname))
+    const outDae = path.join(outputDir, `${baseName}.dae`)
+    const outXlsx = path.join(outputDir, `${baseName}.xlsx`)
 
     const job = {
       status: 'converting',
@@ -2812,11 +2831,10 @@ app.post('/api/revit/process-model-async', upload.single('file'), async (req, re
       error: null,
       startTime: Date.now(),
       sseClients: [],
-      ifcReady: false,
       xlsxReady: false,
       daeReady: false,
       modelScope,
-      requestedIfcSchema,
+      requestedExportMode,
       filePath: req.file.path,
       originalName: req.file.originalname,
     }
@@ -2826,98 +2844,78 @@ app.post('/api/revit/process-model-async', upload.single('file'), async (req, re
     // Return immediately with 202
     res.status(202).json({ jobId, outputDir: path.basename(outputDir) })
 
-    // Start async conversion
-    const candidateCommands = [
-      {
-        args: [req.file.path, outputDir, '--ifc-schema', requestedIfcSchema],
-        mode: 'flag',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        args: [req.file.path, outputDir, requestedIfcSchema],
-        mode: 'positional',
-        ifcSchemaApplied: requestedIfcSchema,
-      },
-      {
-        args: [req.file.path, outputDir],
-        mode: 'default',
-        ifcSchemaApplied: 'converter-default',
-      },
-    ]
-
     // File watcher interval
     const watcher = setInterval(() => {
       try {
         const files = require('fs').readdirSync(outputDir)
-        const newIfc = files.some((f) => f.toLowerCase().endsWith('.ifc'))
         const newXlsx = files.some((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
         const newDae = files.some((f) => f.toLowerCase().endsWith('.dae'))
 
-        if (newIfc !== job.ifcReady || newXlsx !== job.xlsxReady || newDae !== job.daeReady) {
-          job.ifcReady = newIfc
+        if (newXlsx !== job.xlsxReady || newDae !== job.daeReady) {
           job.xlsxReady = newXlsx
           job.daeReady = newDae
           broadcastSSE(job, 'progress', {
-            ifc: job.ifcReady,
-            xlsx: job.xlsxReady,
             dae: job.daeReady,
+            xlsx: job.xlsxReady,
             elapsedMs: Date.now() - job.startTime,
           })
         }
       } catch { /* outputDir not ready yet */ }
     }, 500)
 
-    // Try each command variant
+    // Run conversion
     async function runConversion() {
-      let executed = null
-      let lastError = null
-
-      for (const candidate of candidateCommands) {
-        try {
-          await new Promise((resolve, reject) => {
-            console.log(`[Revit Async] Running: "${converterExe}" ${candidate.args.join(' ')}`)
-            const proc = spawn(converterExe, candidate.args, { stdio: 'pipe', timeout: 300000 })
-            let stderr = ''
-            proc.stderr.on('data', (chunk) => { stderr += chunk.toString() })
-            proc.on('close', (code) => {
-              if (code === 0) resolve(undefined)
-              else reject(new Error(`Exit code ${code}: ${stderr.slice(0, 500)}`))
-            })
-            proc.on('error', reject)
+      try {
+        await new Promise((resolve, reject) => {
+          const args = [req.file.path, outDae, outXlsx, requestedExportMode, 'bbox', 'room']
+          console.log(`[Revit Async] Running: "${converterExe}" ${args.join(' ')}`)
+          const proc = spawn(converterExe, args, {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: 300000,
+            cwd: CONVERTER_PATHS.rvt.dir,
           })
-          executed = candidate
-          break
-        } catch (err) {
-          lastError = err
-          console.warn(`[Revit Async] Command failed (${candidate.mode}), trying next`)
-        }
-      }
-
-      clearInterval(watcher)
-
-      if (!executed) {
+          let stdout = ''
+          let stderr = ''
+          proc.stdout.on('data', (chunk) => {
+            stdout += chunk.toString()
+            // Handle "Press Enter to continue..." prompt
+            if (stdout.includes('Press Enter')) {
+              proc.stdin.write('\n')
+            }
+          })
+          proc.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+          proc.on('close', (code) => {
+            console.log(`[Revit Async] Exit code: ${code}`)
+            if (stdout) console.log(`[Revit Async] stdout: ${stdout.slice(0, 1000)}`)
+            if (stderr) console.warn(`[Revit Async] stderr: ${stderr.slice(0, 500)}`)
+            if (code === 0) resolve(undefined)
+            else reject(new Error(`RvtExporter exit code ${code}: ${stderr.slice(0, 500)}`))
+          })
+          proc.on('error', reject)
+        })
+      } catch (convErr) {
+        clearInterval(watcher)
         job.status = 'error'
-        job.error = lastError?.message || 'All converter variants failed'
+        job.error = convErr?.message || 'RvtExporter failed'
         activeRvtCount--
         broadcastSSE(job, 'error', { code: 'CONVERTER_FAILED', message: job.error })
         await safeUnlink(req.file.path)
         return
       }
 
+      clearInterval(watcher)
+
       // Final file check
       const outputFiles = await fs.readdir(outputDir)
-      const ifcFile = outputFiles.find((f) => f.toLowerCase().endsWith('.ifc'))
       const xlsxFile = outputFiles.find((f) => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls'))
       const daeFile = outputFiles.find((f) => f.toLowerCase().endsWith('.dae'))
 
-      job.ifcReady = !!ifcFile
       job.xlsxReady = !!xlsxFile
       job.daeReady = !!daeFile
 
       broadcastSSE(job, 'progress', {
-        ifc: job.ifcReady,
-        xlsx: job.xlsxReady,
         dae: job.daeReady,
+        xlsx: job.xlsxReady,
         elapsedMs: Date.now() - job.startTime,
       })
 
@@ -2927,17 +2925,14 @@ app.post('/api/revit/process-model-async', upload.single('file'), async (req, re
         modelVersion: modelScope.modelVersion,
         mode: 'auto_rvt_converter',
         outputs: {
-          ifcPath: ifcFile ? `/uploads/${jobId}/${ifcFile}` : null,
-          xlsxPath: xlsxFile ? `/uploads/${jobId}/${xlsxFile}` : null,
           daePath: daeFile ? `/uploads/${jobId}/${daeFile}` : null,
+          xlsxPath: xlsxFile ? `/uploads/${jobId}/${xlsxFile}` : null,
           files: outputFiles,
         },
         xlsxImport: null,
         matchSummary: null,
         converter: {
-          ifcSchemaRequested: requestedIfcSchema,
-          ifcSchemaApplied: executed.ifcSchemaApplied,
-          mode: executed.mode,
+          exportMode: requestedExportMode,
         },
       }
 
@@ -2990,42 +2985,8 @@ app.post('/api/revit/process-model-async', upload.single('file'), async (req, re
             project_id: modelScope.projectId,
             model_version: modelScope.modelVersion,
             source_mode: 'auto_rvt_async',
-            source_files: { rvt: job.originalName, ifc: ifcFile || null, xlsx: xlsxFile || null, dae: daeFile || null },
+            source_files: { rvt: job.originalName, xlsx: xlsxFile || null, dae: daeFile || null },
           })
-
-          // IFC matching
-          if (ifcFile && records.length > 0) {
-            try {
-              const ifcText = await fs.readFile(path.join(outputDir, ifcFile), 'utf8')
-              const regex = /#(\d+)\s*=\s*(IFC[A-Z0-9_]+)\s*\(\s*'([^']+)'/g
-              const ifcElements = []
-              let m
-              while ((m = regex.exec(ifcText)) !== null) {
-                ifcElements.push({ expressID: Number.parseInt(m[1], 10), type: m[2], globalId: m[3], tag: null, name: '', properties: [] })
-                if (ifcElements.length >= 50000) break
-              }
-
-              const report = buildMatchReport({ ifcElements, revitRows: records })
-              response.matchSummary = {
-                totalIfcElements: report.totalIfcElements,
-                totalRevitRows: report.totalRevitRows,
-                totalMatched: report.totalMatched,
-                matchRate: report.matchRate,
-                matchedByKey: report.matchedByKey,
-                ambiguousCount: report.ambiguous.length,
-                missingInIfcCount: report.missingInIfc.length,
-                missingInRevitCount: report.missingInRevit.length,
-              }
-
-              broadcastSSE(job, 'match_summary', {
-                totalMatched: report.totalMatched,
-                totalIfcElements: report.totalIfcElements,
-                matchRate: report.matchRate,
-              })
-            } catch (ifcErr) {
-              response.matchSummary = { status: 'unavailable', reason: ifcErr.message }
-            }
-          }
         } catch (xlsxErr) {
           console.error('[Revit Async] XLSX processing error:', xlsxErr)
         }
@@ -3073,9 +3034,8 @@ app.get('/api/revit/process-status-stream/:jobId', (req, res) => {
 
   // Send current state immediately
   res.write(`event: progress\ndata: ${JSON.stringify({
-    ifc: job.ifcReady,
-    xlsx: job.xlsxReady,
-    dae: job.daeReady,
+    dae: job.daeReady || false,
+    xlsx: job.xlsxReady || false,
     elapsedMs: Date.now() - job.startTime,
   })}\n\n`)
 

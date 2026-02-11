@@ -44,7 +44,7 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type OutputFormat = 'excel' | 'dae' | 'pdf'
+type OutputFormat = 'excel' | 'dae' | 'pdf' | 'ifc'
 type ConversionStatus = 'queued' | 'converting' | 'completed' | 'failed'
 
 interface ConversionJob {
@@ -88,6 +88,7 @@ const FORMAT_OPTIONS: { id: OutputFormat; label: string; description: string; ic
   { id: 'excel', label: 'Excel (.xlsx)', description: '\u0422\u0430\u0431\u043B\u0438\u0446\u044B \u0441\u0432\u043E\u0439\u0441\u0442\u0432, \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u0430, \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u044F', icon: <FileSpreadsheet size={20} /> },
   { id: 'dae', label: 'DAE 3D (.dae)', description: '3D-\u0433\u0435\u043E\u043C\u0435\u0442\u0440\u0438\u044F \u0434\u043B\u044F \u0437\u0440\u0438\u0442\u0435\u043B\u0435\u0439 \u0438 \u0434\u0432\u0438\u0436\u043A\u043E\u0432', icon: <Box size={20} /> },
   { id: 'pdf', label: '\u041E\u0442\u0447\u0451\u0442 \u0432 PDF', description: '\u041E\u0442\u0447\u0451\u0442\u044B \u043E \u0444\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u0441\u0432\u043E\u0439\u0441\u0442\u0432\u0430\u0445', icon: <FileText size={20} /> },
+  { id: 'ifc', label: 'IFC (.ifc)', description: '\u041E\u0442\u043A\u0440\u044B\u0442\u044B\u0439 BIM-\u0444\u043E\u0440\u043C\u0430\u0442 IFC2x3/IFC4', icon: <Box size={20} /> },
 ]
 
 const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
