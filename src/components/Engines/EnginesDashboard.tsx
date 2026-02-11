@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Cog, Bot, Send, RefreshCw, CheckCircle2, XCircle,
   AlertTriangle, Cpu, Database, Sheet, Zap, Server,
+  Package,
 } from 'lucide-react'
 import { Card, StatCard } from '../ui/Card'
 import { Button } from '../ui/Button'
@@ -182,11 +183,23 @@ export default function EnginesDashboard() {
                           <p className="text-sm font-medium text-foreground">CAD/BIM Pipeline</p>
                           <p className="text-xs text-muted-foreground">
                             Конвертация и обработка моделей
-                            {engines?.cadPipeline?.details && ` · Конвертеры: ${(engines.cadPipeline.details as { converterCount?: number }).converterCount || 0}`}
+                            {engines?.cadPipeline?.details && ` · DDC: ${(engines.cadPipeline.details as { converterCount?: number }).converterCount || 0} конвертеров`}
                           </p>
                         </div>
                       </div>
                       {engines?.cadPipeline && statusBadge(engines.cadPipeline.status)}
+                    </div>
+                    {/* Open-source converters sub-section */}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                        <Package size={10} /> dxf-parser
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                        <Package size={10} /> LibreDWG WASM
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
+                        <Package size={10} /> web-ifc
+                      </span>
                     </div>
                   </motion.div>
 
@@ -286,7 +299,43 @@ export default function EnginesDashboard() {
         </Tabs>
       </Card>
 
-      {/* Info Card */}
+      {/* Open-Source Converters Card */}
+      <Card title="Open-Source конвертеры" subtitle="Бесплатные npm-пакеты для обработки CAD-файлов">
+        <div className="space-y-3 text-sm">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">dxf-parser</strong> — чистый JS-парсер DXF файлов. Извлекает слои, линии, полилинии, текст, блоки. Fallback при отсутствии DDC конвертера.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">LibreDWG (WASM)</strong> — WebAssembly-парсер DWG/DXF на основе libredwg. Читает AutoCAD R14–2024 без внешних зависимостей.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">web-ifc</strong> — WebAssembly IFC-парсер (уже интегрирован). Чтение/запись IFC2x3, IFC4.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <XCircle size={14} className="mt-0.5 shrink-0 text-destructive" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">RVT (Revit)</strong> — проприетарный формат. Open-source альтернатив не существует. Требуется DDC конвертер или Autodesk APS API.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <XCircle size={14} className="mt-0.5 shrink-0 text-destructive" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">DGN (MicroStation)</strong> — проприетарный формат. Open-source альтернатив не существует. Требуется DDC конвертер.
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Dependencies Card */}
       <Card title="Зависимости" subtitle="Необходимые сервисы и переменные окружения">
         <div className="space-y-3 text-sm">
           <div className="flex items-start gap-2">

@@ -27,6 +27,7 @@ import {
   getUnmappedColumns,
 } from './revit-xlsx.js'
 import { buildMatchReport } from './revit-matcher.js'
+import DxfParser from 'dxf-parser'
 import { createCWICREngine } from './cwicr-engine.js'
 import { createCostEngine } from './cost-engine.js'
 import { createCADPipeline } from './cad-pipeline.js'
@@ -578,6 +579,12 @@ function converterAvailability() {
       exe: config.exe,
     }
   }
+  // Open-source converters (always available — npm packages)
+  result.openSource = {
+    dxfParser: { available: true, label: 'DXF Parser (JS)', formats: ['dxf'] },
+    libreDwg: { available: true, label: 'LibreDWG (WASM)', formats: ['dwg', 'dxf'] },
+    webIfc: { available: true, label: 'web-ifc (WASM)', formats: ['ifc'] },
+  }
   return result
 }
 
@@ -987,6 +994,63 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
     // Determine which converter to use
     const converterKey = inputExt // rvt, ifc, dwg, dgn
     const converter = CONVERTER_PATHS[converterKey]
+
+    // ── Open-source fallback for DXF files ──────────────────────────────────
+    if (inputExt === 'dxf') {
+      const dxfAvailable = converter && existsSync(path.join(converter.dir, converter.exe))
+      if (!dxfAvailable) {
+        // Fallback: parse DXF with dxf-parser (pure JS, no external binary)
+        const startTime = Date.now()
+        try {
+          const fileContent = await fs.readFile(inputFile, 'utf-8')
+          const parser = new DxfParser()
+          const dxf = parser.parseSync(fileContent)
+
+          const outputDir = path.join(UPLOADS_DIR, `output-${Date.now()}`)
+          await fs.mkdir(outputDir, { recursive: true })
+          const outJson = path.join(outputDir, `${path.basename(req.file.originalname, '.dxf')}.json`)
+          await fs.writeFile(outJson, JSON.stringify(dxf, null, 2))
+
+          const layers = dxf?.tables?.layer?.layers ? Object.keys(dxf.tables.layer.layers) : []
+          const entityCount = dxf?.entities?.length || 0
+          const blockCount = dxf?.blocks ? Object.keys(dxf.blocks).length : 0
+
+          const duration = Date.now() - startTime
+          const record = {
+            id: `conv-${Date.now()}`,
+            inputFile: req.file.originalname,
+            inputFormat: 'dxf',
+            outputFormat: 'json',
+            status: 'completed',
+            converter: 'dxf-parser (open-source)',
+            outputFiles: [path.basename(outJson)],
+            outputDir,
+            summary: { layers: layers.length, entities: entityCount, blocks: blockCount, layerNames: layers.slice(0, 20) },
+            startedAt: new Date(startTime).toISOString(),
+            completedAt: new Date().toISOString(),
+            duration,
+          }
+          conversionHistory.unshift(record)
+          return res.json(record)
+        } catch (parseErr) {
+          const duration = Date.now() - startTime
+          const record = {
+            id: `conv-${Date.now()}`,
+            inputFile: req.file.originalname,
+            inputFormat: 'dxf',
+            outputFormat: 'json',
+            status: 'error',
+            converter: 'dxf-parser (open-source)',
+            message: `DXF parse error: ${parseErr.message}`,
+            startedAt: new Date(startTime).toISOString(),
+            completedAt: new Date().toISOString(),
+            duration,
+          }
+          conversionHistory.unshift(record)
+          return res.status(500).json(record)
+        }
+      }
+    }
 
     if (!converter) {
       return res.status(400).json({
@@ -3866,7 +3930,11 @@ app.get('/api/engines/status', (_req, res) => {
       cadPipeline: {
         name: 'CAD/BIM Pipeline',
         status: converterCount > 0 ? 'online' : 'degraded',
-        details: { converterCount, converters: converterStatus },
+        details: {
+          converterCount,
+          converters: converterStatus,
+          openSource: converterStatus.openSource,
+        },
       },
       sheetsSync: {
         name: 'Google Sheets Sync',
