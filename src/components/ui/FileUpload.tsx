@@ -29,7 +29,7 @@ const FILE_ICONS: Record<string, string> = {
   ifc: 'text-primary',
   rvt: 'text-chart-5',
   dwg: 'text-warning',
-  dgn: 'text-chart-3',
+  dxf: 'text-chart-3',
   xlsx: 'text-success',
   xls: 'text-success',
   csv: 'text-success',
@@ -45,7 +45,7 @@ const SUPPORTED_TYPE_META: Record<string, { icon: LucideIcon; className: string;
   rvt: { icon: Building2, className: 'text-sky-300 border-sky-400/35 bg-sky-500/15', label: '.rvt' },
   ifc: { icon: Cuboid, className: 'text-emerald-300 border-emerald-400/35 bg-emerald-500/15', label: 'ifc' },
   dwg: { icon: PencilRuler, className: 'text-amber-300 border-amber-400/35 bg-amber-500/15', label: '.dwg' },
-  dgn: { icon: Layers3, className: 'text-violet-300 border-violet-400/35 bg-violet-500/15', label: '.dgn' },
+  dxf: { icon: Layers3, className: 'text-violet-300 border-violet-400/35 bg-violet-500/15', label: '.dxf' },
 }
 
 function parseAcceptedExtensions(accept?: string): string[] {

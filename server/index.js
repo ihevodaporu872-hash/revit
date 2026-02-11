@@ -28,11 +28,55 @@ import {
 } from './revit-xlsx.js'
 import { buildMatchReport } from './revit-matcher.js'
 import DxfParser from 'dxf-parser'
+import { createRequire } from 'module'
 import { createCWICREngine } from './cwicr-engine.js'
 import { createCostEngine } from './cost-engine.js'
 import { createCADPipeline } from './cad-pipeline.js'
 import { createSheetsSync } from './sheets-sync.js'
 import { convertRvtToIfc, getRevitIfcStatus } from './revit-ifc-bridge.js'
+
+// ---------------------------------------------------------------------------
+// Lazy WASM initialization for open-source converters
+// ---------------------------------------------------------------------------
+
+// web-ifc: Node.js CJS build — use createRequire for reliable import
+let _ifcApi = null
+let _ifcInitFailed = false
+async function getIfcApi() {
+  if (_ifcApi) return _ifcApi
+  if (_ifcInitFailed) return null
+  try {
+    const nodeRequire = createRequire(import.meta.url)
+    const { IfcAPI } = nodeRequire('web-ifc')
+    const api = new IfcAPI()
+    await api.Init()
+    _ifcApi = api
+    console.log('[Server] web-ifc WASM initialized')
+    return api
+  } catch (err) {
+    _ifcInitFailed = true
+    console.warn('[Server] web-ifc init failed:', err.message)
+    return null
+  }
+}
+
+// LibreDWG WASM: for DWG parsing
+let _libreDwg = null
+let _libreDwgFailed = false
+async function getLibreDwg() {
+  if (_libreDwg) return _libreDwg
+  if (_libreDwgFailed) return null
+  try {
+    const { LibreDwg } = await import('@mlightcad/libredwg-web')
+    _libreDwg = await LibreDwg.create()
+    console.log('[Server] LibreDWG WASM initialized')
+    return _libreDwg
+  } catch (err) {
+    _libreDwgFailed = true
+    console.warn('[Server] LibreDWG WASM init failed:', err.message)
+    return null
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -133,7 +177,7 @@ const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
   fileFilter: (_req, file, cb) => {
     const allowedExtensions = [
-      '.rvt', '.ifc', '.dwg', '.dgn', '.dxf',
+      '.rvt', '.ifc', '.dwg', '.dxf',
       '.xlsx', '.xls', '.csv',
       '.pdf', '.json', '.xml', '.txt',
     ]
@@ -160,21 +204,6 @@ const CONVERTER_PATHS = {
     dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_REVIT'),
     exe: 'RvtExporter.exe',
     label: 'Revit',
-  },
-  ifc: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_IFC'),
-    exe: 'IfcExporter.exe',
-    label: 'IFC',
-  },
-  dwg: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DWG'),
-    exe: 'DwgExporter.exe',
-    label: 'DWG',
-  },
-  dgn: {
-    dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_DGN'),
-    exe: 'DgnExporter.exe',
-    label: 'DGN',
   },
   rvt2ifc: {
     dir: path.join(PIPELINE_ROOT, 'DDC_CONVERTER_Revit2IFC', 'DDC_REVIT2IFC_CONVERTER'),
@@ -570,6 +599,7 @@ function resolveScope(input = {}, defaults = {}) {
 
 function converterAvailability() {
   const result = {}
+  // DDC converters (only RVT remains)
   for (const [key, config] of Object.entries(CONVERTER_PATHS)) {
     const exePath = path.join(config.dir, config.exe)
     result[key] = {
@@ -580,11 +610,11 @@ function converterAvailability() {
       exe: config.exe,
     }
   }
-  // Open-source converters (always available — npm packages)
+  // Open-source converters (primary for DXF, DWG, IFC)
   result.openSource = {
-    dxfParser: { available: true, label: 'DXF Parser (JS)', formats: ['dxf'] },
-    libreDwg: { available: true, label: 'LibreDWG (WASM)', formats: ['dwg', 'dxf'] },
-    webIfc: { available: true, label: 'web-ifc (WASM)', formats: ['ifc'] },
+    dxfParser: { available: true, primary: true, label: 'dxf-parser (JS)', formats: ['dxf'] },
+    libreDwg: { available: !_libreDwgFailed, primary: true, label: 'LibreDWG (WASM)', formats: ['dwg'] },
+    webIfc: { available: !_ifcInitFailed, primary: true, label: 'web-ifc (WASM)', formats: ['ifc'] },
   }
   return result
 }
@@ -993,70 +1023,209 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
     const inputExt = path.extname(req.file.originalname).toLowerCase().replace('.', '')
 
     // Determine which converter to use
-    const converterKey = inputExt // rvt, ifc, dwg, dgn
+    const converterKey = inputExt // rvt, ifc, dwg, dxf
     const converter = CONVERTER_PATHS[converterKey]
+    const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname))
 
-    // ── Open-source fallback for DXF files ──────────────────────────────────
+    // ── DXF: dxf-parser (open-source, primary) ─────────────────────────────
     if (inputExt === 'dxf') {
-      const dxfAvailable = converter && existsSync(path.join(converter.dir, converter.exe))
-      if (!dxfAvailable) {
-        // Fallback: parse DXF with dxf-parser (pure JS, no external binary)
-        const startTime = Date.now()
-        try {
-          const fileContent = await fs.readFile(inputFile, 'utf-8')
-          const parser = new DxfParser()
-          const dxf = parser.parseSync(fileContent)
+      const startTime = Date.now()
+      try {
+        const fileContent = await fs.readFile(inputFile, 'utf-8')
+        const parser = new DxfParser()
+        const dxf = parser.parseSync(fileContent)
 
-          const outputDir = path.join(UPLOADS_DIR, `output-${Date.now()}`)
-          await fs.mkdir(outputDir, { recursive: true })
-          const outJson = path.join(outputDir, `${path.basename(req.file.originalname, '.dxf')}.json`)
-          await fs.writeFile(outJson, JSON.stringify(dxf, null, 2))
+        const outputDir = path.join(UPLOADS_DIR, `output-${Date.now()}`)
+        await fs.mkdir(outputDir, { recursive: true })
+        const outJson = path.join(outputDir, `${baseName}.json`)
+        await fs.writeFile(outJson, JSON.stringify(dxf, null, 2))
 
-          const layers = dxf?.tables?.layer?.layers ? Object.keys(dxf.tables.layer.layers) : []
-          const entityCount = dxf?.entities?.length || 0
-          const blockCount = dxf?.blocks ? Object.keys(dxf.blocks).length : 0
+        const layers = dxf?.tables?.layer?.layers ? Object.keys(dxf.tables.layer.layers) : []
+        const entityCount = dxf?.entities?.length || 0
+        const blockCount = dxf?.blocks ? Object.keys(dxf.blocks).length : 0
 
-          const duration = Date.now() - startTime
-          const record = {
-            id: `conv-${Date.now()}`,
-            inputFile: req.file.originalname,
-            inputFormat: 'dxf',
-            outputFormat: 'json',
-            status: 'completed',
-            converter: 'dxf-parser (open-source)',
-            outputFiles: [path.basename(outJson)],
-            outputDir,
-            summary: { layers: layers.length, entities: entityCount, blocks: blockCount, layerNames: layers.slice(0, 20) },
-            startedAt: new Date(startTime).toISOString(),
-            completedAt: new Date().toISOString(),
-            duration,
-          }
-          conversionHistory.unshift(record)
-          return res.json(record)
-        } catch (parseErr) {
-          const duration = Date.now() - startTime
-          const record = {
-            id: `conv-${Date.now()}`,
-            inputFile: req.file.originalname,
-            inputFormat: 'dxf',
-            outputFormat: 'json',
-            status: 'error',
-            converter: 'dxf-parser (open-source)',
-            message: `DXF parse error: ${parseErr.message}`,
-            startedAt: new Date(startTime).toISOString(),
-            completedAt: new Date().toISOString(),
-            duration,
-          }
-          conversionHistory.unshift(record)
-          return res.status(500).json(record)
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'dxf',
+          outputFormat: 'json',
+          status: 'completed',
+          converter: 'dxf-parser (open-source)',
+          outputFiles: [path.basename(outJson)],
+          outputDir,
+          summary: { layers: layers.length, entities: entityCount, blocks: blockCount, layerNames: layers.slice(0, 20) },
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
         }
+        conversionHistory.unshift(record)
+        return res.json(record)
+      } catch (parseErr) {
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'dxf',
+          outputFormat: 'json',
+          status: 'error',
+          converter: 'dxf-parser (open-source)',
+          message: `DXF parse error: ${parseErr.message}`,
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
+        }
+        conversionHistory.unshift(record)
+        return res.status(500).json(record)
       }
     }
 
+    // ── DWG: LibreDWG WASM (open-source, primary) ──────────────────────────
+    if (inputExt === 'dwg') {
+      const startTime = Date.now()
+      try {
+        const dwg = await getLibreDwg()
+        if (!dwg) throw new Error('LibreDWG WASM не доступен в серверной среде. Используйте CAD Viewer для просмотра DWG файлов.')
+
+        const fileBuffer = await fs.readFile(inputFile)
+        const dataPtr = dwg.dwg_read_data(fileBuffer.buffer, 0)
+        if (dataPtr == null) throw new Error('Не удалось разобрать DWG файл')
+
+        const database = dwg.convert(dataPtr)
+        const layers = dwg.dwg_getall_LAYER(dataPtr)
+        const entities = dwg.dwg_getall_entities_in_model_space(dataPtr)
+        const blocks = dwg.dwg_getall_BLOCK_HEADER(dataPtr)
+
+        let svgContent = ''
+        try { svgContent = dwg.dwg_to_svg(database) } catch (_e) { /* SVG generation optional */ }
+
+        dwg.dwg_free(dataPtr)
+
+        const outputDir = path.join(UPLOADS_DIR, `output-${Date.now()}`)
+        await fs.mkdir(outputDir, { recursive: true })
+
+        const summary = { layers: layers.length, entities: entities.length, blocks: blocks.length }
+
+        const outJson = path.join(outputDir, `${baseName}.json`)
+        await fs.writeFile(outJson, JSON.stringify({ summary, layerCount: layers.length, entityCount: entities.length, blockCount: blocks.length }, null, 2))
+
+        const outputFiles = [path.basename(outJson)]
+        if (svgContent) {
+          const outSvg = path.join(outputDir, `${baseName}.svg`)
+          await fs.writeFile(outSvg, svgContent)
+          outputFiles.push(path.basename(outSvg))
+        }
+
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'dwg',
+          outputFormat: svgContent ? 'json+svg' : 'json',
+          status: 'completed',
+          converter: 'LibreDWG WASM (open-source)',
+          outputFiles,
+          outputDir,
+          summary,
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
+        }
+        conversionHistory.unshift(record)
+        return res.json(record)
+      } catch (parseErr) {
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'dwg',
+          outputFormat: 'json',
+          status: 'error',
+          converter: 'LibreDWG WASM (open-source)',
+          message: parseErr.message,
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
+        }
+        conversionHistory.unshift(record)
+        return res.status(500).json(record)
+      }
+    }
+
+    // ── IFC: web-ifc (open-source, primary) ─────────────────────────────────
+    if (inputExt === 'ifc') {
+      const startTime = Date.now()
+      try {
+        const api = await getIfcApi()
+        if (!api) throw new Error('web-ifc WASM не доступен. Используйте 3D Viewer для просмотра IFC файлов.')
+
+        const fileData = await fs.readFile(inputFile)
+        const modelID = api.OpenModel(fileData)
+
+        // Collect element type counts
+        const allLines = api.GetAllLines(modelID)
+        const lineCount = allLines.size()
+        const typeCounts = {}
+        const sampleLimit = Math.min(lineCount, 50000)
+        for (let i = 0; i < sampleLimit; i++) {
+          const lineID = allLines.get(i)
+          try {
+            const lineData = api.GetLine(modelID, lineID, false)
+            const typeName = lineData?.type != null ? `IFC_TYPE_${lineData.type}` : 'Unknown'
+            typeCounts[typeName] = (typeCounts[typeName] || 0) + 1
+          } catch (_e) { /* skip problematic lines */ }
+        }
+
+        api.CloseModel(modelID)
+
+        const outputDir = path.join(UPLOADS_DIR, `output-${Date.now()}`)
+        await fs.mkdir(outputDir, { recursive: true })
+
+        const summary = { totalElements: lineCount, typeCount: Object.keys(typeCounts).length, typeCounts }
+        const outJson = path.join(outputDir, `${baseName}.json`)
+        await fs.writeFile(outJson, JSON.stringify(summary, null, 2))
+
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'ifc',
+          outputFormat: 'json',
+          status: 'completed',
+          converter: 'web-ifc (open-source)',
+          outputFiles: [path.basename(outJson)],
+          outputDir,
+          summary: { totalElements: lineCount, typeCount: Object.keys(typeCounts).length },
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
+        }
+        conversionHistory.unshift(record)
+        return res.json(record)
+      } catch (parseErr) {
+        const duration = Date.now() - startTime
+        const record = {
+          id: `conv-${Date.now()}`,
+          inputFile: req.file.originalname,
+          inputFormat: 'ifc',
+          outputFormat: 'json',
+          status: 'error',
+          converter: 'web-ifc (open-source)',
+          message: parseErr.message,
+          startedAt: new Date(startTime).toISOString(),
+          completedAt: new Date().toISOString(),
+          duration,
+        }
+        conversionHistory.unshift(record)
+        return res.status(500).json(record)
+      }
+    }
+
+    // ── RVT: DDC converters (kept as-is) ────────────────────────────────────
     if (!converter) {
       return res.status(400).json({
         error: `No converter available for .${inputExt} files`,
-        supported: Object.keys(CONVERTER_PATHS).map(k => `.${k}`),
+        supported: ['.rvt', '.ifc', '.dwg', '.dxf'],
       })
     }
 
@@ -1085,7 +1254,6 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
     const startTime = Date.now()
 
     // Build correct arguments depending on converter type
-    const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname))
     let converterArgs
     let actualExePath = exePath
     let converterCwd = converter.dir
@@ -2278,7 +2446,7 @@ app.post('/api/ai/chat', async (req, res) => {
 
     const systemContext = `You are Jens AI, an intelligent assistant for the Jens Construction Platform. You specialize in:
 
-- CAD/BIM file conversion (Revit, IFC, DWG, DGN)
+- CAD/BIM file conversion (Revit, IFC, DWG, DXF)
 - Construction cost estimation using CWICR databases
 - BIM data validation and quality checks
 - Quantity Take-Off (QTO) analysis
@@ -3936,7 +4104,8 @@ app.get('/api/cost/estimates', async (_req, res) => {
 
 app.get('/api/engines/status', (_req, res) => {
   const converterStatus = converterAvailability()
-  const converterCount = Object.values(converterStatus).filter(c => c.available).length
+  const openSource = converterStatus.openSource || {}
+  const openSourceOnline = Object.values(openSource).filter(c => c.available).length
 
   let cwicrLanguageCount = 0
   let cwicrCachedRows = 0
@@ -3963,11 +4132,11 @@ app.get('/api/engines/status', (_req, res) => {
       },
       cadPipeline: {
         name: 'CAD/BIM Pipeline',
-        status: converterCount > 0 ? 'online' : 'degraded',
+        status: openSourceOnline > 0 ? 'online' : 'degraded',
         details: {
-          converterCount,
+          openSourceCount: openSourceOnline,
           converters: converterStatus,
-          openSource: converterStatus.openSource,
+          openSource,
           revitIfc: getRevitIfcStatus(),
         },
       },

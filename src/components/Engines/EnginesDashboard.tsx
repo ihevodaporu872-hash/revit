@@ -183,7 +183,7 @@ export default function EnginesDashboard() {
                           <p className="text-sm font-medium text-foreground">CAD/BIM Pipeline</p>
                           <p className="text-xs text-muted-foreground">
                             Конвертация и обработка моделей
-                            {engines?.cadPipeline?.details && ` · DDC: ${(engines.cadPipeline.details as { converterCount?: number }).converterCount || 0} конвертеров`}
+                            {engines?.cadPipeline?.details && ` · Open-source: ${(engines.cadPipeline.details as { openSourceCount?: number }).openSourceCount || 0} движков`}
                           </p>
                         </div>
                       </div>
@@ -312,36 +312,30 @@ export default function EnginesDashboard() {
       </Card>
 
       {/* Open-Source Converters Card */}
-      <Card title="Open-Source конвертеры" subtitle="Бесплатные npm-пакеты для обработки CAD-файлов">
+      <Card title="Open-Source конвертеры" subtitle="Основные движки обработки CAD/BIM-файлов">
         <div className="space-y-3 text-sm">
           <div className="flex items-start gap-2">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">dxf-parser</strong> — чистый JS-парсер DXF файлов. Извлекает слои, линии, полилинии, текст, блоки. Fallback при отсутствии DDC конвертера.
+              <strong className="text-foreground">dxf-parser</strong> — чистый JS-парсер DXF файлов. Извлекает слои, линии, полилинии, текст, блоки. Основной движок для .dxf.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">LibreDWG (WASM)</strong> — WebAssembly-парсер DWG/DXF на основе libredwg. Читает AutoCAD R14–2024 без внешних зависимостей.
+              <strong className="text-foreground">LibreDWG (WASM)</strong> — WebAssembly-парсер DWG на основе libredwg. Читает AutoCAD R14–2024. Основной движок для .dwg.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">web-ifc</strong> — WebAssembly IFC-парсер (уже интегрирован). Чтение/запись IFC2x3, IFC4.
+              <strong className="text-foreground">web-ifc (WASM)</strong> — WebAssembly IFC-парсер. Чтение IFC2x3, IFC4. Основной движок для .ifc.
             </span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             <span className="text-muted-foreground">
               <strong className="text-foreground">revit-ifc (RVT→IFC)</strong> — open-source плагин Autodesk/revit-ifc (LGPL v2). Конвертация RVT→IFC через pyRevit CLI + Revit 2023. Требуется машина с установленным Revit.
-            </span>
-          </div>
-          <div className="flex items-start gap-2">
-            <XCircle size={14} className="mt-0.5 shrink-0 text-destructive" />
-            <span className="text-muted-foreground">
-              <strong className="text-foreground">DGN (MicroStation)</strong> — проприетарный формат. Open-source альтернатив не существует. Требуется DDC конвертер.
             </span>
           </div>
         </div>

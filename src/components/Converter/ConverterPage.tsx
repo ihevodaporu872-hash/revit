@@ -79,7 +79,7 @@ const MOCK_HISTORY: ConversionHistoryEntry[] = [
   { id: 'h1', fileName: 'Hospital_Phase2.rvt', inputFormat: 'RVT', outputFormat: 'excel', status: 'completed', createdAt: '2026-02-07T14:30:00Z', duration: '2m 14s', fileSize: '45.2 MB' },
   { id: 'h2', fileName: 'Bridge_Design.ifc', inputFormat: 'IFC', outputFormat: 'dae', status: 'completed', createdAt: '2026-02-07T11:15:00Z', duration: '1m 42s', fileSize: '28.7 MB' },
   { id: 'h3', fileName: 'Office_MEP.dwg', inputFormat: 'DWG', outputFormat: 'pdf', status: 'completed', createdAt: '2026-02-06T16:45:00Z', duration: '0m 38s', fileSize: '12.1 MB' },
-  { id: 'h4', fileName: 'Parking_Structure.dgn', inputFormat: 'DGN', outputFormat: 'excel', status: 'failed', createdAt: '2026-02-06T09:20:00Z', duration: '\u2014', fileSize: '67.3 MB' },
+  { id: 'h4', fileName: 'Site_Plan.dxf', inputFormat: 'DXF', outputFormat: 'excel', status: 'completed', createdAt: '2026-02-06T09:20:00Z', duration: '0m 12s', fileSize: '4.8 MB' },
   { id: 'h5', fileName: 'Residential_Block_A.rvt', inputFormat: 'RVT', outputFormat: 'dae', status: 'completed', createdAt: '2026-02-05T13:10:00Z', duration: '3m 05s', fileSize: '89.4 MB' },
   { id: 'h6', fileName: 'HVAC_Layout.ifc', inputFormat: 'IFC', outputFormat: 'excel', status: 'completed', createdAt: '2026-02-05T08:55:00Z', duration: '1m 18s', fileSize: '19.6 MB' },
 ]
@@ -371,7 +371,7 @@ export default function ConverterPage() {
             <h1 className="display-heading text-[30px] font-semibold leading-tight tracking-tight text-foreground xl:text-[34px]">\u041F\u0440\u0435\u043E\u0431\u0440\u0430\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C CAD/BIM</h1>
           </div>
           <p className="max-w-5xl text-[14px] text-muted-foreground">
-            \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0444\u0430\u0439\u043B\u044B Revit, IFC, DWG \u0438 DGN \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u044B Excel, 3D DAE \u0438\u043B\u0438 PDF
+            \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0444\u0430\u0439\u043B\u044B Revit, IFC, DWG \u0438 DXF \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u044B Excel, 3D DAE \u0438\u043B\u0438 PDF
           </p>
         </div>
 
@@ -407,7 +407,7 @@ export default function ConverterPage() {
                 <div className="lg:col-span-2">
                   <Card className="converter-upload-card" title="\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432" subtitle="\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0441\u044E\u0434\u0430 CAD/BIM-\u0444\u0430\u0439\u043B\u044B \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438" hover>
                     <FileUpload
-                      accept=".rvt,.ifc,.dwg,.dgn"
+                      accept=".rvt,.ifc,.dwg,.dxf"
                       multiple
                       maxSize={500 * 1024 * 1024}
                       onFilesSelected={handleFilesSelected}
