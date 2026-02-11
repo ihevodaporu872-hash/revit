@@ -32,6 +32,7 @@ import { createCWICREngine } from './cwicr-engine.js'
 import { createCostEngine } from './cost-engine.js'
 import { createCADPipeline } from './cad-pipeline.js'
 import { createSheetsSync } from './sheets-sync.js'
+import { convertRvtToIfc, getRevitIfcStatus } from './revit-ifc-bridge.js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -1090,7 +1091,40 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
     let converterCwd = converter.dir
 
     if (converterKey === 'rvt' && outputFormat === 'ifc') {
-      // RVT→IFC: use RVT2IFCconverter.exe
+      // RVT→IFC: try open-source bridge first, then fallback to legacy exe
+      const revitIfcStatus = getRevitIfcStatus()
+
+      if (revitIfcStatus.available) {
+        // Open-source path: pyRevit + revit-ifc plugin
+        try {
+          console.log(`[Converter] Using revit-ifc bridge (${revitIfcStatus.backend})`)
+          const result = await convertRvtToIfc(inputFile, outputDir, {
+            ifcVersion: req.body.ifcVersion || 'IFC4',
+          })
+          const duration = Date.now() - startTime
+          const outputFiles = await fs.readdir(outputDir)
+          const record = {
+            id: `conv-${Date.now()}`,
+            inputFile: req.file.originalname,
+            inputFormat: inputExt,
+            outputFormat: 'ifc',
+            status: 'completed',
+            converter: `revit-ifc (${revitIfcStatus.backend})`,
+            outputFiles,
+            outputDir,
+            startedAt: new Date(startTime).toISOString(),
+            completedAt: new Date().toISOString(),
+            duration,
+          }
+          conversionHistory.unshift(record)
+          return res.json(record)
+        } catch (bridgeErr) {
+          console.warn(`[Converter] revit-ifc bridge failed: ${bridgeErr.message}`)
+          // Fall through to legacy converter
+        }
+      }
+
+      // Fallback: legacy RVT2IFCconverter.exe
       const rvt2ifcConfig = CONVERTER_PATHS.rvt2ifc
       const rvt2ifcExe = path.join(rvt2ifcConfig.dir, rvt2ifcConfig.exe)
       if (!existsSync(rvt2ifcExe)) {
@@ -1100,7 +1134,7 @@ app.post('/api/converter/convert', upload.single('file'), async (req, res) => {
           inputFormat: inputExt,
           outputFormat: 'ifc',
           status: 'error',
-          message: `RVT2IFC converter not found: ${rvt2ifcConfig.exe}. Ensure the DDC Revit2IFC converter package is installed.`,
+          message: `No RVT→IFC converter available. Install pyRevit + revit-ifc plugin or the DDC Revit2IFC converter.`,
           startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
           duration: 0,
@@ -3934,6 +3968,7 @@ app.get('/api/engines/status', (_req, res) => {
           converterCount,
           converters: converterStatus,
           openSource: converterStatus.openSource,
+          revitIfc: getRevitIfcStatus(),
         },
       },
       sheetsSync: {

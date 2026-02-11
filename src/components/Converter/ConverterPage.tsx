@@ -121,6 +121,9 @@ export default function ConverterPage() {
   const [isConverting, setIsConverting] = useState(false)
   const [history, setHistory] = useState<ConversionHistoryEntry[]>(MOCK_HISTORY)
 
+  // IFC version selector (shown when outputFormat === 'ifc')
+  const [ifcVersion, setIfcVersion] = useState<'IFC2x3' | 'IFC4'>('IFC4')
+
   // Native post-processing options
   const [postValidate, setPostValidate] = useState(false)
   const [postClassify, setPostClassify] = useState(false)
@@ -175,6 +178,9 @@ export default function ConverterPage() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('outputFormat', outputFormat)
+      if (outputFormat === 'ifc') {
+        formData.append('ifcVersion', ifcVersion)
+      }
 
       try {
         setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, progress: 30 } : j))
@@ -435,6 +441,44 @@ export default function ConverterPage() {
                       </motion.button>
                     ))}
                   </div>
+
+                  {/* IFC Version Selector */}
+                  <AnimatePresence>
+                    {outputFormat === 'ifc' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-3 overflow-hidden"
+                      >
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                          <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Версия IFC
+                          </p>
+                          <div className="flex gap-2">
+                            {(['IFC2x3', 'IFC4'] as const).map((v) => (
+                              <button
+                                key={v}
+                                onClick={() => setIfcVersion(v)}
+                                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                  ifcVersion === v
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-background text-muted-foreground hover:border-primary/50'
+                                }`}
+                              >
+                                {v === 'IFC2x3' ? 'IFC 2x3' : 'IFC 4'}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="mt-1.5 text-[11px] text-muted-foreground">
+                            {ifcVersion === 'IFC4'
+                              ? 'Рекомендовано — поддержка новых типов и свойств'
+                              : 'Совместимость со старыми программами'}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Native Post-processing */}
                   <div className="mt-4 pt-4 border-t border-border space-y-2">

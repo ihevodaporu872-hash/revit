@@ -200,6 +200,18 @@ export default function EnginesDashboard() {
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">
                         <Package size={10} /> web-ifc
                       </span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+                        (engines?.cadPipeline?.details as { revitIfc?: { available?: boolean } })?.revitIfc?.available
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        <Package size={10} /> revit-ifc
+                        {(engines?.cadPipeline?.details as { revitIfc?: { backend?: string } })?.revitIfc?.backend && (
+                          <span className="opacity-70">
+                            ({(engines?.cadPipeline?.details as { revitIfc?: { backend?: string } }).revitIfc?.backend})
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </motion.div>
 
@@ -321,9 +333,9 @@ export default function EnginesDashboard() {
             </span>
           </div>
           <div className="flex items-start gap-2">
-            <XCircle size={14} className="mt-0.5 shrink-0 text-destructive" />
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             <span className="text-muted-foreground">
-              <strong className="text-foreground">RVT (Revit)</strong> — проприетарный формат. Open-source альтернатив не существует. Требуется DDC конвертер или Autodesk APS API.
+              <strong className="text-foreground">revit-ifc (RVT→IFC)</strong> — open-source плагин Autodesk/revit-ifc (LGPL v2). Конвертация RVT→IFC через pyRevit CLI + Revit 2023. Требуется машина с установленным Revit.
             </span>
           </div>
           <div className="flex items-start gap-2">

@@ -1,0 +1,12 @@
+{
+  "backend": "pyrevit",
+  "revitVersion": "2023",
+  "revitPath": "C:\\Program Files\\Autodesk\\Revit 2023",
+  "pyrevitPath": "",
+  "rbpPath": "",
+  "defaultIfcVersion": "IFC4",
+  "exportBaseQuantities": true,
+  "wallSplitting": false,
+  "timeout": 300000,
+  "maxConcurrent": 1
+}
