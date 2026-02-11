@@ -71,6 +71,7 @@ if input_path:
 IFC_VERSIONS = {
     'IFC2x3': IFCVersion.IFC2x3CV2,
     'IFC4':   IFCVersion.IFC4,
+    'IFC4x3': IFCVersion.IFC4,  # Revit 2023 uses IFC4 as nearest; 2024+ may have IFC4x3
 }
 
 version_key = params.get('ifcVersion', 'IFC4')

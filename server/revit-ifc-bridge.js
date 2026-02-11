@@ -128,13 +128,16 @@ export async function convertRvtToIfc(inputRvt, outputDir, options = {}) {
   const paramsPath = path.join(path.dirname(inputRvt), 'params.json')
   await fs.writeFile(paramsPath, JSON.stringify(params, null, 2))
 
-  if (config.backend === 'pyrevit') {
-    return runPyRevit(inputRvt, outputIfc)
-  } else if (config.backend === 'rbp') {
-    return runBatchRvt(inputRvt, outputIfc)
+  try {
+    if (config.backend === 'pyrevit') {
+      return await runPyRevit(inputRvt, outputIfc)
+    } else if (config.backend === 'rbp') {
+      return await runBatchRvt(inputRvt, outputIfc)
+    }
+    throw new Error(`Unknown revit-ifc backend: ${config.backend}`)
+  } finally {
+    fs.unlink(paramsPath).catch(() => {})
   }
-
-  throw new Error(`Unknown revit-ifc backend: ${config.backend}`)
 }
 
 // ---------------------------------------------------------------------------

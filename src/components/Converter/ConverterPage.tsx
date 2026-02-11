@@ -122,7 +122,7 @@ export default function ConverterPage() {
   const [history, setHistory] = useState<ConversionHistoryEntry[]>(MOCK_HISTORY)
 
   // IFC version selector (shown when outputFormat === 'ifc')
-  const [ifcVersion, setIfcVersion] = useState<'IFC2x3' | 'IFC4'>('IFC4')
+  const [ifcVersion, setIfcVersion] = useState<'IFC2x3' | 'IFC4' | 'IFC4x3'>('IFC4')
 
   // Native post-processing options
   const [postValidate, setPostValidate] = useState(false)
@@ -456,7 +456,7 @@ export default function ConverterPage() {
                             Версия IFC
                           </p>
                           <div className="flex gap-2">
-                            {(['IFC2x3', 'IFC4'] as const).map((v) => (
+                            {(['IFC2x3', 'IFC4', 'IFC4x3'] as const).map((v) => (
                               <button
                                 key={v}
                                 onClick={() => setIfcVersion(v)}
@@ -466,14 +466,16 @@ export default function ConverterPage() {
                                     : 'border-border bg-background text-muted-foreground hover:border-primary/50'
                                 }`}
                               >
-                                {v === 'IFC2x3' ? 'IFC 2x3' : 'IFC 4'}
+                                {v === 'IFC2x3' ? 'IFC 2x3' : v === 'IFC4' ? 'IFC 4' : 'IFC 4x3'}
                               </button>
                             ))}
                           </div>
                           <p className="mt-1.5 text-[11px] text-muted-foreground">
-                            {ifcVersion === 'IFC4'
-                              ? 'Рекомендовано — поддержка новых типов и свойств'
-                              : 'Совместимость со старыми программами'}
+                            {ifcVersion === 'IFC4x3'
+                              ? 'Новейший стандарт — расширенная геометрия и свойства'
+                              : ifcVersion === 'IFC4'
+                                ? 'Рекомендовано — поддержка новых типов и свойств'
+                                : 'Совместимость со старыми программами'}
                           </p>
                         </div>
                       </motion.div>
