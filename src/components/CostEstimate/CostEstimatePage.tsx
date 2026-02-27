@@ -11,6 +11,7 @@ import {
   Download,
   Sparkles,
   ChevronDown,
+  ChevronRight,
   Trash2,
   Plus,
   Minus,
@@ -18,6 +19,10 @@ import {
   Check,
   GitCompare,
   Brain,
+  Loader2,
+  Hammer,
+  Package,
+  Truck,
 } from 'lucide-react'
 import { VORExportButtons, EstimateExportButtons } from './VORExport'
 import VORValidation from './VORValidation'
@@ -44,6 +49,16 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+interface ResourceItem {
+  resource_code: string
+  name: string
+  unit: string
+  type: string
+  quantity: number
+  price_per_unit: number
+  total_cost: number
+}
+
 interface WorkItem {
   id: string
   code: string
@@ -52,6 +67,11 @@ interface WorkItem {
   unitPrice: number
   category: string
   subcategory?: string
+  labor: number
+  materials: number
+  machines: number
+  laborHours: number
+  resources: ResourceItem[]
 }
 
 interface CostLineItem {
@@ -59,6 +79,11 @@ interface CostLineItem {
   workItem: WorkItem
   quantity: number
   total: number
+  labor: number
+  materials: number
+  machines: number
+  laborHours: number
+  expanded: boolean
 }
 
 interface ClassificationResult {
@@ -100,17 +125,19 @@ const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
 
 // ── Mock Data ──────────────────────────────────────────────────────────
 
+const emptyRates = { labor: 0, materials: 0, machines: 0, laborHours: 0, resources: [] as ResourceItem[] }
+
 const MOCK_SEARCH_RESULTS: WorkItem[] = [
-  { id: 'w1', code: '03.31.13.10', description: 'Structural concrete, cast-in-place, walls, 200mm thick', unit: 'm\u00B3', unitPrice: 285.50, category: 'Concrete', subcategory: 'Cast-in-place' },
-  { id: 'w2', code: '03.31.13.20', description: 'Structural concrete, cast-in-place, slabs, 250mm thick', unit: 'm\u00B3', unitPrice: 312.00, category: 'Concrete', subcategory: 'Cast-in-place' },
-  { id: 'w3', code: '03.31.13.30', description: 'Structural concrete, cast-in-place, columns, 400x400mm', unit: 'm\u00B3', unitPrice: 445.00, category: 'Concrete', subcategory: 'Cast-in-place' },
-  { id: 'w4', code: '03.31.13.40', description: 'Structural concrete, cast-in-place, beams, 300x500mm', unit: 'm\u00B3', unitPrice: 398.75, category: 'Concrete', subcategory: 'Cast-in-place' },
-  { id: 'w5', code: '03.21.11.10', description: 'Reinforcement steel bars, Grade 60, #4 to #8', unit: 'kg', unitPrice: 1.85, category: 'Concrete', subcategory: 'Reinforcement' },
-  { id: 'w6', code: '04.21.13.10', description: 'Clay masonry, standard brick, running bond', unit: 'm\u00B2', unitPrice: 95.20, category: 'Masonry', subcategory: 'Clay brick' },
-  { id: 'w7', code: '05.12.13.10', description: 'Structural steel, wide flange beams, W12 to W18', unit: 'kg', unitPrice: 3.45, category: 'Steel', subcategory: 'Structural' },
-  { id: 'w8', code: '07.21.13.10', description: 'Thermal insulation, rigid board, 50mm thick', unit: 'm\u00B2', unitPrice: 28.40, category: 'Insulation', subcategory: 'Board' },
-  { id: 'w9', code: '09.29.10.10', description: 'Gypsum board partition, 12.5mm, single layer each side', unit: 'm\u00B2', unitPrice: 42.60, category: 'Finishes', subcategory: 'Drywall' },
-  { id: 'w10', code: '22.11.13.10', description: 'Water supply piping, copper, 15mm to 25mm diameter', unit: 'm', unitPrice: 38.90, category: 'Plumbing', subcategory: 'Piping' },
+  { id: 'w1', code: '03.31.13.10', description: 'Structural concrete, cast-in-place, walls, 200mm thick', unit: 'm\u00B3', unitPrice: 285.50, category: 'Concrete', subcategory: 'Cast-in-place', labor: 95.20, materials: 162.30, machines: 28.00, laborHours: 2.8, resources: [] },
+  { id: 'w2', code: '03.31.13.20', description: 'Structural concrete, cast-in-place, slabs, 250mm thick', unit: 'm\u00B3', unitPrice: 312.00, category: 'Concrete', subcategory: 'Cast-in-place', labor: 104.00, materials: 178.00, machines: 30.00, laborHours: 3.1, resources: [] },
+  { id: 'w3', code: '03.31.13.30', description: 'Structural concrete, cast-in-place, columns, 400x400mm', unit: 'm\u00B3', unitPrice: 445.00, category: 'Concrete', subcategory: 'Cast-in-place', labor: 178.00, materials: 221.00, machines: 46.00, laborHours: 5.2, resources: [] },
+  { id: 'w4', code: '03.31.13.40', description: 'Structural concrete, cast-in-place, beams, 300x500mm', unit: 'm\u00B3', unitPrice: 398.75, category: 'Concrete', subcategory: 'Cast-in-place', labor: 159.50, materials: 199.25, machines: 40.00, laborHours: 4.7, resources: [] },
+  { id: 'w5', code: '03.21.11.10', description: 'Reinforcement steel bars, Grade 60, #4 to #8', unit: 'kg', unitPrice: 1.85, category: 'Concrete', subcategory: 'Reinforcement', labor: 0.65, materials: 1.10, machines: 0.10, laborHours: 0.02, resources: [] },
+  { id: 'w6', code: '04.21.13.10', description: 'Clay masonry, standard brick, running bond', unit: 'm\u00B2', unitPrice: 95.20, category: 'Masonry', subcategory: 'Clay brick', labor: 42.30, materials: 48.90, machines: 4.00, laborHours: 1.2, resources: [] },
+  { id: 'w7', code: '05.12.13.10', description: 'Structural steel, wide flange beams, W12 to W18', unit: 'kg', unitPrice: 3.45, category: 'Steel', subcategory: 'Structural', labor: 1.20, materials: 2.05, machines: 0.20, laborHours: 0.03, resources: [] },
+  { id: 'w8', code: '07.21.13.10', description: 'Thermal insulation, rigid board, 50mm thick', unit: 'm\u00B2', unitPrice: 28.40, category: 'Insulation', subcategory: 'Board', labor: 8.50, materials: 18.40, machines: 1.50, laborHours: 0.25, resources: [] },
+  { id: 'w9', code: '09.29.10.10', description: 'Gypsum board partition, 12.5mm, single layer each side', unit: 'm\u00B2', unitPrice: 42.60, category: 'Finishes', subcategory: 'Drywall', labor: 18.90, materials: 21.70, machines: 2.00, laborHours: 0.55, resources: [] },
+  { id: 'w10', code: '22.11.13.10', description: 'Water supply piping, copper, 15mm to 25mm diameter', unit: 'm', unitPrice: 38.90, category: 'Plumbing', subcategory: 'Piping', labor: 14.60, materials: 22.30, machines: 2.00, laborHours: 0.42, resources: [] },
 ]
 
 const MOCK_RECENT_ESTIMATES: RecentEstimate[] = [
@@ -153,8 +180,94 @@ export default function CostEstimatePage() {
   // ── Computed values ────────────────────────────────────
 
   const grandTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.total, 0), [costItems])
+  const laborTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.labor, 0), [costItems])
+  const materialsTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.materials, 0), [costItems])
+  const machinesTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.machines, 0), [costItems])
+  const laborHoursTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.laborHours, 0), [costItems])
 
   const currentLang = LANGUAGES.find((l) => l.code === language)!
+
+  // Inline search for estimate tab
+  const [estimateSearch, setEstimateSearch] = useState('')
+  const [estimateSearchResults, setEstimateSearchResults] = useState<WorkItem[]>([])
+  const [isEstimateSearching, setIsEstimateSearching] = useState(false)
+
+  const handleEstimateSearch = async () => {
+    if (!estimateSearch.trim()) return
+    setIsEstimateSearching(true)
+    try {
+      const res = await fetch(`${API_BASE}/cwicr/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: estimateSearch, language, topK: 5 }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.results && data.results.length > 0) {
+          const mapped: WorkItem[] = data.results.map((r: Record<string, unknown>, i: number) => {
+            const costSummary = (r.cost_summary || {}) as Record<string, unknown>
+            const resources = (r.resources || []) as Record<string, unknown>[]
+            const rateUnit = String(r.rate_unit || r.unit || '')
+            const totalCostPosition = Number(costSummary.total_cost_position || 0)
+            const unitDivisor = rateUnit.includes('100') ? 100 : 1
+            const unitCost = Number(r.unit_cost || r.unitPrice || (unitDivisor > 0 ? totalCostPosition / unitDivisor : totalCostPosition) || 0)
+
+            const mappedResources: ResourceItem[] = resources.map((res) => ({
+              resource_code: String(res.resource_code || res.code || ''),
+              name: String(res.name || ''),
+              unit: String(res.unit || ''),
+              type: String(res.type || ''),
+              quantity: Number(res.quantity || 0),
+              price_per_unit: Number(res.pricePerUnit || res.price || 0),
+              total_cost: Number(res.quantity || 0) * Number(res.pricePerUnit || res.price || 0),
+            }))
+
+            const laborRes = mappedResources.filter(r => r.type === 'labor' || r.type === 'Labour')
+            const matRes = mappedResources.filter(r => r.type === 'material' || r.type === 'Materials')
+            const machRes = mappedResources.filter(r => r.type === 'machine' || r.type === 'Machines' || r.type === 'Equipment')
+
+            const laborPerUnit = laborRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const matPerUnit = matRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const machPerUnit = machRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const hoursPerUnit = laborRes.filter(r => r.unit === 'h' || r.unit === 'час' || r.unit === 'Std').reduce((s, r) => s + r.quantity, 0) / unitDivisor
+
+            return {
+              id: `est-${i}`,
+              code: String(r.rate_code || r.code || ''),
+              description: String(r.rate_name || r.name || r.description || ''),
+              unit: rateUnit,
+              unitPrice: unitCost,
+              category: String(r.category || 'CWICR'),
+              labor: laborPerUnit || Number(costSummary.labor || 0) / unitDivisor,
+              materials: matPerUnit || Number(costSummary.materials || 0) / unitDivisor,
+              machines: machPerUnit || Number(costSummary.machines || 0) / unitDivisor,
+              laborHours: hoursPerUnit,
+              resources: mappedResources,
+            }
+          })
+          setEstimateSearchResults(mapped)
+          setIsEstimateSearching(false)
+          return
+        }
+      }
+    } catch {
+      // fallback
+    }
+    const filtered = MOCK_SEARCH_RESULTS.filter(
+      (item) =>
+        item.description.toLowerCase().includes(estimateSearch.toLowerCase()) ||
+        item.code.includes(estimateSearch) ||
+        item.category.toLowerCase().includes(estimateSearch.toLowerCase()),
+    )
+    setEstimateSearchResults(filtered.length > 0 ? filtered : MOCK_SEARCH_RESULTS.slice(0, 5))
+    setIsEstimateSearching(false)
+  }
+
+  const addFromEstimateSearch = (workItem: WorkItem) => {
+    addToCostItems(workItem)
+    setEstimateSearchResults([])
+    setEstimateSearch('')
+  }
 
   // ── Handlers ───────────────────────────────────────────
 
@@ -175,14 +288,47 @@ export default function CostEstimatePage() {
       if (res.ok) {
         const data = await res.json()
         if (data.results && data.results.length > 0) {
-          const mapped: WorkItem[] = data.results.map((r: Record<string, unknown>, i: number) => ({
-            id: `cwicr-${i}`,
-            code: String(r.rate_code || r.code || ''),
-            description: String(r.rate_name || r.name || r.description || ''),
-            unit: String(r.rate_unit || r.unit || ''),
-            unitPrice: Number(r.unit_cost || r.unitPrice || 0),
-            category: String(r.category || 'CWICR'),
-          }))
+          const mapped: WorkItem[] = data.results.map((r: Record<string, unknown>, i: number) => {
+            const costSummary = (r.cost_summary || {}) as Record<string, unknown>
+            const resources = (r.resources || []) as Record<string, unknown>[]
+            const rateUnit = String(r.rate_unit || r.unit || '')
+            const totalCostPosition = Number(costSummary.total_cost_position || 0)
+            const unitDivisor = rateUnit.includes('100') ? 100 : 1
+            const unitCost = Number(r.unit_cost || r.unitPrice || (unitDivisor > 0 ? totalCostPosition / unitDivisor : totalCostPosition) || 0)
+
+            const mappedResources: ResourceItem[] = resources.map((res) => ({
+              resource_code: String(res.resource_code || res.code || ''),
+              name: String(res.name || ''),
+              unit: String(res.unit || ''),
+              type: String(res.type || ''),
+              quantity: Number(res.quantity || 0),
+              price_per_unit: Number(res.pricePerUnit || res.price || 0),
+              total_cost: Number(res.quantity || 0) * Number(res.pricePerUnit || res.price || 0),
+            }))
+
+            const laborRes = mappedResources.filter(r => r.type === 'labor' || r.type === 'Labour')
+            const matRes = mappedResources.filter(r => r.type === 'material' || r.type === 'Materials')
+            const machRes = mappedResources.filter(r => r.type === 'machine' || r.type === 'Machines' || r.type === 'Equipment')
+
+            const laborPerUnit = laborRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const matPerUnit = matRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const machPerUnit = machRes.reduce((s, r) => s + r.total_cost, 0) / unitDivisor
+            const hoursPerUnit = laborRes.filter(r => r.unit === 'h' || r.unit === 'час' || r.unit === 'Std').reduce((s, r) => s + r.quantity, 0) / unitDivisor
+
+            return {
+              id: `cwicr-${i}`,
+              code: String(r.rate_code || r.code || ''),
+              description: String(r.rate_name || r.name || r.description || ''),
+              unit: rateUnit,
+              unitPrice: unitCost,
+              category: String(r.category || 'CWICR'),
+              labor: laborPerUnit || Number(costSummary.labor || 0) / unitDivisor,
+              materials: matPerUnit || Number(costSummary.materials || 0) / unitDivisor,
+              machines: machPerUnit || Number(costSummary.machines || 0) / unitDivisor,
+              laborHours: hoursPerUnit,
+              resources: mappedResources,
+            }
+          })
           setSearchResults(mapped)
           setIsSearching(false)
           return
@@ -207,20 +353,39 @@ export default function CostEstimatePage() {
   const addToCostItems = (workItem: WorkItem) => {
     const existing = costItems.find((ci) => ci.workItem.id === workItem.id)
     if (existing) {
+      const newQty = existing.quantity + 1
       setCostItems((prev) =>
         prev.map((ci) =>
           ci.workItem.id === workItem.id
-            ? { ...ci, quantity: ci.quantity + 1, total: (ci.quantity + 1) * ci.workItem.unitPrice }
+            ? {
+                ...ci,
+                quantity: newQty,
+                total: newQty * ci.workItem.unitPrice,
+                labor: newQty * ci.workItem.labor,
+                materials: newQty * ci.workItem.materials,
+                machines: newQty * ci.workItem.machines,
+                laborHours: newQty * ci.workItem.laborHours,
+              }
             : ci,
         ),
       )
     } else {
       setCostItems((prev) => [
         ...prev,
-        { id: `ci-${Date.now()}`, workItem, quantity: 1, total: workItem.unitPrice },
+        {
+          id: `ci-${Date.now()}`,
+          workItem,
+          quantity: 1,
+          total: workItem.unitPrice,
+          labor: workItem.labor,
+          materials: workItem.materials,
+          machines: workItem.machines,
+          laborHours: workItem.laborHours,
+          expanded: false,
+        },
       ])
     }
-    addNotification('success', `Added "${workItem.code}" to cost estimate`)
+    addNotification('success', `Добавлено "${workItem.code}" в расчёт`)
   }
 
   const updateQuantity = (itemId: string, delta: number) => {
@@ -229,7 +394,15 @@ export default function CostEstimatePage() {
         .map((ci) => {
           if (ci.id !== itemId) return ci
           const newQty = Math.max(0, ci.quantity + delta)
-          return { ...ci, quantity: newQty, total: newQty * ci.workItem.unitPrice }
+          return {
+            ...ci,
+            quantity: newQty,
+            total: newQty * ci.workItem.unitPrice,
+            labor: newQty * ci.workItem.labor,
+            materials: newQty * ci.workItem.materials,
+            machines: newQty * ci.workItem.machines,
+            laborHours: newQty * ci.workItem.laborHours,
+          }
         })
         .filter((ci) => ci.quantity > 0),
     )
@@ -242,7 +415,25 @@ export default function CostEstimatePage() {
     }
     setCostItems((prev) =>
       prev.map((ci) =>
-        ci.id === itemId ? { ...ci, quantity: qty, total: qty * ci.workItem.unitPrice } : ci,
+        ci.id === itemId
+          ? {
+              ...ci,
+              quantity: qty,
+              total: qty * ci.workItem.unitPrice,
+              labor: qty * ci.workItem.labor,
+              materials: qty * ci.workItem.materials,
+              machines: qty * ci.workItem.machines,
+              laborHours: qty * ci.workItem.laborHours,
+            }
+          : ci,
+      ),
+    )
+  }
+
+  const toggleExpanded = (itemId: string) => {
+    setCostItems((prev) =>
+      prev.map((ci) =>
+        ci.id === itemId ? { ...ci, expanded: !ci.expanded } : ci,
       ),
     )
   }
@@ -290,35 +481,49 @@ export default function CostEstimatePage() {
         unit: cr.unit,
         unitPrice: cr.unitPrice,
         category: 'Classified',
+        ...emptyRates,
       },
       quantity: cr.quantity,
       total: cr.quantity * cr.unitPrice,
+      labor: 0,
+      materials: 0,
+      machines: 0,
+      laborHours: 0,
+      expanded: false,
     }))
     setCostItems((prev) => [...prev, ...newItems])
-    addNotification('success', `Added ${newItems.length} classified items to cost estimate`)
+    addNotification('success', `Добавлено ${newItems.length} позиций в расчёт`)
   }
 
   // ── Column definitions ──────────────────────────────────
 
   const searchColumns = [
-    { key: 'code', header: 'Item Code', render: (item: WorkItem) => (
+    { key: 'code', header: 'Код', render: (item: WorkItem) => (
       <span className="font-mono text-xs font-medium text-primary">{item.code}</span>
     )},
-    { key: 'description', header: 'Description', render: (item: WorkItem) => (
+    { key: 'description', header: 'Описание', render: (item: WorkItem) => (
       <span className="text-sm">{item.description}</span>
     )},
-    { key: 'unit', header: 'Unit', render: (item: WorkItem) => (
+    { key: 'unit', header: 'Ед.', render: (item: WorkItem) => (
       <Badge variant="default">{item.unit}</Badge>
     )},
-    { key: 'unitPrice', header: 'Unit Price', render: (item: WorkItem) => (
+    { key: 'unitPrice', header: 'Цена/ед.', render: (item: WorkItem) => (
       <span className="font-medium">{formatCurrency(item.unitPrice)}</span>
     )},
-    { key: 'category', header: 'Category', render: (item: WorkItem) => (
+    { key: 'breakdown', header: 'Расценки', render: (item: WorkItem) => (
+      <div className="flex items-center gap-2 text-xs">
+        {item.labor > 0 && <span className="text-blue-500">Р: {formatCurrency(item.labor)}</span>}
+        {item.materials > 0 && <span className="text-emerald-500">М: {formatCurrency(item.materials)}</span>}
+        {item.machines > 0 && <span className="text-amber-500">Мех: {formatCurrency(item.machines)}</span>}
+        {item.labor === 0 && item.materials === 0 && item.machines === 0 && <span className="text-muted-foreground">—</span>}
+      </div>
+    )},
+    { key: 'category', header: 'Категория', render: (item: WorkItem) => (
       <Badge variant="primary">{item.category}</Badge>
     )},
     { key: 'actions', header: '', className: 'w-20', render: (item: WorkItem) => (
       <Button variant="ghost" size="sm" icon={<Plus size={14} />} onClick={() => addToCostItems(item)}>
-        Add
+        Добавить
       </Button>
     )},
   ]
@@ -638,9 +843,127 @@ export default function CostEstimatePage() {
           if (activeTab === 'estimate') {
             return (
               <div className="space-y-6">
+                {/* Summary Cards */}
+                {costItems.length > 0 && (
+                  <motion.div
+                    className="grid grid-cols-2 lg:grid-cols-5 gap-3"
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <motion.div variants={fadeInUp}>
+                      <div className="p-4 bg-card rounded-lg border border-border">
+                        <p className="text-xs text-muted-foreground">Общая стоимость</p>
+                        <motion.p
+                          key={grandTotal}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={springTransition}
+                          className="text-xl font-bold text-foreground"
+                        >
+                          {formatCurrency(grandTotal)}
+                        </motion.p>
+                      </div>
+                    </motion.div>
+                    <motion.div variants={fadeInUp}>
+                      <div className="p-4 bg-card rounded-lg border border-border">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Hammer size={12} className="text-blue-500" />
+                          <p className="text-xs text-muted-foreground">Работа</p>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">{formatCurrency(laborTotal)}</p>
+                        {grandTotal > 0 && <p className="text-xs text-muted-foreground">{((laborTotal / grandTotal) * 100).toFixed(0)}%</p>}
+                      </div>
+                    </motion.div>
+                    <motion.div variants={fadeInUp}>
+                      <div className="p-4 bg-card rounded-lg border border-border">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Package size={12} className="text-emerald-500" />
+                          <p className="text-xs text-muted-foreground">Материалы</p>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">{formatCurrency(materialsTotal)}</p>
+                        {grandTotal > 0 && <p className="text-xs text-muted-foreground">{((materialsTotal / grandTotal) * 100).toFixed(0)}%</p>}
+                      </div>
+                    </motion.div>
+                    <motion.div variants={fadeInUp}>
+                      <div className="p-4 bg-card rounded-lg border border-border">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Truck size={12} className="text-amber-500" />
+                          <p className="text-xs text-muted-foreground">Механизмы</p>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">{formatCurrency(machinesTotal)}</p>
+                        {grandTotal > 0 && <p className="text-xs text-muted-foreground">{((machinesTotal / grandTotal) * 100).toFixed(0)}%</p>}
+                      </div>
+                    </motion.div>
+                    <motion.div variants={fadeInUp}>
+                      <div className="p-4 bg-card rounded-lg border border-border">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Clock size={12} className="text-violet-500" />
+                          <p className="text-xs text-muted-foreground">Трудозатраты</p>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">{laborHoursTotal.toFixed(1)} ч</p>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {/* Inline Search */}
+                <Card hover>
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={estimateSearch}
+                        onChange={(e) => setEstimateSearch(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleEstimateSearch()}
+                        placeholder="Найти и добавить расценку... например: 'бетонная стена', 'штукатурка', '03.31'"
+                        className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-sm"
+                      />
+                    </div>
+                    <Button onClick={handleEstimateSearch} loading={isEstimateSearching} icon={<Search size={16} />}>
+                      Найти
+                    </Button>
+                  </div>
+
+                  {/* Inline search results dropdown */}
+                  <AnimatePresence>
+                    {estimateSearchResults.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="mt-3 border border-border rounded-lg overflow-hidden"
+                      >
+                        {estimateSearchResults.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/80 transition-colors border-b border-border/50 last:border-b-0 cursor-pointer"
+                            onClick={() => addFromEstimateSearch(item)}
+                          >
+                            <span className="font-mono text-xs text-primary min-w-[100px]">{item.code}</span>
+                            <span className="text-sm text-foreground flex-1 truncate">{item.description}</span>
+                            <Badge variant="default">{item.unit}</Badge>
+                            <span className="text-sm font-medium text-foreground min-w-[80px] text-right">{formatCurrency(item.unitPrice)}</span>
+                            {(item.labor > 0 || item.materials > 0) && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-[180px]">
+                                {item.labor > 0 && <span className="text-blue-500">Р: {formatCurrency(item.labor)}</span>}
+                                {item.materials > 0 && <span className="text-emerald-500">М: {formatCurrency(item.materials)}</span>}
+                                {item.machines > 0 && <span className="text-amber-500">Мех: {formatCurrency(item.machines)}</span>}
+                              </div>
+                            )}
+                            <Plus size={16} className="text-primary shrink-0" />
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Card>
+
+                {/* Cost items table */}
                 <Card
-                  title="\u0420\u0430\u0441\u0447\u0451\u0442 \u0441\u043C\u0435\u0442\u044B"
-                  subtitle={`\u041F\u043E\u0437\u0438\u0446\u0438\u0438 \u0432 \u0440\u0430\u0441\u0447\u0451\u0442\u0435: ${costItems.length}`}
+                  title="Расчёт сметы"
+                  subtitle={`Позиции в расчёте: ${costItems.length}`}
                   hover
                   actions={<EstimateExportButtons costItems={costItems} grandTotal={grandTotal} />}
                 >
@@ -648,26 +971,35 @@ export default function CostEstimatePage() {
                     <motion.div variants={scaleIn} initial="hidden" animate="visible">
                       <div className="text-center py-16">
                         <Calculator size={48} className="mx-auto text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground">\u041F\u043E\u0437\u0438\u0446\u0438\u0438 \u043F\u043E\u043A\u0430 \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B</p>
+                        <p className="text-muted-foreground">Позиции пока не добавлены</p>
                         <p className="text-muted-foreground/60 text-xs mt-1">
-                          \u041D\u0430\u0439\u0434\u0438\u0442\u0435 \u043F\u043E\u0437\u0438\u0446\u0438\u0438 \u0438\u043B\u0438 \u043A\u043B\u0430\u0441\u0441\u0438\u0444\u0438\u0446\u0438\u0440\u0443\u0439\u0442\u0435 BIM-\u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0438\u0445
+                          Используйте поиск выше, чтобы найти и добавить расценки
                         </p>
                       </div>
                     </motion.div>
                   ) : (
                     <>
-                      {/* Cost items table */}
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
                             <tr className="border-b border-border">
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041A\u043E\u0434</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0415\u0434.</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0426\u0435\u043D\u0430 \u0437\u0430 \u0435\u0434.</th>
-                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u041A\u043E\u043B-\u0432\u043E</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">\u0418\u0442\u043E\u0433\u043E</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3 w-16"></th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-8"></th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Код</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Описание</th>
+                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Ед.</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Цена/ед.</th>
+                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Кол-во</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                <span className="flex items-center justify-end gap-1"><Hammer size={12} className="text-blue-500" />Работа</span>
+                              </th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                <span className="flex items-center justify-end gap-1"><Package size={12} className="text-emerald-500" />Мат-лы</span>
+                              </th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                <span className="flex items-center justify-end gap-1"><Truck size={12} className="text-amber-500" />Мех.</span>
+                              </th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Итого</th>
+                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-10"></th>
                             </tr>
                           </thead>
                           <AnimatePresence mode="popLayout">
@@ -677,67 +1009,143 @@ export default function CostEstimatePage() {
                               animate="visible"
                             >
                               {costItems.map((item) => (
-                                <motion.tr
-                                  key={item.id}
-                                  variants={listItem}
-                                  initial="hidden"
-                                  animate="visible"
-                                  exit="exit"
-                                  layout
-                                  className="border-b border-border/50 hover:bg-muted transition-colors"
-                                >
-                                  <td className="px-4 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
-                                  <td className="px-4 py-3 text-sm text-foreground">{item.workItem.description}</td>
-                                  <td className="px-4 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
-                                  <td className="px-4 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center justify-center gap-1">
+                                <>
+                                  <motion.tr
+                                    key={item.id}
+                                    variants={listItem}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="exit"
+                                    layout
+                                    className="border-b border-border/50 hover:bg-muted transition-colors"
+                                  >
+                                    <td className="px-3 py-3">
+                                      {item.workItem.resources.length > 0 && (
+                                        <button
+                                          onClick={() => toggleExpanded(item.id)}
+                                          className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+                                        >
+                                          {item.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                        </button>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
+                                    <td className="px-3 py-3 text-sm text-foreground">{item.workItem.description}</td>
+                                    <td className="px-3 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
+                                    <td className="px-3 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
+                                    <td className="px-3 py-3">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          onClick={() => updateQuantity(item.id, -1)}
+                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                        >
+                                          <Minus size={14} />
+                                        </button>
+                                        <input
+                                          type="number"
+                                          value={item.quantity}
+                                          onChange={(e) => setQuantityDirect(item.id, parseFloat(e.target.value) || 0)}
+                                          className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
+                                        />
+                                        <button
+                                          onClick={() => updateQuantity(item.id, 1)}
+                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                        >
+                                          <Plus size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-sm text-blue-500 text-right">{item.labor > 0 ? formatCurrency(item.labor) : '—'}</td>
+                                    <td className="px-3 py-3 text-sm text-emerald-500 text-right">{item.materials > 0 ? formatCurrency(item.materials) : '—'}</td>
+                                    <td className="px-3 py-3 text-sm text-amber-500 text-right">{item.machines > 0 ? formatCurrency(item.machines) : '—'}</td>
+                                    <td className="px-3 py-3 text-sm font-medium text-foreground text-right">
+                                      {formatCurrency(item.total)}
+                                    </td>
+                                    <td className="px-3 py-3 text-right">
                                       <button
-                                        onClick={() => updateQuantity(item.id, -1)}
-                                        className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                        onClick={() => removeCostItem(item.id)}
+                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                       >
-                                        <Minus size={14} />
+                                        <Trash2 size={14} />
                                       </button>
-                                      <input
-                                        type="number"
-                                        value={item.quantity}
-                                        onChange={(e) => setQuantityDirect(item.id, parseInt(e.target.value) || 0)}
-                                        className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
-                                      />
-                                      <button
-                                        onClick={() => updateQuantity(item.id, 1)}
-                                        className="p-1 rounded hover:bg-muted text-muted-foreground"
-                                      >
-                                        <Plus size={14} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-sm font-medium text-foreground text-right">
-                                    {formatCurrency(item.total)}
-                                  </td>
-                                  <td className="px-4 py-3 text-right">
-                                    <button
-                                      onClick={() => removeCostItem(item.id)}
-                                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    </td>
+                                  </motion.tr>
+                                  {/* Expanded resource rows */}
+                                  {item.expanded && item.workItem.resources.length > 0 && (
+                                    <motion.tr
+                                      key={`${item.id}-resources`}
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: 'auto' }}
+                                      exit={{ opacity: 0, height: 0 }}
                                     >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </td>
-                                </motion.tr>
+                                      <td colSpan={11} className="px-3 py-0">
+                                        <div className="ml-8 my-2 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+                                          <table className="w-full">
+                                            <thead>
+                                              <tr className="border-b border-border/30">
+                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Код ресурса</th>
+                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Наименование</th>
+                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Тип</th>
+                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Ед.</th>
+                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Расход</th>
+                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Цена</th>
+                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Стоимость</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {item.workItem.resources.map((r, ri) => {
+                                                const scaledQty = r.quantity * item.quantity
+                                                const scaledCost = scaledQty * r.price_per_unit
+                                                const typeColor = (r.type === 'labor' || r.type === 'Labour') ? 'text-blue-500'
+                                                  : (r.type === 'material' || r.type === 'Materials') ? 'text-emerald-500'
+                                                  : 'text-amber-500'
+                                                const typeLabel = (r.type === 'labor' || r.type === 'Labour') ? 'Работа'
+                                                  : (r.type === 'material' || r.type === 'Materials') ? 'Материал'
+                                                  : 'Механизм'
+                                                return (
+                                                  <tr key={ri} className="border-b border-border/20 last:border-b-0">
+                                                    <td className="px-3 py-1.5 text-xs font-mono text-muted-foreground">{r.resource_code}</td>
+                                                    <td className="px-3 py-1.5 text-xs text-foreground">{r.name}</td>
+                                                    <td className={`px-3 py-1.5 text-xs font-medium ${typeColor}`}>{typeLabel}</td>
+                                                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.unit}</td>
+                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{scaledQty.toFixed(3)}</td>
+                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{formatCurrency(r.price_per_unit)}</td>
+                                                    <td className={`px-3 py-1.5 text-xs font-medium text-right ${typeColor}`}>{formatCurrency(scaledCost)}</td>
+                                                  </tr>
+                                                )
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </td>
+                                    </motion.tr>
+                                  )}
+                                </>
                               ))}
                             </motion.tbody>
                           </AnimatePresence>
+                          <tfoot>
+                            <tr className="border-t-2 border-border">
+                              <td colSpan={6} className="px-3 py-3 text-sm font-semibold text-foreground text-right">Итого:</td>
+                              <td className="px-3 py-3 text-sm font-bold text-blue-500 text-right">{formatCurrency(laborTotal)}</td>
+                              <td className="px-3 py-3 text-sm font-bold text-emerald-500 text-right">{formatCurrency(materialsTotal)}</td>
+                              <td className="px-3 py-3 text-sm font-bold text-amber-500 text-right">{formatCurrency(machinesTotal)}</td>
+                              <td className="px-3 py-3 text-lg font-bold text-foreground text-right">{formatCurrency(grandTotal)}</td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
                         </table>
                       </div>
 
-                      {/* Totals */}
+                      {/* Bottom summary */}
                       <div className="mt-4 pt-4 border-t-2 border-border">
                         <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-sm text-muted-foreground">{costItems.length} line items</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>{costItems.length} позиций</span>
+                            {laborHoursTotal > 0 && <span>Трудозатраты: {laborHoursTotal.toFixed(1)} ч</span>}
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">\u041E\u0431\u0449\u0438\u0439 \u0438\u0442\u043E\u0433</p>
+                            <p className="text-sm text-muted-foreground">Общий итог</p>
                             <motion.p
                               key={grandTotal}
                               initial={{ opacity: 0, scale: 0.85, y: 4 }}

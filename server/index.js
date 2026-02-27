@@ -3946,7 +3946,7 @@ app.post('/api/cwicr/search', async (req, res) => {
     const { query, language = 'EN', topK = 10 } = req.body
     if (!query) return res.status(400).json({ error: 'query is required' })
     const results = await cwicr.fullSearch(query, language, topK)
-    res.json(results)
+    res.json({ results })
   } catch (err) {
     console.error('[CWICR] search error:', err.message)
     res.status(500).json({ error: 'Search failed', message: err.message })
