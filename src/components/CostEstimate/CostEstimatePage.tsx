@@ -1039,13 +1039,15 @@ export default function CostEstimatePage() {
                                 <div className="flex-1" />
                                 <div className="flex items-center gap-4 text-right">
                                   <span className="text-xs text-muted-foreground">
-                                    Работа: <span className="font-medium text-blue-500">{formatCurrency(totals.labor)}</span>
+                                    Итого по работам: <span className="font-medium text-blue-500">{formatCurrency(totals.labor)} руб.</span>
                                   </span>
+                                  <span className="text-xs text-muted-foreground opacity-40">|</span>
                                   <span className="text-xs text-muted-foreground">
-                                    Мат-лы: <span className="font-medium text-emerald-500">{formatCurrency(totals.materials)}</span>
+                                    Итого по материалам: <span className="font-medium text-emerald-500">{formatCurrency(totals.materials)} руб.</span>
                                   </span>
+                                  <span className="text-xs text-muted-foreground opacity-40">|</span>
                                   <span className="text-sm font-bold text-foreground">
-                                    Итого: {formatCurrency(totals.total)}
+                                    Всего: {formatCurrency(totals.total)} руб.
                                   </span>
                                 </div>
                               </button>
