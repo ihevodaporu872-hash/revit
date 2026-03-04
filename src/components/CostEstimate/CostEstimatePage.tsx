@@ -23,6 +23,8 @@ import {
   Hammer,
   Package,
   Truck,
+  Wind,
+  ShieldAlert,
 } from 'lucide-react'
 import { VORExportButtons, EstimateExportButtons } from './VORExport'
 import VORValidation from './VORValidation'
@@ -74,6 +76,8 @@ interface WorkItem {
   resources: ResourceItem[]
 }
 
+type SystemType = 'general' | 'smoke'
+
 interface CostLineItem {
   id: string
   workItem: WorkItem
@@ -84,7 +88,13 @@ interface CostLineItem {
   machines: number
   laborHours: number
   expanded: boolean
+  systemType: SystemType
 }
+
+const SYSTEM_SECTIONS: { type: SystemType; label: string; icon: typeof Wind }[] = [
+  { type: 'general', label: 'Общеобменная система', icon: Wind },
+  { type: 'smoke', label: 'Противодымная вентиляция', icon: ShieldAlert },
+]
 
 interface ClassificationResult {
   elementName: string
@@ -186,6 +196,31 @@ export default function CostEstimatePage() {
   const laborHoursTotal = useMemo(() => costItems.reduce((sum, item) => sum + item.laborHours, 0), [costItems])
 
   const currentLang = LANGUAGES.find((l) => l.code === language)!
+
+  // Section collapse state
+  const [collapsedSections, setCollapsedSections] = useState<Record<SystemType, boolean>>({ general: false, smoke: false })
+
+  const toggleSection = (type: SystemType) => {
+    setCollapsedSections(prev => ({ ...prev, [type]: !prev[type] }))
+  }
+
+  const sectionTotals = useMemo(() => {
+    const result: Record<SystemType, { labor: number; materials: number; total: number }> = {
+      general: { labor: 0, materials: 0, total: 0 },
+      smoke: { labor: 0, materials: 0, total: 0 },
+    }
+    for (const item of costItems) {
+      const s = result[item.systemType]
+      s.labor += item.labor
+      s.materials += item.materials
+      s.total += item.total
+    }
+    return result
+  }, [costItems])
+
+  const changeSystemType = (itemId: string, newType: SystemType) => {
+    setCostItems(prev => prev.map(ci => ci.id === itemId ? { ...ci, systemType: newType } : ci))
+  }
 
   // Inline search for estimate tab
   const [estimateSearch, setEstimateSearch] = useState('')
@@ -382,6 +417,7 @@ export default function CostEstimatePage() {
           machines: workItem.machines,
           laborHours: workItem.laborHours,
           expanded: false,
+          systemType: 'general',
         },
       ])
     }
@@ -490,6 +526,7 @@ export default function CostEstimatePage() {
       machines: 0,
       laborHours: 0,
       expanded: false,
+      systemType: 'general',
     }))
     setCostItems((prev) => [...prev, ...newItems])
     addNotification('success', `Добавлено ${newItems.length} позиций в расчёт`)
@@ -960,7 +997,7 @@ export default function CostEstimatePage() {
                   </AnimatePresence>
                 </Card>
 
-                {/* Cost items table */}
+                {/* Cost items grouped by system */}
                 <Card
                   title="Расчёт сметы"
                   subtitle={`Позиции в расчёте: ${costItems.length}`}
@@ -979,162 +1016,234 @@ export default function CostEstimatePage() {
                     </motion.div>
                   ) : (
                     <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-border">
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-8"></th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Код</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Описание</th>
-                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Ед.</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Цена/ед.</th>
-                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Кол-во</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
-                                <span className="flex items-center justify-end gap-1"><Hammer size={12} className="text-blue-500" />Работа</span>
-                              </th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
-                                <span className="flex items-center justify-end gap-1"><Package size={12} className="text-emerald-500" />Мат-лы</span>
-                              </th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
-                                <span className="flex items-center justify-end gap-1"><Truck size={12} className="text-amber-500" />Мех.</span>
-                              </th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Итого</th>
-                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-10"></th>
-                            </tr>
-                          </thead>
-                          <AnimatePresence mode="popLayout">
-                            <motion.tbody
-                              variants={staggerContainer}
-                              initial="hidden"
-                              animate="visible"
-                            >
-                              {costItems.map((item) => (
-                                <>
-                                  <motion.tr
-                                    key={item.id}
-                                    variants={listItem}
-                                    initial="hidden"
-                                    animate="visible"
-                                    exit="exit"
-                                    layout
-                                    className="border-b border-border/50 hover:bg-muted transition-colors"
+                      <div className="space-y-4">
+                        {SYSTEM_SECTIONS.map((section) => {
+                          const sectionItems = costItems.filter(ci => ci.systemType === section.type)
+                          const totals = sectionTotals[section.type]
+                          const isCollapsed = collapsedSections[section.type]
+                          const SectionIcon = section.icon
+
+                          return (
+                            <div key={section.type} className="border border-border rounded-lg overflow-hidden">
+                              {/* Accordion Header */}
+                              <button
+                                onClick={() => toggleSection(section.type)}
+                                className="w-full flex items-center gap-3 px-4 py-3 bg-muted/50 hover:bg-muted transition-colors"
+                              >
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                  <SectionIcon size={18} className={section.type === 'general' ? 'text-blue-500' : 'text-orange-500'} />
+                                  <span className="font-semibold text-foreground">{section.label}</span>
+                                  <Badge variant="default">{sectionItems.length}</Badge>
+                                </div>
+                                <div className="flex-1" />
+                                <div className="flex items-center gap-4 text-right">
+                                  <span className="text-xs text-muted-foreground">
+                                    Работа: <span className="font-medium text-blue-500">{formatCurrency(totals.labor)}</span>
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Мат-лы: <span className="font-medium text-emerald-500">{formatCurrency(totals.materials)}</span>
+                                  </span>
+                                  <span className="text-sm font-bold text-foreground">
+                                    Итого: {formatCurrency(totals.total)}
+                                  </span>
+                                </div>
+                              </button>
+
+                              {/* Accordion Body */}
+                              <AnimatePresence initial={false}>
+                                {!isCollapsed && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
                                   >
-                                    <td className="px-3 py-3">
-                                      {item.workItem.resources.length > 0 && (
-                                        <button
-                                          onClick={() => toggleExpanded(item.id)}
-                                          className="p-0.5 rounded hover:bg-muted text-muted-foreground"
-                                        >
-                                          {item.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                        </button>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
-                                    <td className="px-3 py-3 text-sm text-foreground">{item.workItem.description}</td>
-                                    <td className="px-3 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
-                                    <td className="px-3 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
-                                    <td className="px-3 py-3">
-                                      <div className="flex items-center justify-center gap-1">
-                                        <button
-                                          onClick={() => updateQuantity(item.id, -1)}
-                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
-                                        >
-                                          <Minus size={14} />
-                                        </button>
-                                        <input
-                                          type="number"
-                                          value={item.quantity}
-                                          onChange={(e) => setQuantityDirect(item.id, parseFloat(e.target.value) || 0)}
-                                          className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
-                                        />
-                                        <button
-                                          onClick={() => updateQuantity(item.id, 1)}
-                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
-                                        >
-                                          <Plus size={14} />
-                                        </button>
+                                    {sectionItems.length === 0 ? (
+                                      <div className="text-center py-8 text-muted-foreground text-sm">
+                                        Нет позиций в этом разделе
                                       </div>
-                                    </td>
-                                    <td className="px-3 py-3 text-sm text-blue-500 text-right">{item.labor > 0 ? formatCurrency(item.labor) : '—'}</td>
-                                    <td className="px-3 py-3 text-sm text-emerald-500 text-right">{item.materials > 0 ? formatCurrency(item.materials) : '—'}</td>
-                                    <td className="px-3 py-3 text-sm text-amber-500 text-right">{item.machines > 0 ? formatCurrency(item.machines) : '—'}</td>
-                                    <td className="px-3 py-3 text-sm font-medium text-foreground text-right">
-                                      {formatCurrency(item.total)}
-                                    </td>
-                                    <td className="px-3 py-3 text-right">
-                                      <button
-                                        onClick={() => removeCostItem(item.id)}
-                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    </td>
-                                  </motion.tr>
-                                  {/* Expanded resource rows */}
-                                  {item.expanded && item.workItem.resources.length > 0 && (
-                                    <motion.tr
-                                      key={`${item.id}-resources`}
-                                      initial={{ opacity: 0, height: 0 }}
-                                      animate={{ opacity: 1, height: 'auto' }}
-                                      exit={{ opacity: 0, height: 0 }}
-                                    >
-                                      <td colSpan={11} className="px-3 py-0">
-                                        <div className="ml-8 my-2 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
-                                          <table className="w-full">
-                                            <thead>
-                                              <tr className="border-b border-border/30">
-                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Код ресурса</th>
-                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Наименование</th>
-                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Тип</th>
-                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Ед.</th>
-                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Расход</th>
-                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Цена</th>
-                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Стоимость</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {item.workItem.resources.map((r, ri) => {
-                                                const scaledQty = r.quantity * item.quantity
-                                                const scaledCost = scaledQty * r.price_per_unit
-                                                const typeColor = (r.type === 'labor' || r.type === 'Labour') ? 'text-blue-500'
-                                                  : (r.type === 'material' || r.type === 'Materials') ? 'text-emerald-500'
-                                                  : 'text-amber-500'
-                                                const typeLabel = (r.type === 'labor' || r.type === 'Labour') ? 'Работа'
-                                                  : (r.type === 'material' || r.type === 'Materials') ? 'Материал'
-                                                  : 'Механизм'
-                                                return (
-                                                  <tr key={ri} className="border-b border-border/20 last:border-b-0">
-                                                    <td className="px-3 py-1.5 text-xs font-mono text-muted-foreground">{r.resource_code}</td>
-                                                    <td className="px-3 py-1.5 text-xs text-foreground">{r.name}</td>
-                                                    <td className={`px-3 py-1.5 text-xs font-medium ${typeColor}`}>{typeLabel}</td>
-                                                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.unit}</td>
-                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{scaledQty.toFixed(3)}</td>
-                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{formatCurrency(r.price_per_unit)}</td>
-                                                    <td className={`px-3 py-1.5 text-xs font-medium text-right ${typeColor}`}>{formatCurrency(scaledCost)}</td>
-                                                  </tr>
-                                                )
-                                              })}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </td>
-                                    </motion.tr>
-                                  )}
-                                </>
-                              ))}
-                            </motion.tbody>
-                          </AnimatePresence>
-                          <tfoot>
-                            <tr className="border-t-2 border-border">
-                              <td colSpan={6} className="px-3 py-3 text-sm font-semibold text-foreground text-right">Итого:</td>
-                              <td className="px-3 py-3 text-sm font-bold text-blue-500 text-right">{formatCurrency(laborTotal)}</td>
-                              <td className="px-3 py-3 text-sm font-bold text-emerald-500 text-right">{formatCurrency(materialsTotal)}</td>
-                              <td className="px-3 py-3 text-sm font-bold text-amber-500 text-right">{formatCurrency(machinesTotal)}</td>
-                              <td className="px-3 py-3 text-lg font-bold text-foreground text-right">{formatCurrency(grandTotal)}</td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                                    ) : (
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                          <thead>
+                                            <tr className="border-b border-border">
+                                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-8"></th>
+                                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Код</th>
+                                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Описание</th>
+                                              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Ед.</th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Цена/ед.</th>
+                                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Кол-во</th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                                <span className="flex items-center justify-end gap-1"><Hammer size={12} className="text-blue-500" />Работа</span>
+                                              </th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                                <span className="flex items-center justify-end gap-1"><Package size={12} className="text-emerald-500" />Мат-лы</span>
+                                              </th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">
+                                                <span className="flex items-center justify-end gap-1"><Truck size={12} className="text-amber-500" />Мех.</span>
+                                              </th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3">Итого</th>
+                                              <th className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-20">Раздел</th>
+                                              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-3 w-10"></th>
+                                            </tr>
+                                          </thead>
+                                          <AnimatePresence mode="popLayout">
+                                            <motion.tbody
+                                              variants={staggerContainer}
+                                              initial="hidden"
+                                              animate="visible"
+                                            >
+                                              {sectionItems.map((item) => (
+                                                <>
+                                                  <motion.tr
+                                                    key={item.id}
+                                                    variants={listItem}
+                                                    initial="hidden"
+                                                    animate="visible"
+                                                    exit="exit"
+                                                    layout
+                                                    className="border-b border-border/50 hover:bg-muted transition-colors"
+                                                  >
+                                                    <td className="px-3 py-3">
+                                                      {item.workItem.resources.length > 0 && (
+                                                        <button
+                                                          onClick={() => toggleExpanded(item.id)}
+                                                          className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+                                                        >
+                                                          {item.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                        </button>
+                                                      )}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-sm font-mono text-primary">{item.workItem.code}</td>
+                                                    <td className="px-3 py-3 text-sm text-foreground">{item.workItem.description}</td>
+                                                    <td className="px-3 py-3"><Badge variant="default">{item.workItem.unit}</Badge></td>
+                                                    <td className="px-3 py-3 text-sm text-foreground text-right">{formatCurrency(item.workItem.unitPrice)}</td>
+                                                    <td className="px-3 py-3">
+                                                      <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                          onClick={() => updateQuantity(item.id, -1)}
+                                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                                        >
+                                                          <Minus size={14} />
+                                                        </button>
+                                                        <input
+                                                          type="number"
+                                                          value={item.quantity}
+                                                          onChange={(e) => setQuantityDirect(item.id, parseFloat(e.target.value) || 0)}
+                                                          className="w-16 text-center py-1 border border-border rounded text-sm bg-card text-foreground"
+                                                        />
+                                                        <button
+                                                          onClick={() => updateQuantity(item.id, 1)}
+                                                          className="p-1 rounded hover:bg-muted text-muted-foreground"
+                                                        >
+                                                          <Plus size={14} />
+                                                        </button>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-3 py-3 text-sm text-blue-500 text-right">{item.labor > 0 ? formatCurrency(item.labor) : '—'}</td>
+                                                    <td className="px-3 py-3 text-sm text-emerald-500 text-right">{item.materials > 0 ? formatCurrency(item.materials) : '—'}</td>
+                                                    <td className="px-3 py-3 text-sm text-amber-500 text-right">{item.machines > 0 ? formatCurrency(item.machines) : '—'}</td>
+                                                    <td className="px-3 py-3 text-sm font-medium text-foreground text-right">
+                                                      {formatCurrency(item.total)}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-center">
+                                                      <select
+                                                        value={item.systemType}
+                                                        onChange={(e) => changeSystemType(item.id, e.target.value as SystemType)}
+                                                        className="text-xs px-1.5 py-1 border border-border rounded bg-card text-foreground cursor-pointer"
+                                                      >
+                                                        {SYSTEM_SECTIONS.map(s => (
+                                                          <option key={s.type} value={s.type}>
+                                                            {s.type === 'general' ? 'ОВ' : 'ПД'}
+                                                          </option>
+                                                        ))}
+                                                      </select>
+                                                    </td>
+                                                    <td className="px-3 py-3 text-right">
+                                                      <button
+                                                        onClick={() => removeCostItem(item.id)}
+                                                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                                      >
+                                                        <Trash2 size={14} />
+                                                      </button>
+                                                    </td>
+                                                  </motion.tr>
+                                                  {/* Expanded resource rows */}
+                                                  {item.expanded && item.workItem.resources.length > 0 && (
+                                                    <motion.tr
+                                                      key={`${item.id}-resources`}
+                                                      initial={{ opacity: 0, height: 0 }}
+                                                      animate={{ opacity: 1, height: 'auto' }}
+                                                      exit={{ opacity: 0, height: 0 }}
+                                                    >
+                                                      <td colSpan={12} className="px-3 py-0">
+                                                        <div className="ml-8 my-2 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+                                                          <table className="w-full">
+                                                            <thead>
+                                                              <tr className="border-b border-border/30">
+                                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Код ресурса</th>
+                                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Наименование</th>
+                                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Тип</th>
+                                                                <th className="text-left text-xs text-muted-foreground px-3 py-1.5">Ед.</th>
+                                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Расход</th>
+                                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Цена</th>
+                                                                <th className="text-right text-xs text-muted-foreground px-3 py-1.5">Стоимость</th>
+                                                              </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                              {item.workItem.resources.map((r, ri) => {
+                                                                const scaledQty = r.quantity * item.quantity
+                                                                const scaledCost = scaledQty * r.price_per_unit
+                                                                const typeColor = (r.type === 'labor' || r.type === 'Labour') ? 'text-blue-500'
+                                                                  : (r.type === 'material' || r.type === 'Materials') ? 'text-emerald-500'
+                                                                  : 'text-amber-500'
+                                                                const typeLabel = (r.type === 'labor' || r.type === 'Labour') ? 'Работа'
+                                                                  : (r.type === 'material' || r.type === 'Materials') ? 'Материал'
+                                                                  : 'Механизм'
+                                                                return (
+                                                                  <tr key={ri} className="border-b border-border/20 last:border-b-0">
+                                                                    <td className="px-3 py-1.5 text-xs font-mono text-muted-foreground">{r.resource_code}</td>
+                                                                    <td className="px-3 py-1.5 text-xs text-foreground">{r.name}</td>
+                                                                    <td className={`px-3 py-1.5 text-xs font-medium ${typeColor}`}>{typeLabel}</td>
+                                                                    <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.unit}</td>
+                                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{scaledQty.toFixed(3)}</td>
+                                                                    <td className="px-3 py-1.5 text-xs text-foreground text-right">{formatCurrency(r.price_per_unit)}</td>
+                                                                    <td className={`px-3 py-1.5 text-xs font-medium text-right ${typeColor}`}>{formatCurrency(scaledCost)}</td>
+                                                                  </tr>
+                                                                )
+                                                              })}
+                                                            </tbody>
+                                                          </table>
+                                                        </div>
+                                                      </td>
+                                                    </motion.tr>
+                                                  )}
+                                                </>
+                                              ))}
+                                            </motion.tbody>
+                                          </AnimatePresence>
+                                          <tfoot>
+                                            <tr className="border-t-2 border-border bg-muted/30">
+                                              <td colSpan={6} className="px-3 py-2.5 text-xs font-semibold text-muted-foreground text-right">Итого по разделу:</td>
+                                              <td className="px-3 py-2.5 text-xs font-bold text-blue-500 text-right">{formatCurrency(totals.labor)}</td>
+                                              <td className="px-3 py-2.5 text-xs font-bold text-emerald-500 text-right">{formatCurrency(totals.materials)}</td>
+                                              <td className="px-3 py-2.5 text-xs font-bold text-amber-500 text-right">
+                                                {formatCurrency(totals.total - totals.labor - totals.materials)}
+                                              </td>
+                                              <td className="px-3 py-2.5 text-sm font-bold text-foreground text-right">{formatCurrency(totals.total)}</td>
+                                              <td colSpan={2}></td>
+                                            </tr>
+                                          </tfoot>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )
+                        })}
                       </div>
 
                       {/* Bottom summary */}
